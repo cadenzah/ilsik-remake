@@ -3,7 +3,25 @@
 export interface UnitType {
   id: number; name: string; por: number; cls: number
   lv: number; hp: number; mp: number; atk: number; def: number; mov: number
+  equip: [number, number, number]   // 무기·방어구·도구 Item id, 0 = 없음
+  canMagic: number; magic: number[] // Magic id
 }
+
+/** ECLIPSE.EAD. cat 0 무기 / 1 방어구 / 2 도구. stat·stat2 = [능력치 번호, 보정량] (formats.md) */
+export interface Item {
+  id: number; cat: number; sub: number; name: string
+  f1: number; f2: number; f3: number
+  stat: [number, number]; stat2: [number, number]
+}
+
+/** ECLIPSE.MAD. effect 7 = 공격, 0 = 회복 (formats.md) */
+export interface Magic {
+  id: number; school: number; name: string
+  range: number; area: number; effect: number; power: number; mp: number
+}
+
+/** 게임 데이터 표. items·magic 은 id 로 바로 찾도록 Map */
+export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic> }
 
 export interface StageMap {
   w: number; h: number; atlasCols: number
@@ -30,7 +48,12 @@ async function json<T>(src: string): Promise<T> {
   return r.json()
 }
 
-export const loadUnitTypes = () => json<UnitType[]>(`${A}/data/units.json`)
+export async function loadTables(): Promise<Tables> {
+  const [types, items, magic] = await Promise.all([
+    json<UnitType[]>(`${A}/data/units.json`), json<Item[]>(`${A}/data/items.json`), json<Magic[]>(`${A}/data/magic.json`),
+  ])
+  return { types, items: new Map(items.map(i => [i.id, i])), magic: new Map(magic.map(m => [m.id, m])) }
+}
 export const loadDialogue = () => json<string[]>(`${A}/data/dialogue.json`)
 
 export async function loadStage(n: number) {

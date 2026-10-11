@@ -37,6 +37,8 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 .bar > i { display: block; height: 100%; background: var(--hp); }
 .stats { display: flex; gap: 10px; font-size: 13px; color: var(--dim); margin-top: 4px; }
 .stats b { color: var(--text); }
+.loadout { font-size: 12px; color: var(--text); margin-top: 3px; }
+.loadout span { color: var(--dim); }
 #card .terrain { grid-column: 1 / -1; font-size: 12px; color: var(--dim); border-top: 1px solid var(--line); padding-top: 6px; }
 
 #forecast { position: fixed; padding: 8px 10px; background: var(--panel); border: 1px solid var(--enemy);

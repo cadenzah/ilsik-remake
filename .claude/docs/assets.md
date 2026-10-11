@@ -25,5 +25,7 @@
 - `stages/NN.png` 타일 아틀라스 (11열, 56×48), `stages/NN.json` {w,h,tiles,layer2,layer3,atlasCols}
 - `units/III.png` 이동 13프레임 가로띠 (56×48, 투명 처리) — 유닛 0~103
 - `portraits/NNN.png` 초상화 96×111
-- `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치
+- `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)
+- `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
+- 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`
 - 효과음: build/snd/ (아직 웹으로 안 옮김)

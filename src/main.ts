@@ -1,4 +1,4 @@
-import { loadDialogue, loadStage, loadUnitSprite, loadUnitTypes, TH, TW, type StageMap, type UnitType } from './data'
+import { loadDialogue, loadStage, loadTables, loadUnitSprite, TH, TW, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
 import { attackSpots, dist, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
@@ -23,6 +23,7 @@ const S = {
   map: null as unknown as StageMap,
   atlas: null as unknown as HTMLImageElement,
   types: [] as UnitType[],
+  tables: null as unknown as Tables,
   dialogue: [] as string[],
   sprites: new Map<number, HTMLImageElement>(),
   units: [] as Unit[],
@@ -47,8 +48,9 @@ function spawn(p: Placement, side: Unit['side']): Unit {
 }
 
 async function boot() {
-  const [types, dialogue, stage] = await Promise.all([loadUnitTypes(), loadDialogue(), loadStage(S.def.n)])
-  S.types = types
+  const [tables, dialogue, stage] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n)])
+  S.tables = tables
+  S.types = tables.types
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas
@@ -417,7 +419,7 @@ function onHover(t: Pos | null, sx: number, sy: number) {
   S.hover = t
   if (!t) { showCard(null, null); showForecast(null, null); return }
   const there = unitAt(t.x, t.y)
-  showCard(there ?? null, terrainName(S.map, t.x, t.y))
+  showCard(there ?? null, terrainName(S.map, t.x, t.y), S.tables)
   const md = S.mode
   if (there?.side === 'enemy' && md.kind === 'selected' && attackSpots(md.unit, md.moves, there).length)
     showForecast(md.unit, there, sx, sy)

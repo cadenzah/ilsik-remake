@@ -3,7 +3,7 @@
 import json, os, struct, sys
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__))
-import stage, units
+import stage, units, tables
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 IMG = os.path.join(ROOT, 'build', 'img')
@@ -70,11 +70,22 @@ def export_data():
         lines.append(fnt[p + 2:p + 2 + n].decode('cp949', 'replace'))
         p += 2 + n
     json.dump(lines, open(os.path.join(d, 'dialogue.json'), 'w'), ensure_ascii=False, indent=0)
-    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'mp', 'atk', 'mov')} | {'def': u['def_']}
+    # equip = [무기, 방어구, 도구] EAD id (0 = 없음), magic = MAD id 목록
+    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'mp', 'atk', 'mov', 'magic')}
+          | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'canMagic': u['can_magic']}
           for u in units.load()]
     json.dump(us, open(os.path.join(d, 'units.json'), 'w'), ensure_ascii=False, indent=0)
+    json.dump(tables.load_magic(), open(os.path.join(d, 'magic.json'), 'w'), ensure_ascii=False, indent=0)
+    # stat/sub = [능력치 번호, 보정량], 번호 의미는 formats.md
+    items = [{k: it[k] for k in ('id', 'cat', 'sub', 'name', 'f1', 'f2', 'f3')}
+             | {'stat': [it['kind'], it['value']], 'stat2': [it['x1'], it['x2']]}
+             for it in tables.load_items()]
+    json.dump(items, open(os.path.join(d, 'items.json'), 'w'), ensure_ascii=False, indent=0)
 
 
 if __name__ == '__main__':
-    export_stages(); export_units(); export_portraits(); export_data()
+    if sys.argv[1:] == ['data']:
+        export_data()
+    else:
+        export_stages(); export_units(); export_portraits(); export_data()
     print('ok')
