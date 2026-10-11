@@ -3,6 +3,8 @@
 import os, struct, sys
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 SCHOOLS = ['빛', '어둠', '바람', '물', '불', '땅', '소환', '노래', '기원']
+# 장비 (kind,value)·(x1,x2) 의 능력치 번호. 이름 기준 추정, 5·6·8~12 미상
+STATS = {1: 'HP', 2: 'MP', 3: '공격', 4: '방어', 7: '민첩'}
 
 
 def _read(name):

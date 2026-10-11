@@ -25,8 +25,8 @@
 
 ### 3단계 — 데이터 표 분석 (현재)
 - [x] D1 `ECLIPSE.MAD` 마법 74종 필드 (`tools/tables.py`)
-- [~] D2 `ECLIPSE.EAD` 장비·도구 182종 필드 — 구조·분류 확정, kind/x1/x2 의미 남음 (formats.md)
-- [ ] D3 `ECLIPSE1/2.PAD` 유닛 표 나머지 필드 (마법 목록, 장비, 종족·직업), PAD 1과 2의 차이
+- [x] D2 `ECLIPSE.EAD` 장비·도구 182종 필드 (능력치 번호 5·6·8~12 는 E 단계에서)
+- [x] D3 `ECLIPSE1/2.PAD` 장비·마법 목록 확정, PAD1/2 = 1부/2부 추정 (+54~60 미분석)
 - [ ] D4 결과를 public/assets/data/*.json 으로 내보내기, formats.md 갱신
 
 ### 4단계 — EXE 역분석: 스토리 데이터

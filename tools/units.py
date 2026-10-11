@@ -12,6 +12,11 @@ def load(path='ECLIPSE1.PAD'):
         b = 8 + i * R
         u = {k: struct.unpack_from('<H', d, b + o)[0] for k, o in F.items()}
         u['name'] = d[b:b + 10].decode('cp949', 'replace').strip()
+        g = lambda o: struct.unpack_from('<H', d, b + o)[0]
+        # 장비 슬롯 3개 = (EAD 세부 종류, EAD id), id 0 = 없음
+        u['equip'] = [(g(o), g(o + 2)) for o in (78, 82, 86)]
+        u['can_magic'] = g(90)
+        u['magic'] = [g(94 + 2 * k) for k in range(g(92))]  # MAD id, 최대 8
         u['raw'] = d[b + 10:b + R - 6]
         out.append(u)
     return out
@@ -19,4 +24,4 @@ def load(path='ECLIPSE1.PAD'):
 
 if __name__ == '__main__':
     for u in load(*sys.argv[1:]):
-        print(f"{u['id']:3d} {u['name']:6s} por{u['por']:3d} cls{u['cls']:3d} lv{u['lv']:3d} hp{u['hp']:4d} mp{u['mp']:4d} x{u['x34']:3d} atk{u['atk']:3d} def{u['def_']:3d} mov{u['mov']:2d}")
+        print(f"{u['id']:3d} {u['name']:6s} por{u['por']:3d} cls{u['cls']:3d} lv{u['lv']:3d} hp{u['hp']:4d} mp{u['mp']:4d} x{u['x34']:3d} atk{u['atk']:3d} def{u['def_']:3d} mov{u['mov']:2d} eq{[e[1] for e in u['equip']]} mag{u['magic']}")

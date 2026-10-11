@@ -1,9 +1,5 @@
 # 현재 상태 (덮어쓰기로 갱신)
-
-단계: 3단계 데이터 표 분석 (방향 = 절충안, plan.md 참고)
-완료: D1 마법 표. D2 장비 표는 구조·분류 확정 (`tools/tables.py`)
-다음: D2 마무리 (kind/x1/x2 의미) → D3 유닛 표 PAD 나머지 필드 (레코드 118B 중 +52 이후 미분석: 마법 목록·장비·종족 추정) → D4 json 내보내기
-  - PAD 레코드 중 리사(id2) +78 부근 `03 00 18 00 19 00 1a 00` = 마법 개수 3 + 마법 id 24,25,26 로 보임 → MAD id 와 대조
-  - PAD 1과 2 차이 비교 필요 (난이도 또는 1부/2부)
-그 다음: 4단계 EXE 역분석 (Ghidra) → 5단계 스토리 분석·개선 제안 (사용자 요청, plan.md S1·S2)
-실행: `npm run dev` (포트 5173). 개발 모드 window.__game 으로 상태 접근
+단계: 3단계 데이터 표 분석. D1~D3 완료 (마법·장비·유닛 장비/마법 목록, formats.md)
+다음: D4 `tools/export_web.py` 에서 magic.json·items.json 출력, units.json 에 equip·magic·can_magic 추가 → 게임 쪽에서 사용
+그 다음: 4단계 EXE 역분석 (Ghidra, 배치·대화 트리거·능력치 번호 5~12 확정) → 5단계 스토리 분석 (plan.md S1·S2)
+실행: `npm run dev` (포트 5173). 개발 모드 window.__game 으로 상태 접근. git 기본 브랜치 main
