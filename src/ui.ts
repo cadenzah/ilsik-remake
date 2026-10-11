@@ -69,14 +69,15 @@ export function toast(text: string, cls: string, ms = 900): Promise<void> {
 }
 
 /** 대화 재생. 클릭/Space/Enter 로 진행, Esc 로 전부 건너뛰기. */
-export function playDialogue(lines: { who: UnitType; text: string }[]): Promise<void> {
+export function playDialogue(lines: { who?: UnitType; text: string }[]): Promise<void> {
   return new Promise(done => {
     let i = 0
     const show = () => {
       if (i >= lines.length) { finish(); return }
       const l = lines[i]
-      ui.dlgPortrait.src = portraitUrl(l.who.por)
-      ui.dlgName.textContent = l.who.name
+      ui.dlgPortrait.hidden = !l.who
+      if (l.who) ui.dlgPortrait.src = portraitUrl(l.who.por)
+      ui.dlgName.textContent = l.who?.name ?? ''
       ui.dlgText.textContent = l.text
     }
     const next = () => { i++; show() }

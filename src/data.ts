@@ -68,6 +68,20 @@ export interface BattleRecord {
 export interface Battles { route: number[][]; records: Record<string, BattleRecord> }
 export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
 
+/** 원작 대화 장면과 전투 전후 흐름 (tools/script.py, EXE 하드코딩에서 추출).
+ *  장면 키 "phase:scene" — phase 0 전투 시작, 1 전투 중 트리거, 2 전투 후. scene = 스테이지 번호 또는 스테이지*10+k */
+export type SceneLine = [who: number, line: number, branch: number]  // who -1 = 초상화 없음, branch 0 항상 / 1 선택 '예' / 2 '아니오'
+export type PostStep = { join: number } | { count: number } | { set: [number, number] } | { scene: string }
+export interface Scenes {
+  scenes: Record<string, SceneLine[]>
+  pre: Record<string, string[]>        // 스테이지 → 전투 시작 장면들
+  post: Record<string, PostStep[]>     // 스테이지 → 승리 후 합류·장면 (순서대로)
+  trigger: string[]
+  party: number[]                      // 초기 일행
+  routeSelectAfter: number
+}
+export const loadScenes = () => json<Scenes>(`${A}/data/scenes.json`)
+
 export async function loadStage(n: number) {
   const id = String(n).padStart(2, '0')
   const [map, atlas] = await Promise.all([json<StageMap>(`${A}/stages/${id}.json`), loadImage(`${A}/stages/${id}.png`)])

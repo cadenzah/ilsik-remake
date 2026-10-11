@@ -3,7 +3,7 @@
 import json, os, struct, sys
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__))
-import stage, units, tables, bad
+import stage, units, tables, bad, script
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 IMG = os.path.join(ROOT, 'build', 'img')
@@ -82,6 +82,8 @@ def export_data():
              for it in tables.load_items()]
     json.dump(items, open(os.path.join(d, 'items.json'), 'w'), ensure_ascii=False, indent=0)
     export_battles(d)
+    # 대화 장면·전투 전후 흐름 (tools/script.py). scenes["phase:scene"] = [[인물, 줄, 분기]], 인물 -1 = 초상화 없음
+    json.dump(script.export(), open(os.path.join(d, 'scenes.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
 
 
 def export_battles(d):

@@ -1,4 +1,4 @@
-import { loadBattles, loadDialogue, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type StageMap, type Tables, type UnitType } from './data'
+import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type Scenes, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
 import { attackSpots, dist, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
@@ -27,6 +27,7 @@ const S = {
   types: [] as UnitType[],
   tables: null as unknown as Tables,
   dialogue: [] as string[],
+  scenes: null as unknown as Scenes,
   sprites: new Map<number, HTMLImageElement>(),
   units: [] as Unit[],
   turn: 1,
@@ -56,7 +57,7 @@ function weaponRange(t: UnitType): [number, number] {
 }
 
 function placements(rec: BattleRecord) {
-  const allies: Placement[] = S.def.party.slice(0, rec.slots.length)
+  const allies: Placement[] = S.scenes.party.slice(0, rec.slots.length)
     .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], awake: true }))
   for (const n of rec.npc) allies.push({ type: n.type, x: n.at[0], y: n.at[1], awake: true })
   const enemies: Placement[] = rec.groups.flatMap(g =>
@@ -65,8 +66,9 @@ function placements(rec: BattleRecord) {
 }
 
 async function boot() {
-  const [tables, dialogue, stage, battles] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n), loadBattles()])
+  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n), loadBattles(), loadScenes()])
   S.tables = tables
+  S.scenes = scenes
   Object.assign(S, placements(battles.records[`${S.def.n}-${S.def.route}`]))
   S.types = tables.types
   S.dialogue = dialogue
@@ -86,8 +88,23 @@ async function start() {
   S.turn = 1
   S.mode = { kind: 'busy' }
   centerOn(S.units[0])
-  await playDialogue(S.def.intro.map(l => ({ who: S.types[l.who], text: S.dialogue[l.line] })))
+  await playDialogue(sceneLines(S.scenes.pre[S.def.n] ?? []))
   await beginPlayerTurn()
+}
+
+// ---------- 원작 대화 ----------
+
+// 선택지 분기는 아직 UI 가 없어 '예'(1) 쪽을 재생한다
+function sceneLines(keys: string[]) {
+  return keys.flatMap(k => S.scenes.scenes[k] ?? []).filter(([, , br]) => br !== 2)
+    .map(([who, line]) => ({ who: who >= 0 ? S.types[who] : undefined, text: S.dialogue[line] }))
+}
+
+// 승리 후 장면. 원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에 보여 준다
+function postLines(stage: number) {
+  const steps = S.scenes.post[stage] ?? []
+  return [...sceneLines(steps.flatMap(s => 'scene' in s ? [s.scene] : [])),
+    ...steps.flatMap(s => 'join' in s ? [{ text: `${S.types[s.join].name}이(가) 일행에 합류했다.` }] : [])]
 }
 
 // ---------- 카메라 ----------
@@ -311,7 +328,7 @@ async function checkEnd(): Promise<boolean> {
   if (!alive('enemy').length) {
     S.mode = { kind: 'busy' }
     await sleep(400)
-    await playDialogue(S.def.outro.map(l => ({ who: S.types[l.who], text: S.dialogue[l.line] })))
+    await playDialogue(postLines(S.def.n))
     showResult('승리', `${S.turn}턴 만에 ${S.def.title} 클리어 — 시험판은 여기까지입니다.`, () => void start())
     return true
   }

@@ -61,3 +61,17 @@ if __name__ == '__main__' and sys.argv[1] == 'fn':
     s, o = (int(x, 16) for x in sys.argv[2].split(':'))
     st = func_start(s, o)
     print('\n'.join(dis(s, st, int(sys.argv[3]) if len(sys.argv) > 3 else 80)))
+
+def refs(val):
+    """즉치값/주소로 val(u16) 을 쓰는 명령 위치 목록 (분기 제외)."""
+    h = f'0x{val:x}'
+    for s in SEGS:
+        for ins in sweep(s):
+            if ins.mnemonic.startswith('j') or ins.mnemonic in ('call', 'loop'): continue
+            ops = ins.op_str.replace('[', ' ').replace(']', ' ').replace(',', ' ').split()
+            if h in ops: yield s, ins
+
+if __name__ == '__main__' and sys.argv[1] == 'refs':
+    for v in sys.argv[2:]:
+        for s, ins in refs(int(v, 16)):
+            print(f'{s:04x}:{ins.address:04x}  {ins.mnemonic} {ins.op_str}')
