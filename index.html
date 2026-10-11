@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>일식 (Eclipse) Web</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <header id="topbar">
+    <div id="title"></div>
+    <div id="phase"></div>
+    <div class="spacer"></div>
+    <button id="btn-threat" title="적이 닿을 수 있는 범위 표시 (T)">위협 범위 <kbd>T</kbd></button>
+    <button id="btn-end" title="아군 턴 종료 (E)">턴 종료 <kbd>E</kbd></button>
+  </header>
+  <aside id="card" hidden></aside>
+  <div id="forecast" hidden></div>
+  <div id="menu" hidden></div>
+  <div id="toast" hidden></div>
+  <section id="dialogue" hidden>
+    <img id="dlg-portrait" alt="" />
+    <div id="dlg-body">
+      <div id="dlg-name"></div>
+      <div id="dlg-text"></div>
+      <div id="dlg-hint">클릭 / Space 다음 · Esc 건너뛰기</div>
+    </div>
+  </section>
+  <section id="result" hidden></section>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

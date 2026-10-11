@@ -1,6 +1,7 @@
 # 현재 상태 (덮어쓰기로 갱신)
 
-단계: 2일차 웹 시험판
-완료: 1일차 전부 (이미지·맵·유닛표·대사·효과음 추출, 웹 자원 내보내기)
-다음: T6 Vite+TS 골격
-재생성: `.venv/bin/python -I tools/extract_all.py && .venv/bin/python -I tools/voc.py && .venv/bin/python -I tools/export_web.py`
+단계: 시험판 완료, 사용자 검토 대기 → 다음 방향(충실 재현 vs 재해석) 결정 필요
+완료: 1장 페얼촌 플레이 가능 (이동·공격·적AI·대화·승패). 자동 플레이로 승리/패배 둘 다 검증
+다음 후보: Ghidra 설치 후 ECP.EXE 에서 스테이지 배치·대화 화자·전투 공식 역분석
+실행: `npm run dev` (포트 5173, .claude/launch.json 이름 "dev"). 개발 모드에서 window.__game 으로 상태 접근
+자동 플레이 검증: 포인터 이벤트를 캔버스에 보내는 방식 (스크린샷 좌표는 CSS 좌표의 약 1.04배)
