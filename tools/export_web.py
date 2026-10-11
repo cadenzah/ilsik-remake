@@ -1,0 +1,80 @@
+"""build/ 추출물과 original/ 데이터에서 웹용 자원을 public/assets/ 로 만든다.
+선행: tools/extract_all.py. 출력 구조는 .claude/docs/assets.md 의 '웹 자원' 절 참고."""
+import json, os, struct, sys
+from PIL import Image
+sys.path.insert(0, os.path.dirname(__file__))
+import stage, units
+
+ROOT = os.path.join(os.path.dirname(__file__), '..')
+IMG = os.path.join(ROOT, 'build', 'img')
+OUT = os.path.join(ROOT, 'public', 'assets')
+TRANSPARENT = 255
+TW, TH = 56, 48
+
+
+def rgba(path):
+    """팔레트 255번을 투명으로."""
+    im = Image.open(path)
+    a = im.point(lambda i: 0 if i == TRANSPARENT else 255, 'L')
+    im = im.convert('RGBA')
+    im.putalpha(a)
+    return im
+
+
+def mkdir(*p):
+    d = os.path.join(OUT, *p)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def export_stages():
+    d = mkdir('stages')
+    for n in range(1, 44):
+        s = stage.load(n)
+        tiles = stage.tile_images(n)
+        cols = 11
+        atlas = Image.new('RGB', (cols * TW, ((len(tiles) + cols - 1) // cols) * TH))
+        for i, t in enumerate(tiles):
+            atlas.paste(t, ((i % cols) * TW, (i // cols) * TH))
+        atlas.save(os.path.join(d, f'{n:02d}.png'))
+        json.dump({k: s[k] for k in ('w', 'h', 'tiles', 'layer2', 'layer3')} | {'atlasCols': cols},
+                  open(os.path.join(d, f'{n:02d}.json'), 'w'), separators=(',', ':'))
+
+
+def export_units():
+    """유닛 i 의 이동 프레임 13장을 가로 한 줄(56×48 × 13)로."""
+    d = mkdir('units')
+    for i in range(104):
+        src = os.path.join(IMG, f'ECP{i // 10:02d}.MOV', f'{i % 10:03d}.png')
+        im = rgba(src)
+        strip = Image.new('RGBA', (13 * TW, TH))
+        for f in range(13):
+            r, c = divmod(f, 9)
+            x, y = 1 + c * (TW + 1), 1 + r * (TH + 1)
+            strip.paste(im.crop((x, y, x + TW, y + TH)), (f * TW, 0))
+        strip.save(os.path.join(d, f'{i:03d}.png'))
+
+
+def export_portraits():
+    d = mkdir('portraits')
+    for f in sorted(os.listdir(os.path.join(IMG, 'ECLIPSE.POR'))):
+        Image.open(os.path.join(IMG, 'ECLIPSE.POR', f)).convert('RGB').save(os.path.join(d, f))
+
+
+def export_data():
+    d = mkdir('data')
+    fnt = open(os.path.join(ROOT, 'original', 'ECLIPSE.FNT'), 'rb').read()
+    lines, p = [], 0
+    while p + 2 <= len(fnt):
+        n = struct.unpack_from('<H', fnt, p)[0]
+        lines.append(fnt[p + 2:p + 2 + n].decode('cp949', 'replace'))
+        p += 2 + n
+    json.dump(lines, open(os.path.join(d, 'dialogue.json'), 'w'), ensure_ascii=False, indent=0)
+    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'mp', 'atk', 'mov')} | {'def': u['def_']}
+          for u in units.load()]
+    json.dump(us, open(os.path.join(d, 'units.json'), 'w'), ensure_ascii=False, indent=0)
+
+
+if __name__ == '__main__':
+    export_stages(); export_units(); export_portraits(); export_data()
+    print('ok')

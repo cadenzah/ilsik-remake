@@ -5,12 +5,12 @@
 ## 1~2일차: 시험판 (현재)
 
 ### 1일차 — 자원 추출
-- [ ] T1 FRT 이미지 컨테이너 → PNG 일괄 추출 (`tools/frt.py`, `tools/extract_all.py`), `build/catalog.json` 생성
-- [ ] T2 각 파일의 용도 판별 → `docs/assets.md` (몽타주로 확인)
-- [ ] T3 대사 텍스트 추출 (`ECLIPSE.FNT`, CP949) → `build/text/*.json`
-- [ ] T4 음성·효과음 추출 (`*.FVT` = Creative Voice) → WAV
-- [ ] T5 1스테이지 데이터 탐색: 맵 배경(`ECP01.ECP`), 격자 크기, 지형/통행 정보, 유닛 스프라이트, 초기 배치 위치 → `docs/formats.md`
-      (지형·배치 데이터 위치 미확인. 후보: `ECLIPSE.LML`, `*.PAD`, `ECLIPSE.BAD/EAD/MAD`, EXE 내부 테이블)
+- [x] T1 FRT 이미지 컨테이너 → PNG 일괄 추출 (`tools/frt.py`, `tools/extract_all.py`), `build/catalog.json` 생성
+- [x] T2 각 파일의 용도 판별 → `docs/assets.md` (몽타주로 확인)
+- [x] T3 대사 텍스트 추출 (`ECLIPSE.FNT`, CP949) → `build/text/*.json`
+- [x] T4 음성·효과음 추출 (`*.FVT` = Creative Voice) → WAV
+- [x] T5 1스테이지 데이터 탐색: 맵 배경(`ECP01.ECP`), 격자 크기, 지형/통행 정보, 유닛 스프라이트, 초기 배치 위치 → `docs/formats.md`
+      → 맵·지형은 확정. 초기 배치·이벤트는 EXE 하드코딩으로 추정, 시험판은 근사 배치 사용
 
 ### 2일차 — 웹 시험판
 - [ ] T6 Vite + TS 프로젝트 골격, 추출 자원을 `public/assets/` 로 복사하는 스크립트

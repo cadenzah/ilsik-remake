@@ -10,13 +10,20 @@
 - `ECLIPSE.UND` / `ECLIPSE1.UND` / `ECLIPSE2.UND` 1240 / 808 / 505 × 640×480 — 첫 항목들이 ECP01.ECP와 동일. 용도 미확인
 - `ECLIPSE.POR` 111 × 96×111 — 인물 초상화 (확인)
 - `ECLIPSE.MAG` 11 × 640×480 — 마법 이펙트 스프라이트 시트 (확인)
-- `ECLIPSE.SHA` 104 × 56×48 — 유닛 스프라이트 추정
+- `ECLIPSE.SHA` 104 × 56×48 — 유닛 정지 아이콘 (확인)
 - `ECLIPSE.EQU` 182 × 48×56 — 장비 아이콘 추정
 - `ECLIPSE.INS` 57 × 48×48 — 도구 아이콘 추정
 - `ECPMAG.MRK` 92 × 32×40 — 마법 아이콘 추정
 - `ECLIPSE.SCR` 87 × 가변×22 — UI 글자/버튼 이미지 추정
 - `ECLIPSE.STA` 17, `ECLIPSE.OTH` 9, `ECLIPSE.MAR` 11 — UI 부품 추정
 - `ECLIPSE.WIN` 3, `ECLIPSE.BS` 3, `ECLIPSE.780` 14 × 640×480 — 화면 배경 추정
-- `ECPnn.FIG/MAG/MOV` (00~10) 10 × 5xx×7x~9x — 캐릭터 직업별 전투 애니메이션 띠 추정
+- `ECPnn.MOV/FIG/MAG` (00~10) — 유닛 종류별 이동/공격/마법 애니메이션 (확인, formats.md)
 - `ECLIPSE1/2.SLI` 5 × 568×99 — 슬라이드/컷인 추정
 - `ECPFINAL.ECP` 28 × 62×64, `ECPMARK.MAR` 2 × 640×480
+
+## 웹 자원 (`tools/export_web.py` → public/assets/, gitignore)
+- `stages/NN.png` 타일 아틀라스 (11열, 56×48), `stages/NN.json` {w,h,tiles,layer2,layer3,atlasCols}
+- `units/III.png` 이동 13프레임 가로띠 (56×48, 투명 처리) — 유닛 0~103
+- `portraits/NNN.png` 초상화 96×111
+- `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치
+- 효과음: build/snd/ (아직 웹으로 안 옮김)
