@@ -1,5 +1,5 @@
 # 현재 상태 (덮어쓰기로 갱신)
-단계: 3단계 완료. D4 로 units/items/magic.json 출력, 게임은 loadTables() 로 읽어 유닛 카드에 장비·마법 표시 (전투 수치엔 미반영 — 6단계)
-다음: 4단계 E1 Ghidra 설치·ECP.EXE 로드 → E2 배치(TroopsData)·능력치 번호 5~12 확정
-그 다음: E3~E4 대화 트리거·승패 조건 → 5단계 스토리 분석 (plan.md S1·S2)
-실행: `npm run dev` (포트 5173). 개발 모드 window.__game.S (S.tables 포함). git 기본 브랜치 main
+단계: 4단계 E1·E2 완료. 배치는 ECLIPSE.BAD (레코드=(장-1)*3+루트), 전투 순서표 EXE DS:0x204a (29전×3루트) → public/assets/data/battles.json, 1장이 원작 배치 사용
+다음: E3 대화 순서·화자·트리거 (FNT 인덱스를 쓰는 코드 찾기: 2ff8:0068 캠페인 루프 주변, tools/exe.py fn) — 초기 일행·루트 결정 조건도 같이
+그 다음: E4 승패 조건, 능력치 번호 5~12 → 5단계 스토리 분석 (plan.md S1·S2)
+실행: `npm run dev` (포트 5173). 개발 모드 window.__game.S. 데이터 재생성 `.venv/bin/python tools/export_web.py data`

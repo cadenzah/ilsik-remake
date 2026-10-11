@@ -4,6 +4,7 @@
 
 - `ECPnn.ECP` (01~43) 2~3 × 640×480 — 스테이지 타일셋 + 마지막은 미니맵 (확인)
 - `ECLIPSE.LML` — 43개 스테이지 맵 배치 (확인)
+- `ECLIPSE.BAD` — 스테이지별 출전 칸·적·NPC 배치, 보물·보상 (확인, formats.md)
 - `ECLIPSE.FNT` — 대사 440줄 (확인)
 - `ECLIPSE1/2.PAD` — 유닛 종류 111종 표, `ECLIPSE.MAD` 마법 74종, `ECLIPSE.EAD` 장비 182종 (확인)
 - `ECPPLANE.ECP` — 제작진 크레딧, 발행 정보 화면 (확인)

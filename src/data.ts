@@ -56,6 +56,18 @@ export async function loadTables(): Promise<Tables> {
 }
 export const loadDialogue = () => json<string[]>(`${A}/data/dialogue.json`)
 
+/** ECLIPSE.BAD 배치 (tools/bad.py). at = [x, y] 칸 */
+export interface BattleUnit { type: number; at: [number, number] }
+export interface BattleRecord {
+  slots: [number, number][]                 // 주인공 일행 출전 칸 (최대 8)
+  npc: BattleUnit[]                          // 함께 싸우는 동료·NPC
+  groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active 0 = 처음엔 대기 (추정)
+  treasure: { item: number; at: [number, number] }[] // 숨은 보물 (추정)
+  reward: number[]                           // 클리어 보상 도구 (추정)
+}
+export interface Battles { route: number[][]; records: Record<string, BattleRecord> }
+export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
+
 export async function loadStage(n: number) {
   const id = String(n).padStart(2, '0')
   const [map, atlas] = await Promise.all([json<StageMap>(`${A}/stages/${id}.json`), loadImage(`${A}/stages/${id}.png`)])

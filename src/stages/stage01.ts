@@ -1,14 +1,14 @@
-// 1장 페얼촌. 배치와 화자는 원작 미분석 상태의 근사치 (원작은 EXE 하드코딩으로 추정).
-// 대사는 dialogue.json 의 인덱스로 참조한다.
+// 1장 페얼촌. 배치는 원작 ECLIPSE.BAD (battles.json) 에서 읽는다.
+// 화자·출전 일행은 아직 근사치 (E3 에서 확정). 대사는 dialogue.json 의 인덱스로 참조한다.
 
-export interface Placement { type: number; x: number; y: number; range?: [number, number] }
+export interface Placement { type: number; x: number; y: number; awake?: boolean }
 export interface Line { who: number; line: number }   // who = 유닛 종류 id (초상화·이름 출처)
 
 export interface StageDef {
   n: number
   title: string
-  allies: Placement[]
-  enemies: Placement[]
+  route: number      // ECLIPSE.BAD 루트 (0~2)
+  party: number[]    // 출전 칸에 순서대로 놓을 유닛 종류 id
   intro: Line[]
   outro: Line[]
   leader: number   // 이 유닛이 쓰러지면 패배
@@ -20,17 +20,8 @@ export const stage01: StageDef = {
   n: 1,
   title: '1장 · 페얼촌',
   leader: ARIKUS,
-  allies: [
-    { type: ARIKUS, x: 21, y: 3 },
-    { type: LESDA, x: 22, y: 4 },
-  ],
-  enemies: [
-    { type: 64, x: 4, y: 9 },    // 애수인
-    { type: 64, x: 6, y: 12 },
-    { type: 31, x: 2, y: 13 },   // 강시
-    { type: 31, x: 8, y: 15 },
-    { type: 63, x: 10, y: 12, range: [1, 2] }, // 화살병
-  ],
+  route: 0,
+  party: [ARIKUS, LESDA],   // 원작 출전 칸 3개, 초기 일행 미확정
   intro: [
     { who: ARIKUS, line: 0 }, { who: LESDA, line: 1 }, { who: CHIEF, line: 2 },
     { who: ARIKUS, line: 3 }, { who: CHIEF, line: 4 }, { who: ARIKUS, line: 5 },

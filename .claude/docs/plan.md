@@ -30,8 +30,8 @@
 - [x] D4 결과를 public/assets/data/*.json 으로 내보내기, formats.md 갱신
 
 ### 4단계 — EXE 역분석: 스토리 데이터 (현재)
-- [ ] E1 Ghidra 설치, ECP.EXE 로드 (16비트 MZ, Borland C++ 1994)
-- [ ] E2 스테이지별 아군·적 배치 (TroopsData) 추출 → 43장
+- [x] E1 ECP.EXE 로드 — Ghidra 대신 capstone 기반 `tools/exe.py` (순수 16비트 MZ라 충분)
+- [x] E2 배치 = `ECLIPSE.BAD` + 전투 순서표(3루트) → `battles.json`, 1장에 적용. 남음: 루트 결정 조건, 초기 일행, 능력치 번호 5~12
 - [ ] E3 대화 순서·화자·발생 시점(전투 전/중/후, 증원, 합류) 추출
 - [ ] E4 승리·패배 조건
 

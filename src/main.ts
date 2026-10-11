@@ -1,4 +1,4 @@
-import { loadDialogue, loadStage, loadTables, loadUnitSprite, TH, TW, type StageMap, type Tables, type UnitType } from './data'
+import { loadBattles, loadDialogue, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
 import { attackSpots, dist, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
@@ -20,6 +20,8 @@ type Mode =
 
 const S = {
   def: stage01 as StageDef,
+  allies: [] as Placement[],
+  enemies: [] as Placement[],
   map: null as unknown as StageMap,
   atlas: null as unknown as HTMLImageElement,
   types: [] as UnitType[],
@@ -42,19 +44,35 @@ function spawn(p: Placement, side: Unit['side']): Unit {
   const t = S.types[p.type]
   return {
     uid: uidSeq++, type: t, side, x: p.x, y: p.y, hp: t.hp, maxHp: t.hp,
-    atk: t.atk, def: t.def, mov: t.mov, range: p.range ?? [1, 1], acted: false, awake: side === 'ally',
+    atk: t.atk, def: t.def, mov: t.mov, range: weaponRange(t), acted: false, awake: side === 'ally' || !!p.awake,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
 }
 
+// 무기 f2: 1 근접, 2~3 원거리 (formats.md 추정)
+function weaponRange(t: UnitType): [number, number] {
+  const f2 = S.tables.items.get(t.equip[0])?.f2 ?? 1
+  return f2 >= 2 ? [1, f2] : [1, 1]
+}
+
+function placements(rec: BattleRecord) {
+  const allies: Placement[] = S.def.party.slice(0, rec.slots.length)
+    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], awake: true }))
+  for (const n of rec.npc) allies.push({ type: n.type, x: n.at[0], y: n.at[1], awake: true })
+  const enemies: Placement[] = rec.groups.flatMap(g =>
+    g.units.map(u => ({ type: u.type, x: u.at[0], y: u.at[1], awake: g.active === 1 })))
+  return { allies, enemies }
+}
+
 async function boot() {
-  const [tables, dialogue, stage] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n)])
+  const [tables, dialogue, stage, battles] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n), loadBattles()])
   S.tables = tables
+  Object.assign(S, placements(battles.records[`${S.def.n}-${S.def.route}`]))
   S.types = tables.types
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas
-  const ids = new Set([...S.def.allies, ...S.def.enemies].map(p => p.type))
+  const ids = new Set([...S.allies, ...S.enemies].map(p => p.type))
   await Promise.all([...ids].map(async id => S.sprites.set(id, await loadUnitSprite(id))))
   ui.title.textContent = S.def.title
   resize()
@@ -64,7 +82,7 @@ async function boot() {
 
 async function start() {
   uidSeq = 0
-  S.units = [...S.def.allies.map(p => spawn(p, 'ally')), ...S.def.enemies.map(p => spawn(p, 'enemy'))]
+  S.units = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.turn = 1
   S.mode = { kind: 'busy' }
   centerOn(S.units[0])
