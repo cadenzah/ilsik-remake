@@ -4,12 +4,18 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "setup:force": "node scripts/setup.mjs --force",
+    "assets": ".venv/bin/python tools/export_web.py data",
     "dev": "vite",
+    "start": "node scripts/setup.mjs && vite --open",
     "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
-  }
+  },
+  "packageManager": "pnpm@12.11.2"
 }

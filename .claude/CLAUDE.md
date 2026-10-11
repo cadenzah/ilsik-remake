@@ -15,7 +15,9 @@
 - `original/` 원작 파일 (ISO 추출, gitignore) — 출처 ISO 경로는 `.env` 의 `ECLIPSE_ISO`
 - `tools/` 추출·분석 스크립트 (Python, `.venv/bin/python` 사용)
 - `build/` 추출 산출물 (gitignore, `tools/extract_all.py` 로 재생성)
-- `src/`, `public/` 웹 게임 (Vite + TypeScript + Canvas 2D)
+- `src/`, `public/` 웹 게임 (Vite + TypeScript + Canvas 2D), 패키지 매니저 pnpm
+- 환경마다 다른 값(경로 등)은 하드코딩하지 말고 `.env` 에 둔다 (`.env.example` 에 키 추가, `.env` 는 gitignore)
+- `scripts/setup.mjs` 로컬 준비 (ISO 추출 → .venv → build/ → public/assets/), `pnpm run setup`
 
 ## 토큰 절약 규칙
 - 바이너리를 xxd 로 길게 덤프하지 않는다. `tools/` 에 요약 출력 스크립트를 만들고 결과만 본다.
