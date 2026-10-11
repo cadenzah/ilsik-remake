@@ -1,0 +1,8 @@
+# 원작 데이터와 그로부터 생성된 산출물은 저작권 자료이므로 커밋하지 않는다 (tools/로 재생성 가능)
+original/
+build/
+public/assets/
+.venv/
+node_modules/
+dist/
+.DS_Store
