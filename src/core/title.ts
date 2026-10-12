@@ -1,12 +1,13 @@
 // 타이틀·메인 메뉴 — 원작 124e:e404 재현 (formats.md "메인 메뉴")
 // 원작: 돌판 로고(ECPMARK 0)가 세 번 번쩍(세 번째에 천둥) → 밝아져 4초 → 어두워지고 두루마리 노인(ECPMARK 1) 위
 // (460,0) 돌 창틀에 유랑천하·지난흔적·게임종료. 게임종료는 제작진·발행 화면(ECPPLANE)을 보여 주고 끝난다.
-// 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·인트로 소리·판 선택.
+// 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·설정(글꼴·로고 효과음)·판 선택.
 // 화면은 640×480 을 통째로 확대
 import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
 import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, type EditionId } from './save'
+import { setSetting, setting, type Setting } from './settings'
 import { stageDef, type StageDef } from './stage'
 
 export interface Launch { ed: EditionId; def: StageDef; camp?: Camp }  // camp 없음 = 캠페인 밖 기본 상태
@@ -20,11 +21,12 @@ const chapterName = (n: number, route: number) => stageDef(n, route).title + (n 
 
 // 로고 연출은 페이지를 열 때마다. 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
 export const SKIP_INTRO = 'eclipse.skipIntro'
-// 인트로 천둥 소리. 기본 끔, 켜면 원본 음량의 1/2
-const INTRO_SOUND = 'eclipse.introSound'
+// 로고 효과음 (천둥, 설정 logoSound): 켜면 원본 음량의 1/2
 const THUNDER_VOLUME = 0.5
-const soundOn = () => { try { return localStorage.getItem(INTRO_SOUND) === '1' } catch { return false } }
-const setSound = (on: boolean) => { try { localStorage.setItem(INTRO_SOUND, on ? '1' : '0') } catch { /* 무시 */ } }
+const SETTINGS: { k: Setting; label: string; title: string }[] = [
+  { k: 'bitmapFont', label: '원작 글꼴', title: '원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴)' },
+  { k: 'logoSound', label: '로고 효과음', title: '시작 로고 연출의 천둥소리' },
+]
 const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
 
 /** 브라우저가 소리 자동 재생을 막는 상태인가. 사용자 입력 전 페이지는 대개 막힌다 (AudioContext 가 suspended 로 시작) */
@@ -117,11 +119,19 @@ export function showTitle(): Promise<Launch> {
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
         { label: '제 작 진', on: () => credits(0) },
-        { label: '인트로 소리', cls: 'opt', toggle: soundOn(), title: '로고 연출의 천둥 소리',
-          on: () => { setSound(!soundOn()); menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus() } },
+        { label: '설 정', title: '글꼴·효과음', on: () => settings() },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
+    }
+
+    // 설정: 켬/끔 스위치들 (두 판 공통). 바꾸면 그 자리에 초점을 둔 채 다시 그린다
+    const settings = (focus = 0) => {
+      win.classList.add('wide')
+      rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.title,
+        on: () => { setSetting(o.k, !setting(o.k)); settings(SETTINGS.indexOf(o)) } })),
+        { label: '돌아가기', cls: 'back', on: menu }])
+      body.querySelectorAll<HTMLButtonElement>('.opt')[focus]?.focus()
     }
 
     // 클리어한 장 다시 하기 (진행 저장에는 영향 없음)
@@ -198,7 +208,7 @@ export function showTitle(): Promise<Launch> {
 
 /** 로고 연출. 클릭·키를 누르면 바로 끝낸다 */
 async function intro(stage: HTMLElement, bg: HTMLImageElement) {
-  const thunder = soundOn() ? thunderAudio() : null
+  const thunder = setting('logoSound') ? thunderAudio() : null
   if (thunder && autoplayBlocked()) await waitGesture(stage)   // 막힌 채 재생하면 소리 없이 지나간다
   let skip = false, skipNow = () => {}
   const skipped = new Promise<void>(ok => { skipNow = ok })

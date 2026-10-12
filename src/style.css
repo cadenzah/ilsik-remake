@@ -108,6 +108,8 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .row.ed { margin-top: 6px; }
 #titlescreen .wide .row { width: 180px; font-size: 14px; }
 #titlescreen .row.back { margin-top: 6px; }
+#titlescreen .wide .row.opt { font-size: 14px; height: 24px; line-height: 24px; color: inherit; }   /* 설정 창 */
+#titlescreen .wide .row.opt:first-child { margin-top: 12px; }
 /* 제작진 화면 (원작 게임종료 때의 ECPPLANE 화면과 같은 검은 바탕 흰 글자) */
 #titlescreen .page { position: absolute; inset: 0; background: #000; }
 #titlescreen .page nav { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;

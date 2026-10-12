@@ -8,6 +8,7 @@
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { bitmapize } from './font'
+import { setting } from './settings'
 import { equippedStats } from './unit'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
@@ -96,8 +97,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   // 정비 화면에서 고치는 사본 (원래 표·캠페인 상태는 전투로 갈 때만 바뀐다)
   const party = o.party.map(t => ({ ...t, equip: [...t.equip] as UnitType['equip'] }))
   const items = [...o.items]
+  const bitmap = setting('bitmapFont')
   let picked: number | null = null   // 고른 소지품 칸 (원작 [bp-0xb7c], 없음 = 0x65)
-  const font = (el: Element) => { if (!o.remake) void bitmapize(el, '.txt, .num, .say, .t, button') }   // 원작판 = 원작 비트맵 글꼴
+  const font = (el: Element) => { if (bitmap) void bitmapize(el, '.txt, .num, .say, .t, button') }   // 설정 '원작 글꼴' = 원작 비트맵 글꼴 (두 판 공통)
 
   // 원작판: 처음엔 편성 아님 (출전 줄 빔). 개선판: 처음부터 편성, 앞에서부터 채워 둠
   let editing = o.remake
