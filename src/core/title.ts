@@ -63,13 +63,19 @@ export function showTitle(): Promise<Launch> {
     }
 
     // 창 안 항목 (글자 버튼)
-    type Row = { label: string; on?: () => void; cls?: string; title?: string }
+    // toggle 이 있으면 켬/끔 스위치 모양 (role=switch)
+    type Row = { label: string; on?: () => void; cls?: string; title?: string; toggle?: boolean }
     const rows = (items: Row[]) => {
       body.innerHTML = ''
       for (const r of items) {
         const b = document.createElement('button')
         b.className = `row ${r.cls ?? ''}`
         b.textContent = r.label
+        if (r.toggle !== undefined) {
+          b.setAttribute('role', 'switch')
+          b.setAttribute('aria-checked', String(r.toggle))
+          b.insertAdjacentHTML('beforeend', '<i class="switch" aria-hidden="true"></i>')
+        }
         if (r.title) b.title = r.title
         if (r.on) b.onclick = r.on
         else b.disabled = true
@@ -87,7 +93,7 @@ export function showTitle(): Promise<Launch> {
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), p.flags) : undefined },
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
         { label: '제 작 진', on: () => credits(0) },
-        { label: `인트로 소리 ${soundOn() ? '켬' : '끔'}`, cls: 'opt', title: '로고 연출의 천둥 소리',
+        { label: '인트로 소리', cls: 'opt', toggle: soundOn(), title: '로고 연출의 천둥 소리',
           on: () => { setSound(!soundOn()); menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus() } },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
