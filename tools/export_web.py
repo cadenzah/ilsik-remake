@@ -89,7 +89,7 @@ def export_camp():
     """정비 화면 (원작 124e:8994, formats.md "정비 화면"). 화면 = 창틀 ECPMAI "tactics" 8조각 + WIN 2 를 (25,12) 에 (DOSBox 로 확정).
     camp-bg 640×480 (창틀 + WIN 2), camp-status = WIN 1 인물기본자료 바탕 330×330 (화면 (25,12)),
     camp-face = BS 1 출전 줄 얼굴 56×48 (11열, 간격 57), camp-mini = BS 2 대기 격자 46×39 (13열, 간격 47), 둘 다 칸 = 유닛 번호 0~28,
-    equip = ECLIPSE.EQU 아이콘 182개 48×56 를 13열로 (칸 = 품목 id − 1), camp-por = 초상 96×111 12열 (칸 = por). 팔레트 255 = 투명"""
+    equip = ECLIPSE.EQU 아이콘 182개 48×56 를 13열로 (칸 = 품목 id − 1), camp-por = 초상 96×111 12열 (칸 = por). 팔레트 255 = 투명. camp-x = STA 11 장착 불가 X"""
     import frtwnd
     d = mkdir('ui')
     pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECLIPSE.WIN'), 2)
@@ -120,6 +120,7 @@ def export_camp():
     for i, f in enumerate(por):
         atlas.paste(rgba(os.path.join(IMG, 'ECLIPSE.POR', f)), ((i % 12) * 96, (i // 12) * 111))
     atlas.save(os.path.join(d, 'camp-por.png'))
+    rgba(os.path.join(IMG, 'ECLIPSE.STA', '011.png')).save(os.path.join(d, 'camp-x.png'))   # STA 11 = 장착 불가 빨간 X (46×39)
 
 
 def export_status_icons():
@@ -153,7 +154,7 @@ def export_data():
     # lv = 등급, fatigue = 피로도, exp = 경험치. cls 는 race 와 같은 값 (예전 이름)
     us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'atk', 'spi', 'agi', 'mov', 'magic',
                              'race', 'sex', 'job', 'rank', 'fatigue', 'exp')}
-          | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'canMagic': u['can_magic'], 'moveKind': u['move_kind']}
+          | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'toolKind': u['equip'][2][0], 'canMagic': u['can_magic'], 'moveKind': u['move_kind']}
           for u in units.load()]
     json.dump(us, open(os.path.join(d, 'units.json'), 'w'), ensure_ascii=False, indent=0)
     lb = units.labels()
@@ -203,6 +204,9 @@ if __name__ == '__main__':
         export_ui()
     elif sys.argv[1:] == ['icons']:
         export_status_icons()
+    elif sys.argv[1:] == ['font']:
+        import font; font.export()
     else:
-        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_data()
+        import font
+        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_data(); font.export()
     print('ok')

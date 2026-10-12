@@ -154,6 +154,11 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #camp .mg, #camp .mgi { background-image: url(/assets/ui/magic-icons.png); }
 #camp button { all: unset; position: absolute; box-sizing: border-box; cursor: inherit; }
 #camp .mb.full { opacity: .55; }
+#camp .mb .x { position: absolute; left: 0; top: 0; }   /* 원작 STA 11: 고른 도구를 못 쓰는 인물 */
+#camp .bmp { display: block; image-rendering: pixelated; }   /* 원작 비트맵 글꼴 (font.ts) */
+#camp .num.cur .bmp { margin-left: auto; }
+#camp .dlg .bmp { margin: 0 auto; position: relative; top: 3px; }
+#camp.remake .it.picked { outline: 2px solid #c86414; }
 #camp .hit:focus-visible, #camp .mb:focus-visible, #camp .sb:focus-visible, #camp .it:focus-visible, #camp .eq:focus-visible { outline: 1px dotted #000; }
 /* 개선판: 마우스 올림·남은 칸·선두 표시 */
 #camp.remake .mb:hover:not(.gone), #camp.remake .sb:hover, #camp.remake .it:hover, #camp.remake .eq:hover { outline: 1px solid #c86414; }

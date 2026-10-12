@@ -7,9 +7,11 @@
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { fadeIn, fadeOut } from './fade'
+import { bitmapize } from './font'
 import { equippedStats } from './unit'
 
-export type CampResult = { go: 'battle'; deploy: number[] } | { go: 'title' }
+/** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
+export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] } | { go: 'title' }
 
 export interface CampOptions {
   party: UnitType[]   // 일행 (0번 = 선두, 뺄 수 없음)
@@ -25,6 +27,7 @@ const WAIT = { x: 26, y: 376, dx: 47, dy: 46, cols: 7, w: 46, h: 39 }   // 대�
 const SLOT = { x: 379, y: 370, dx: 57, dy: 50, cols: 4, w: 56, h: 48 }  // 출전 줄 BS 1, 4열 × 2줄
 const ITEM = { x: 379, y: 115, dx: 51, dy: 57, cols: 3, per: 12 }        // 도구 목록 MAR/EQU 48×56, 3열 × 4줄
 const BTN = { x: 571, w: 40, h: 24, read: 42, write: 77, music: 112, quit: 148, swap: 271, act: 305 }
+const TOOL = { x: 530, w: 18, trash: [128, 37], put: [192, 25], take: [238, 25] } as const   // 도구 옆 작은 아이콘 (원작 판정 범위)
 const MINI = 29   // BS 얼굴 수 (유닛 0~28). 그 밖의 유닛은 이동 그림 첫 장으로
 
 const PAGE_HELP = {
@@ -34,7 +37,14 @@ const PAGE_HELP = {
   swapRemake: '앞에서부터 다시 채운다.',
   act: '출전인물로 전투를 시작한다.',
   quit: '타이틀(주화면)로 돌아간다.',
+  trash: '고른 도구를 버린다.',
+  put: '고른 도구를 지금 보이는 인물에게 장착한다.',
+  take: '지금 보이는 인물의 도구를 풀어 소지품에 넣는다.',
 }
+
+/** 그 인물이 쓸 수 있는 도구인가 (원작 124e:9d1b): 공용(세부 30) 또는 인물의 도구 종류(+0x5c) 와 같은 세부. 지도 넷(175~178)은 안 됨 */
+export const canEquip = (t: UnitType, it?: Item) =>
+  !!it && it.cat === 2 && (it.id < 175 || it.id > 178) && (it.sub === 30 || it.sub === t.toolKind)
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`)
 const px = (x: number, y: number, w?: number, h?: number) =>
@@ -68,6 +78,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       <button class="hit" data-b="quit" style="${px(BTN.x, BTN.quit, BTN.w, BTN.h)}" aria-label="종료"></button>
       <button class="hit" data-b="swap" style="${px(BTN.x, BTN.swap, BTN.w, BTN.h)}" aria-label="출전 편성"></button>
       <button class="hit" data-b="act" style="${px(BTN.x, BTN.act, BTN.w, BTN.h + 1)}" aria-label="행동"></button>
+      <button class="hit" data-b="trash" style="${px(TOOL.x, TOOL.trash[0], TOOL.w, TOOL.trash[1])}" aria-label="버리기"></button>
+      <button class="hit" data-b="put" style="${px(TOOL.x, TOOL.put[0], TOOL.w, TOOL.put[1])}" aria-label="장착"></button>
+      <button class="hit" data-b="take" style="${px(TOOL.x, TOOL.take[0], TOOL.w, TOOL.take[1])}" aria-label="해제"></button>
       <button class="hit" data-b="up" style="${px(532, 294, 15, 18)}" aria-label="도구 앞 쪽"></button>
       <button class="hit" data-b="down" style="${px(532, 316, 15, 18)}" aria-label="도구 뒤 쪽"></button>
     </div>`
@@ -80,6 +93,12 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   fit()
   addEventListener('resize', fit)
 
+  // 정비 화면에서 고치는 사본 (원래 표·캠페인 상태는 전투로 갈 때만 바뀐다)
+  const party = o.party.map(t => ({ ...t, equip: [...t.equip] as UnitType['equip'] }))
+  const items = [...o.items]
+  let picked: number | null = null   // 고른 소지품 칸 (원작 [bp-0xb7c], 없음 = 0x65)
+  const font = (el: Element) => { if (!o.remake) void bitmapize(el, '.txt, .num, .say, .t, button') }   // 원작판 = 원작 비트맵 글꼴
+
   // 원작판: 처음엔 편성 아님 (출전 줄 빔). 개선판: 처음부터 편성, 앞에서부터 채워 둠
   let editing = o.remake
   let sel: number[] = o.remake ? [...o.initial] : []
@@ -90,7 +109,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   // ---- 인물기본자료 (원작 7c18 모드 1, WIN 1 위) ----
   const showStatus = (i: number) => {
     shown = i
-    const t = o.party[i], st = equippedStats(t, o.tables.items)
+    const t = party[i], st = equippedStats(t, o.tables.items)
     por.style.backgroundPosition = `-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px`
     const p = profile(t, o.tables.labels)
     const row = (y: number, label: string, cur: number, max: number) =>
@@ -123,6 +142,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       b.onclick = show
       b.onmouseenter = show
     })
+    font(status)
   }
 
   // ---- 도구설명 (358,19) ----
@@ -136,6 +156,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     }).join('')
     desc.innerHTML = `<span class="ico" style="${px(17, 0, 48, 56)}">${icon(it.id)}</span>` +
       `<span class="txt b" style="${px(72, 3)}">${esc(it.name)}</span>${fx}`
+    font(desc)
   }
   const describeMagic = (id: number) => {
     const m = o.tables.magic.get(id)
@@ -144,38 +165,73 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       `<span class="txt b" style="${px(72, 3)}">${esc(m.name)}</span>` +
       `<span class="txt" style="${px(72, 22)}">${MAGIC_EFFECTS[m.effect] ?? ''}</span>` +
       `<span class="txt" style="${px(72, 41)}">피로 +${m.fatigue}</span>`
+    font(desc)
   }
-  const say = (text: string) => { desc.innerHTML = `<p class="say">${esc(text)}</p>` }
+  const say = (text: string) => { desc.innerHTML = `<p class="say" data-wrap="190">${esc(text)}</p>`; font(desc) }
 
   // ---- 도구 목록 12칸 ----
   const drawItems = () => {
-    const pages = Math.max(1, Math.ceil(o.items.length / ITEM.per))
+    const pages = Math.max(1, Math.ceil(items.length / ITEM.per))
     page = Math.min(page, pages - 1)
-    itemBox.innerHTML = o.items.slice(page * ITEM.per, (page + 1) * ITEM.per).map((id, k) =>
+    itemBox.innerHTML = items.slice(page * ITEM.per, (page + 1) * ITEM.per).map((id, k) =>
       `<button class="it" data-item="${id}" style="${px(ITEM.x + ITEM.dx * (k % ITEM.cols), ITEM.y + ITEM.dy * Math.floor(k / ITEM.cols), 48, 56)}"
         aria-label="${esc(o.tables.items.get(id)?.name ?? '')}">${icon(id)}</button>`).join('')
-    itemBox.querySelectorAll<HTMLButtonElement>('.it').forEach(b => {
+    itemBox.querySelectorAll<HTMLButtonElement>('.it').forEach((b, k) => {
       const show = () => describe(o.tables.items.get(Number(b.dataset.item)))
-      b.onclick = show
-      if (o.remake) b.onmouseenter = show
+      b.classList.toggle('picked', picked === page * ITEM.per + k)
+      b.onclick = () => { if (!dialog) pick(page * ITEM.per + k) }   // 원작: 고르고 설명, 못 쓰는 인물에 X
+      if (o.remake) b.onmouseenter = () => { if (!dialog && picked === null) show() }
     })
+  }
+
+  // ---- 도구 고르기·버리기·장착·해제 (원작 124e:9a5b·9e4f·9f85) ----
+  const pickedItem = () => picked === null ? undefined : o.tables.items.get(items[picked])
+  const pick = (k: number | null) => {
+    picked = k
+    if (k === null) desc.innerHTML = ''
+    else describe(pickedItem())
+    drawItems()
+    draw()
+  }
+  const trash = () => {
+    if (picked === null) return   // 원작: 고른 도구가 없으면 무시
+    confirm('제거', TOOL.trash[0], () => { items.splice(picked!, 1); pick(null) }, 390)
+  }
+  const put = () => {
+    const t = party[shown]
+    if (picked === null || !canEquip(t, pickedItem())) return
+    const old = t.equip[2]
+    t.equip[2] = items[picked]
+    if (old) items[picked] = old    // 맞바꿈: 옛 도구가 고른 칸 자리로
+    else items.splice(picked, 1)
+    showStatus(shown)
+    pick(null)
+  }
+  const take = () => {
+    const t = party[shown]
+    if (!t.equip[2]) return
+    items.push(t.equip[2])          // 목록 끝에 붙인다
+    t.equip[2] = 0
+    showStatus(shown)
+    pick(null)
   }
 
   // ---- 대기 격자·출전 줄 ----
   const draw = () => {
-    waitBox.innerHTML = o.party.map((t, i) => {
+    waitBox.innerHTML = party.map((t, i) => {
       const c = i % WAIT.cols, r = Math.floor(i / WAIT.cols)
       const gone = editing && sel.includes(i)   // 출전에 뽑힌 대원 칸은 지움 (원작 BS 0 조각)
       const full = editing && !gone && sel.length >= o.max
       return `<button class="mb ${gone ? 'gone' : ''} ${full ? 'full' : ''} ${i === shown ? 'shown' : ''}" data-i="${i}"
-        style="${px(WAIT.x + WAIT.dx * c, WAIT.y + WAIT.dy * r, WAIT.w, WAIT.h)}" aria-label="${esc(t.name)}">${gone ? '' : sprite(t, false)}</button>`
+        style="${px(WAIT.x + WAIT.dx * c, WAIT.y + WAIT.dy * r, WAIT.w, WAIT.h)}" aria-label="${esc(t.name)}">${gone ? '' : sprite(t, false)}${
+        !gone && picked !== null && !canEquip(t, pickedItem()) ? `<img class="x" src="${A}/ui/camp-x.png" alt="장착 불가">` : ''}</button>`
     }).join('')
     const slots = o.remake ? o.max : sel.length
     slotBox.innerHTML = Array.from({ length: slots }, (_, j) => {
       const i = sel[j], c = j % SLOT.cols, r = Math.floor(j / SLOT.cols)
       const style = px(SLOT.x + SLOT.dx * c, SLOT.y + SLOT.dy * r, SLOT.w, SLOT.h)
       if (i === undefined) return `<span class="empty" style="${style}"></span>`
-      return `<button class="sb ${j === 0 ? 'lead' : ''}" data-j="${j}" style="${style}" aria-label="${esc(o.party[i].name)}">${sprite(o.party[i], true)}</button>`
+      return `<button class="sb ${j === 0 ? 'lead' : ''}" data-j="${j}" style="${style}" aria-label="${esc(party[i].name)}">${sprite(party[i], true)}</button>`
     }).join('')
     root.classList.toggle('editing', editing)
     count.hidden = !o.remake
@@ -189,7 +245,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         if (!sel.includes(i) && sel.length < o.max) { sel.push(i); draw() }
         showStatus(i)
       }
-      if (o.remake) b.onmouseenter = () => { if (!dialog) showStatus(i) }
+      if (o.remake) b.onmouseenter = () => { if (!dialog && picked === null) showStatus(i) }   // 도구를 고른 동안엔 장착 대상이 흔들리지 않게
     })
     slotBox.querySelectorAll<HTMLButtonElement>('.sb').forEach(b => {
       const j = Number(b.dataset.j)
@@ -207,12 +263,13 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   }
 
   // ---- 확인창 (원작 0aa2:0c58, 화면 좌표) ----
-  const confirm = (title: string, y: number, ok: () => void) => {
+  const confirm = (title: string, y: number, ok: () => void, x = 500) => {
     dialog = document.createElement('div')
     dialog.className = 'dlg'
-    dialog.style.cssText = px(500, y, 136, 66)
+    dialog.style.cssText = px(x, y, 136, 66)
     dialog.innerHTML = `<div class="t">${title}</div><button class="ok">결정</button><button class="no">취소</button>`
     stage.append(dialog)
+    font(dialog)
     const close = () => { dialog?.remove(); dialog = null }
     dialog.querySelector<HTMLButtonElement>('.ok')!.onclick = () => { close(); ok() }
     dialog.querySelector<HTMLButtonElement>('.no')!.onclick = close
@@ -226,7 +283,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       if (r.go === 'title') { done(r); return }   // 타이틀로는 toTitle 이 어둡게 한 뒤 새로 불러온다
       void fadeOut().then(() => { root.remove(); done(r) })
     }
-    const fight = () => finish({ go: 'battle', deploy: [...sel] })
+    const fight = () => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip) })
     const act = () => {
       if (!sel.length) return   // 원작: 출전 수 0 이면 아무 반응 없음
       confirm('여행계속', 313, fight)   // 두 판 모두 확인 뒤 전투
@@ -245,9 +302,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         else { editing = true; sel = [0] }   // 원작: 누를 때마다 선두만으로 다시 시작
         draw()
       },
-      act,
+      act, trash, put, take,
       up: () => { if (page > 0) { page--; drawItems() } },
-      down: () => { if ((page + 1) * ITEM.per < o.items.length) { page++; drawItems() } },
+      down: () => { if ((page + 1) * ITEM.per < items.length) { page++; drawItems() } },
     }
     root.querySelectorAll<HTMLButtonElement>('.hit').forEach(b => {
       const k = b.dataset.b!
@@ -257,9 +314,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         if (help) b.onmouseenter = () => { if (!dialog) say(help) }
       }
     })
-    stage.oncontextmenu = e => { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else cancelEdit() }
+    stage.oncontextmenu = e => { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else if (picked !== null) pick(null); else cancelEdit() }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else cancelEdit() }
+      if (e.key === 'Escape') { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else if (picked !== null) pick(null); else cancelEdit() }
       else if (e.key === 'Enter' && o.remake && !dialog) { e.preventDefault(); act() }
     }
     addEventListener('keydown', onKey, true)

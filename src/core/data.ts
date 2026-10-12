@@ -5,6 +5,7 @@ export interface UnitType {
   // PAD 기본 능력치 (장비 보정 전). atk 역량 · def 방어 · spi 정신 · agi 민첩 (formats.md)
   lv: number; hp: number; atk: number; def: number; spi: number; agi: number; mov: number
   equip: [number, number, number]   // 무기·방어구·도구 Item id, 0 = 없음
+  toolKind: number                  // 쓸 수 있는 도구 세부 종류 (런타임 +0x5c, EAD sub 와 비교. 24 전사·25 마법사 계열…)
   canMagic: number; magic: number[] // Magic id
   // 인물 상태창 글자 (labels.json 색인, formats.md "정비 화면"). rank = 부하상태, moveKind = 이동방식
   race: number; sex: number; job: number; rank: number; moveKind: number; fatigue: number; exp: number
@@ -46,7 +47,7 @@ export const TH = 48
 
 export const A = '/assets'
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((ok, fail) => {
     const im = new Image()
     im.onload = () => ok(im)

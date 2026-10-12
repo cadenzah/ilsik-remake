@@ -1,6 +1,6 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
-import { FLAGS, ITEMS, PARTY, finishStage, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
 import { campScreen } from './camp'
@@ -19,7 +19,7 @@ const STEP_MS = 110
 
 let uidSeq = 0
 function spawn(p: Placement, side: Unit['side']): Unit {
-  const t = S.types[p.type]
+  const t = p.troop === 0 ? partyType(p.type) : S.types[p.type]   // 일행은 정비 화면에서 바꾼 장비로
   const st = equippedStats(t, S.tables.items)
   if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
   return {
@@ -56,6 +56,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.def = def
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
   S.tables = tables
+  S.types = tables.types
   S.scenes = scenes
   S.routeTable = battles.route
   if (camp !== undefined) restore(camp)
@@ -67,15 +68,17 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
   if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
-    const r = await campScreen({ party: PARTY.map(t => tables.types[t]), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first })
+    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first })
     if (r.go === 'title') { toTitle(); return }
     S.deploy = r.deploy
+    ITEMS.splice(0, ITEMS.length, ...r.items)
+    r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
+    atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
   }
   Object.assign(S, placements(rec))
   S.reward = rec.reward
   S.cond = battles.cond[def.n] ?? []
   S.turnEv = battles.turn[def.n] ?? []
-  S.types = tables.types
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas

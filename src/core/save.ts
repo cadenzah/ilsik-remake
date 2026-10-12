@@ -10,10 +10,11 @@ export interface Progress {
   flags: string[]
   party?: number[]                       // 없으면 (옛 저장) 초기 일행
   items?: number[]
+  equip?: Camp['equip']
 }
 
 /** 이어하기 상태 */
-export const progressCamp = (p: Progress): Camp => ({ flags: p.flags, party: p.party ?? [], items: p.items ?? [] })
+export const progressCamp = (p: Progress): Camp => ({ flags: p.flags, party: p.party ?? [], items: p.items ?? [], equip: p.equip })
 
 const key = (ed: EditionId) => `eclipse.progress.${ed}`
 
