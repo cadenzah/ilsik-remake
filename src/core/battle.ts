@@ -5,6 +5,7 @@ import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
 import { recordClear } from './save'
+import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
 import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
@@ -207,8 +208,11 @@ export async function checkEnd(): Promise<boolean> {
   return true
 }
 
-/** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억) */
-export const toTitle = () => { location.href = location.pathname }
+/** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
+export const toTitle = () => {
+  try { sessionStorage.setItem(SKIP_INTRO, '1') } catch { /* 무시 */ }
+  location.href = location.pathname
+}
 
 function cleared(ending: boolean) {
   const def = S.def, next = ending ? null : nextStage(def.n, def.route)

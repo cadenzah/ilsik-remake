@@ -1,7 +1,8 @@
 // 타이틀·메인 메뉴 — 원작 124e:e404 재현 (formats.md "메인 메뉴")
 // 원작: 돌판 로고(ECPMARK 0)가 세 번 번쩍(세 번째에 천둥) → 밝아져 4초 → 어두워지고 두루마리 노인(ECPMARK 1) 위
 // (460,0) 돌 창틀에 유랑천하·지난흔적·게임종료. 게임종료는 제작진·발행 화면(ECPPLANE)을 보여 주고 끝난다.
-// 웹: 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·판 선택을 같은 창에 둔다. 화면은 640×480 을 통째로 확대
+// 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·인트로 소리·판 선택.
+// 화면은 640×480 을 통째로 확대
 import { A } from './data'
 import { lastEdition, loadProgress, resetProgress, setLastEdition, type EditionId } from './save'
 import { stageDef, type StageDef } from './stage'
@@ -15,7 +16,13 @@ const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
 const ROUTE = ['A', 'B', 'C']
 const chapterName = (n: number, route: number) => stageDef(n, route).title + (n >= 10 ? ` (${ROUTE[route]} 길)` : '')
 
-const INTRO_SEEN = 'eclipse.introSeen'   // 같은 탭에서 타이틀로 돌아올 때는 로고 연출을 건너뛴다
+// 로고 연출은 페이지를 열 때마다. 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
+export const SKIP_INTRO = 'eclipse.skipIntro'
+// 인트로 천둥 소리. 기본 끔, 켜면 원본 음량의 1/2
+const INTRO_SOUND = 'eclipse.introSound'
+const THUNDER_VOLUME = 0.5
+const soundOn = () => { try { return localStorage.getItem(INTRO_SOUND) === '1' } catch { return false } }
+const setSound = (on: boolean) => { try { localStorage.setItem(INTRO_SOUND, on ? '1' : '0') } catch { /* 무시 */ } }
 const sleep = (ms: number) => new Promise(ok => setTimeout(ok, ms))
 const rand = (n: number) => Math.floor(Math.random() * n)
 
@@ -55,15 +62,14 @@ export function showTitle(): Promise<Launch> {
       done({ ed, def, flags })
     }
 
-    // 창 안 항목. img = 원작 버튼 그림 (보통/강조 2단), 없으면 같은 모양의 글자
-    type Row = { label: string; img?: string; on?: () => void; cls?: string; title?: string }
+    // 창 안 항목 (글자 버튼)
+    type Row = { label: string; on?: () => void; cls?: string; title?: string }
     const rows = (items: Row[]) => {
       body.innerHTML = ''
       for (const r of items) {
         const b = document.createElement('button')
-        b.className = `row ${r.img ? 'pic' : 'txt'} ${r.cls ?? ''}`
-        if (r.img) { b.style.backgroundImage = `url(${A}/ui/${r.img})`; b.setAttribute('aria-label', r.label) }
-        else b.textContent = r.label
+        b.className = `row ${r.cls ?? ''}`
+        b.textContent = r.label
         if (r.title) b.title = r.title
         if (r.on) b.onclick = r.on
         else b.disabled = true
@@ -76,11 +82,13 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하 (새로 시작)', img: 'btn-new.png', on: () => { resetProgress(ed); launch(stageDef(1, 0, true)) } },
-        { label: '지난흔적 (이어하기)', img: 'btn-load.png', title: p ? `${chapterName(p.next.n, p.next.route)}부터` : '저장된 진행 없음',
+        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true)) } },
+        { label: '지난흔적', title: p ? `이어하기 — ${chapterName(p.next.n, p.next.route)}부터` : '이어하기 — 저장된 진행 없음',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), p.flags) : undefined },
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
-        { label: '제 작 진', on: () => void credits() },
+        { label: '제 작 진', on: () => credits(0) },
+        { label: `인트로 소리 ${soundOn() ? '켬' : '끔'}`, cls: 'opt', title: '로고 연출의 천둥 소리',
+          on: () => { setSound(!soundOn()); menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus() } },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
@@ -95,27 +103,42 @@ export function showTitle(): Promise<Launch> {
         { label: '돌아가기', cls: 'back', on: menu }])
     }
 
-    // 원작 게임종료와 같은 제작진(ECPPLANE 0)·발행(ECPPLANE 1) 화면 + 팬 게임 고지. 클릭·키로 넘긴다
-    const credits = async () => {
+    // 원작 게임종료와 같은 제작진(ECPPLANE 0)·발행(ECPPLANE 1) 화면 + 팬 게임 고지. 이전·다음으로 넘긴다
+    const PAGES = [`<img src="${A}/ui/staff.png" alt="원작 제작진">`, `<img src="${A}/ui/publish.png" alt="원작 발행 정보">`,
+      `<div class="notice"><h2>팬 게임 고지</h2>${NOTICE}</div>`]
+    let pageAt = -1
+    const credits = (i: number) => {
+      pageAt = i
       win.hidden = true
-      for (const html of [`<img src="${A}/ui/staff.png" alt="원작 제작진">`, `<img src="${A}/ui/publish.png" alt="원작 발행 정보">`,
-        `<div class="notice"><h2>팬 게임 고지</h2>${NOTICE}</div>`]) {
-        page.innerHTML = html
-        page.hidden = false
-        await waitInput()
-      }
+      page.hidden = false
+      page.innerHTML = `${PAGES[i]}<nav>
+          <button data-go="-1" ${i === 0 ? 'disabled' : ''}>◀ 이전</button>
+          <span>${i + 1} / ${PAGES.length}</span>
+          <button data-go="1" ${i === PAGES.length - 1 ? 'disabled' : ''}>다음 ▶</button>
+          <button data-go="0" class="close">돌아가기</button>
+        </nav>`
+      page.querySelectorAll<HTMLButtonElement>('nav button').forEach(b => b.onclick = () => {
+        const d = Number(b.dataset.go)
+        if (d) credits(pageAt + d)
+        else closeCredits()
+      })
+      page.querySelector<HTMLButtonElement>(`nav button[data-go="${i === PAGES.length - 1 ? 0 : 1}"]`)?.focus()
+    }
+    const closeCredits = () => {
+      pageAt = -1
       page.hidden = true
       win.hidden = false
       menu()
     }
 
-    const waitInput = () => new Promise<void>(ok => {
-      const go = () => { removeEventListener('pointerdown', go); removeEventListener('keydown', go, true); ok() }
-      setTimeout(() => { addEventListener('pointerdown', go); addEventListener('keydown', go, true) }, 150)
-    })
-
-    // 위·아래 화살표로 항목 이동, Esc 로 돌아가기 (Enter·Space 는 버튼 기본 동작)
+    // 메뉴: 위·아래 화살표로 항목 이동, Esc 로 돌아가기. 제작진: 좌·우 화살표로 이전·다음, Esc 로 돌아가기
     const onKey = (e: KeyboardEvent) => {
+      if (pageAt >= 0) {
+        if (e.key === 'ArrowLeft' && pageAt > 0) credits(pageAt - 1)
+        else if (e.key === 'ArrowRight' && pageAt < PAGES.length - 1) credits(pageAt + 1)
+        else if (e.key === 'Escape') closeCredits()
+        return
+      }
       if (win.hidden) return
       const bs = [...body.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
       const i = bs.indexOf(document.activeElement as HTMLButtonElement)
@@ -134,9 +157,9 @@ export function showTitle(): Promise<Launch> {
     }
 
     void (async () => {
-      let seen = false
-      try { seen = sessionStorage.getItem(INTRO_SEEN) === '1'; sessionStorage.setItem(INTRO_SEEN, '1') } catch { /* 무시 */ }
-      if (!seen) await intro(stage, bg)
+      let skip = false
+      try { skip = sessionStorage.getItem(SKIP_INTRO) === '1'; sessionStorage.removeItem(SKIP_INTRO) } catch { /* 무시 */ }
+      if (!skip) await intro(stage, bg)
       showMenu()
     })()
   })
@@ -144,18 +167,22 @@ export function showTitle(): Promise<Launch> {
 
 /** 로고 연출. 클릭·키를 누르면 바로 끝낸다 */
 async function intro(stage: HTMLElement, bg: HTMLImageElement) {
-  let skip = false
-  const onSkip = () => { skip = true }
+  let skip = false, skipNow = () => {}
+  const skipped = new Promise<void>(ok => { skipNow = ok })
+  const onSkip = () => { skip = true; skipNow() }
   addEventListener('pointerdown', onSkip)
   addEventListener('keydown', onSkip)
-  const wait = async (ms: number) => { const t = performance.now() + ms; while (!skip && performance.now() < t) await sleep(Math.min(30, ms)) }
+  const wait = (ms: number) => skip ? Promise.resolve() : Promise.race([sleep(ms), skipped])
+  // decode() 는 숨은 탭에서 끝나지 않을 수 있어 load 이벤트로 (최대 2초)
+  const loaded = new Promise<void>(ok => { bg.onload = bg.onerror = () => ok() })
   bg.src = `${A}/ui/mark0.png`
-  await bg.decode().catch(() => {})
-  const thunder = new Audio(`${A}/ui/thunder.wav`)
+  await Promise.race([loaded, sleep(2000)])
+  const thunder = soundOn() ? new Audio(`${A}/ui/thunder.wav`) : null
+  if (thunder) thunder.volume = THUNDER_VOLUME
   stage.classList.add('cut', 'dark')
   // 원작: 세 번 번쩍 — 켬 10~159ms, 끔 10~309ms, 세 번째 직전에 천둥
   for (let i = 0; i < 3 && !skip; i++) {
-    if (i === 2) thunder.play().catch(() => {})   // 자동 재생이 막히면 소리 없이
+    if (i === 2) thunder?.play().catch(() => {})   // 자동 재생이 막히면 소리 없이
     stage.classList.remove('dark'); await wait(rand(150) + 10)
     stage.classList.add('dark'); await wait(rand(300) + 10)
   }

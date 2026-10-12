@@ -64,7 +64,7 @@ def export_portraits():
 def export_ui():
     """타이틀·메인 메뉴 (원작 124e:e404 재현용, formats.md "메인 메뉴").
     mark0 돌판 로고, mark1 두루마리 노인 (메뉴 배경), staff/publish 제작진·발행 화면 (ECPPLANE 0·1),
-    menu-frame = MAIN.ECP face 9조각을 합친 172×199 (ECPMARK 1번 팔레트), btn-new/btn-load = 버튼 120×48 (위 보통, 아래 강조),
+    menu-frame = MAIN.ECP face 9조각을 합친 172×199 (ECPMARK 1번 팔레트). 버튼 그림(b1~b3)은 저해상도라 쓰지 않고 글자로 (사용자 결정),
     thunder.wav = ECPMARK.FVT 1번 (로고 번쩍일 때)"""
     import shutil, frtwnd
     d = mkdir('ui')
@@ -79,13 +79,8 @@ def export_ui():
                   (0x803, (146, 60)), (0x403, (0, 173)), (0x603, (26, 173)), (0x503, (146, 173))):
         fr.paste(f(k), xy)
     fr.save(os.path.join(d, 'menu-frame.png'))
-    for b, name in (('b2', 'new'), ('b1', 'load'), ('b3', 'quit')):
-        im = Image.new('RGB', (120, 48))
-        for k, xy in ((0x000, (0, 0)), (0x100, (60, 0)), (0x300, (0, 24)), (0x400, (60, 24))):
-            im.paste(E[(b, k)], xy)
-        im.save(os.path.join(d, f'btn-{name}.png'))
     shutil.copy(os.path.join(ROOT, 'build', 'snd', 'ECPMARK.FVT', '001.wav'), os.path.join(d, 'thunder.wav'))
-    for old in ('title.png',):
+    for old in ('title.png', 'btn-new.png', 'btn-load.png', 'btn-quit.png'):
         if os.path.exists(os.path.join(d, old)): os.remove(os.path.join(d, old))
 
 

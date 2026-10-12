@@ -95,11 +95,10 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .body { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; padding: 0 0 6px; margin-top: -10px;
   max-height: 360px; overflow-y: auto; scrollbar-width: none; }
 #titlescreen .row { all: unset; box-sizing: border-box; cursor: pointer; width: 120px; height: 24px; flex: none; text-align: center;
-  font: 700 15px/24px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; letter-spacing: 1px;
+  font: 700 16px/24px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; letter-spacing: 2px;
   color: #9c9c90; text-shadow: 1px 1px 0 #3c3c3c; }
-#titlescreen .row.pic { background: no-repeat 0 0; }
-#titlescreen .row.pic:hover:not(:disabled), #titlescreen .row.pic:focus-visible { background-position: 0 -24px; }
-#titlescreen .row.txt:hover:not(:disabled), #titlescreen .row.txt:focus-visible { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
+#titlescreen .row:hover:not(:disabled), #titlescreen .row:focus-visible { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
+#titlescreen .row.opt { font-size: 12px; height: 20px; line-height: 20px; letter-spacing: 0; margin-top: 4px; color: #6c846c; }
 #titlescreen .row:disabled { cursor: default; opacity: .45; }
 #titlescreen .row.ed { width: 56px; font-size: 13px; height: 20px; line-height: 20px; color: #6c846c; }
 #titlescreen .row.ed.on { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
@@ -107,7 +106,15 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .wide .row { width: 180px; font-size: 14px; }
 #titlescreen .row.back { margin-top: 6px; }
 /* 제작진 화면 (원작 게임종료 때의 ECPPLANE 화면과 같은 검은 바탕 흰 글자) */
-#titlescreen .page { position: absolute; inset: 0; background: #000; cursor: pointer; }
+#titlescreen .page { position: absolute; inset: 0; background: #000; }
+#titlescreen .page nav { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+  gap: 14px; padding: 8px; background: rgba(0,0,0,.75); }
+#titlescreen .page nav span { color: #9c9c90; font-size: 13px; min-width: 40px; text-align: center; }
+#titlescreen .page nav button { all: unset; cursor: pointer; padding: 2px 8px; color: #9c9c90; text-shadow: 1px 1px 0 #3c3c3c;
+  font: 700 14px/20px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+#titlescreen .page nav button:hover:not(:disabled), #titlescreen .page nav button:focus-visible { color: #fcfcfc; }
+#titlescreen .page nav button:disabled { opacity: .35; cursor: default; }
+#titlescreen .page nav .close { position: absolute; right: 12px; }
 #titlescreen .page img { width: 640px; height: 480px; }
 #titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: #fcfcfc; text-align: center; font: 16px/1.7 "Apple SD Gothic Neo", "Malgun Gothic", serif; }

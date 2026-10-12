@@ -63,7 +63,7 @@ src/editions/remake/     index.ts — 원작판을 펼쳐 order(페이즈제)·f
 - 테스트 팁: 브라우저 패널이 숨겨지면 rAF 가 멈춰 걷기 애니메이션이 멈춘다 → 로드 직후 `requestAnimationFrame = cb => setTimeout(() => cb(performance.now()), 16)`
 
 ## 타이틀 메뉴 — 완료 (2026-10-12)
-- `src/core/title.ts` 원작 메인 메뉴 재현 (formats.md "메인 메뉴"): 640×480 통째 확대, 로고 번쩍+천둥 → 두루마리 노인 + 돌 창틀. 창 안 = 유랑천하(새로 시작)·지난흔적(이어하기) 원작 버튼 그림 + 장 선택·제작진·판 선택(같은 모양 글자). 제작진 = ECPPLANE 0·1 + 팬 게임 고지 (원작 게임종료 화면 흐름). 로고 연출은 탭마다 한 번 (sessionStorage)
+- `src/core/title.ts` 원작 메인 메뉴 재현 (formats.md "메인 메뉴"): 640×480 통째 확대, 로고 번쩍+천둥 → 두루마리 노인 + 돌 창틀. 창 안 = 글자 버튼 (원작 버튼 그림은 저해상도라 안 씀, 사용자 결정): 유랑천하(새로 시작)·지난흔적(이어하기)·장 선택·제작진·인트로 소리·판 선택. 제작진 = ECPPLANE 0·1 + 팬 게임 고지 3쪽, 이전/다음·←→·Esc. 로고 연출은 페이지를 열 때마다 (게임 중 "타이틀로" 때만 sessionStorage eclipse.skipIntro 로 한 번 건너뜀). 천둥 소리 기본 끔 (localStorage eclipse.introSound), 켜면 음량 0.5
 - `src/core/save.ts` 판마다 localStorage `eclipse.progress.{original|remake}` = {next 이어하기 장, cleared 장 선택 목록, flags}, 마지막 판 `eclipse.edition`
 - 새로 시작 = next 를 1장으로 (클리어 기록은 유지). 이어하기 = next 장. 장 선택 = 클리어한 장 다시 하기 (진행 저장 안 함)
 - 승리 화면: 다음 장 (전투 순서표 `nextStage`, 9장 뒤 진로 선택 3택 = Edition.routeLabels) / 다시 하기 / 타이틀로. 상단 "타이틀" 버튼 (확인 후 새로고침)
