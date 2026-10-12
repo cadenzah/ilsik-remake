@@ -45,26 +45,35 @@ export function sceneLines(keys: string[]) {
 const applies = (s: PostStep) => (!s.routes || s.routes.includes(S.def.route)) && (!s.flag || FLAGS.has(s.flag))
   && (s.item === undefined || hasItem(s.item)) && (s.noItem === undefined || !hasItem(s.noItem))
 
+export type Alive = (troop: number, member: number) => boolean
+export type Note = { text: string }
+
+/** 장면이 아닌 전투 후 단계 하나 (합류·이탈·교체·소지품·플래그). 합류 알림은 notes 에 */
+export function applyStep(s: PostStep, notes: Note[], alive: Alive) {
+  if ('join' in s) { PARTY.push(s.join); notes.push(joinLine(s.join)) }
+  else if ('leave' in s) PARTY.splice(0, PARTY.length, ...PARTY.filter(t => t !== s.leave))
+  else if ('swap' in s) PARTY.forEach((t, i) => { if (t === s.swap[0]) PARTY[i] = s.swap[1] })
+  else if ('count' in s) PARTY.length = s.count                // 일행 배열 직접 대입 (8장 후 2명으로 재설정)
+  else if ('set' in s) PARTY[s.set[0]] = s.set[1]
+  else if ('take' in s) { const i = ITEMS.indexOf(s.take); if (i >= 0) ITEMS.splice(i, 1) }
+  else if ('give' in s) ITEMS.push(s.give)
+  else if ('setFlag' in s) { if (alive(...s.alive)) FLAGS.add(s.setFlag) }
+  // promote (40장 레이몬 직업 단계 +0x62) 는 직업 단계가 아직 없어 건너뛴다
+}
+
 /** 승리 처리: 전투 중 합류(joined)·클리어 보상(reward, 추정)을 넣고, 전투 후 단계를 순서대로 실행해 일행·소지품·플래그를 고친다.
- *  alive(부대, 번호) = 그 대원이 살아 있나. 돌려주는 대사는 장면 뒤에 알림 (원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에 보여 준다) */
-export function finishStage(joined: number[], reward: number[], alive: (troop: number, member: number) => boolean) {
+ *  돌려주는 scenes = 재생할 원작 장면 키, notes = 장면 뒤에 보일 합류 알림 (원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에).
+ *  ownSteps = 개선판 대본이 이 장의 캠페인 단계를 대신 쓴다 → 원작 단계(장면 포함)를 모두 건너뛴다 (script-format.md 3절) */
+export function finishStage(joined: number[], reward: number[], alive: Alive, ownSteps = false) {
   PARTY.push(...joined)
   ITEMS.push(...reward)
-  const scenes: string[] = [], notes: { text: string }[] = []
-  for (const s of S.scenes.post[S.def.n] ?? []) {
+  const scenes: string[] = [], notes: Note[] = []
+  for (const s of ownSteps ? [] : S.scenes.post[S.def.n] ?? []) {
     if (!applies(s)) continue
     if ('scene' in s) scenes.push(s.scene)
-    else if ('join' in s) { PARTY.push(s.join); notes.push(joinLine(s.join)) }
-    else if ('leave' in s) PARTY.splice(0, PARTY.length, ...PARTY.filter(t => t !== s.leave))
-    else if ('swap' in s) PARTY.forEach((t, i) => { if (t === s.swap[0]) PARTY[i] = s.swap[1] })
-    else if ('count' in s) PARTY.length = s.count                // 일행 배열 직접 대입 (8장 후 2명으로 재설정)
-    else if ('set' in s) PARTY[s.set[0]] = s.set[1]
-    else if ('take' in s) { const i = ITEMS.indexOf(s.take); if (i >= 0) ITEMS.splice(i, 1) }
-    else if ('give' in s) ITEMS.push(s.give)
-    else if ('setFlag' in s) { if (alive(...s.alive)) FLAGS.add(s.setFlag) }
-    // promote (40장 레이몬 직업 단계 +0x62) 는 직업 단계가 아직 없어 건너뛴다
+    else applyStep(s, notes, alive)
   }
-  return [...sceneLines(scenes), ...notes]
+  return { scenes, notes }
 }
 
 export type Next = { n: number; route: number } | { choose: [number, number, number] } | null

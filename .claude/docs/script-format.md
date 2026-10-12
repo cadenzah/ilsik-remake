@@ -1,4 +1,4 @@
-# 개선판 대본 형식 (S3 설계안, 2026-10-13 — 사용자 확인 대기)
+# 개선판 대본 형식 (S3, 2026-10-13 사용자 확정 — 5절 4가지 모두 추천안)
 
 목표: S2 제안 1~15 를 개선판에 쌓을 그릇. 원작판은 지금처럼 `scenes.json`(EXE 추출)을 그대로 쓰고,
 개선판은 `content/remake/` 의 대본이 원작 장면을 **장면 단위로 덮어쓰거나 새 장면을 더한다**. 엔진(대화 재생기·캠페인 실행기)은 공통.
@@ -12,7 +12,7 @@ content/remake/
   names.json                 화자 이름 → 유닛 번호, 표기 통일 (제안 13: 아크리스→아리크스 등)
 ```
 - 확장자 `.ecs` = 줄 단위 글 (JSON 아님). 대사를 쓰고 고치기 쉽고 git diff 가 읽힌다.
-- 웹은 Vite `import.meta.glob('…/*.ecs', { query: '?raw' })` 로 읽어 `src/core/script.ts` 가 실행 때 해석 (빌드 도구 추가 없음). 문법 오류는 `pnpm check` 의 검사 스크립트가 줄 번호와 함께 알린다.
+- 웹은 Vite `import.meta.glob('…/*.ecs', { query: '?raw' })` 로 읽어 (`src/editions/remake/index.ts`) `src/core/script.ts` 가 판을 불러올 때 해석 (빌드 도구 추가 없음). 문법 오류 = 게임 화면에 `파일:줄: 이유` (ScriptError).
 - 저작권: 원작 문장을 그대로 쓰는 줄은 **원작 줄 번호만** 적는다 (`=123`). 저장소에 들어가는 글은 새로 쓰거나 현대어로 고쳐 쓴 문장뿐.
 
 ## 2. 문법 (예: 3장)
@@ -67,3 +67,10 @@ win: 휴, 다들 무사하지?
 2. 덮어쓰기 단위 = 장면 통째 + `keep` 덧붙이기 (줄 패치 없음)
 3. 원작 줄 재사용 = 번호 참조 (`=33`), 고쳐 쓴 줄은 새 문장으로 저장
 4. 개선판에 `do` 가 있으면 그 장 원작 캠페인 단계 전체 대체
+
+## 6. 구현 상태 (2026-10-13)
+- `src/core/script.ts`: parseChapter (문법 전부), nameIndex (이름#번호, names.json 표기 통일), runBlocks (화자 대체·keep·do·선택지·조건), story(시점, 원작 장면, …) = 블록 없으면 원작 그대로
+- 연결됨: 장 카드 (전투 시작 알림 2.2초), `pre`, `post` (do 있으면 원작 캠페인 단계 전체 대체 — campaign.finishStage ownSteps), `turn N` (그 턴의 원작 턴 이벤트 장면을 keep 으로)
+- 아직: `troop`·`dead`·`hp`·`win`·`lose` 시점 (해석만 됨), goal 표시, banter.ecs, epilogue.ecs, campaign.json (전투 순서표·진로 문구), 원작 9장 선택지 (지금 '예' 고정) 의 대본화
+- 원작 장면 키 = scenes.json 의 "phase:scene". keep 은 그 시점 원작 장면 전부. 선택지 창 = showResult('선택')
+- 시험 대본 `content/remake/chapters/01.ecs` (장 카드 + keep)

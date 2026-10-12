@@ -10,6 +10,7 @@ import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
+import { chapter, initScript, ownsSteps, story } from './script'
 import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
@@ -57,6 +58,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
   S.tables = tables
   S.types = tables.types
+  initScript(ed.script, tables.types)
   S.scenes = scenes
   S.routeTable = battles.route
   if (camp !== undefined) restore(camp)
@@ -106,7 +108,9 @@ async function start() {
   S.mode = { kind: 'busy' }
   centerOn(S.units[0])
   await fadeIn()
-  await playDialogue(sceneLines(S.scenes.pre[S.def.n] ?? []))
+  const card = chapter()?.card
+  if (card) await toast(`${S.def.n}장 · ${card[0]}${card[1] ? ` — ${card[1]}` : ''}`, 'card', 2200)   // 장 카드 (S2 제안 4)
+  await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
   await runRounds()
 }
 
@@ -239,10 +243,13 @@ export async function checkEnd(): Promise<boolean> {
     if (!result) S.mode = prev
   }
   if (!result) return false
-  await playDialogue(finishStage(S.joined, S.reward, (t, m) => (member([t, m])?.hp ?? 0) > 0))
+  const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
+  await story('post', done.scenes, aliveMember, undefined, done.notes)
   cleared(result === 'ending')
   return true
 }
+
+const aliveMember = (t: number, m: number) => (member([t, m])?.hp ?? 0) > 0
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
@@ -294,7 +301,7 @@ async function turnEvents() {
       }
     }
   }
-  if (scenes.length) await playDialogue(sceneLines(scenes))
+  await story('turn', scenes, aliveMember, String(S.turn))
 }
 
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다 */

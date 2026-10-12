@@ -1,6 +1,10 @@
 // 개선판: 원작판을 바탕으로 덮어쓴다. 지금은 원작판 규칙·AI + 페이즈제 턴 + 편의 기능
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
+import aliases from '../../../content/remake/names.json'
+
+// 개선판 대본 (content/remake/chapters/NN.ecs, 저장소에 커밋). 원문 그대로 받아 core/script.ts 가 해석한다
+const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs', { query: '?raw', import: 'default', eager: true })
 
 export const edition: Edition = {
   ...original,
@@ -13,6 +17,7 @@ export const edition: Edition = {
     const enemy = units.filter(u => u.side === 'enemy')
     return [party, npc, enemy].filter(s => s.length)
   },
+  script: { files, aliases },
   features: { threat: true, forecast: true, quickAttack: true, commandFirst: false, autoRest: true, originalCamp: false },
   // S2 제안 1: 세 길을 목적으로 (story-proposal.md)
   routeLabels: ['레스다의 유언대로 유하 마을의 크란을 찾는다', '끌려간 소녀를 쫓아 북쪽 동굴로', '고신전을 지나 제국으로 곧장'],

@@ -32,6 +32,8 @@ export interface Edition {
    *  autoRest = 이동·공격 없이 차례를 마치면 휴식, 아니면 휴식은 "휴식?" 확인으로만 (원작)
    *  originalCamp = 정비 화면을 원작 동작으로 (⟺ 로 편성 시작·선두만, 뒤까지 빼기, '여행계속' 확인 — 확인은 두 판 공통), 아니면 개선판 (앞에서부터 채워 둠). 정비 화면은 두 판 모두 전투마다 */
   features: { threat: boolean; forecast: boolean; quickAttack: boolean; commandFirst: boolean; autoRest: boolean; originalCamp: boolean }
+  /** 대본 (.ecs 원문, script-format.md). 없으면 원작 장면 그대로 */
+  script?: { files: Record<string, string>; aliases?: Record<string, string> }
   /** 9장 후 진로 선택지 문구 (루트 A·B·C) */
   routeLabels: [string, string, string]
 }
