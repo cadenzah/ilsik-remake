@@ -1,4 +1,4 @@
-"""개선판 대본(content/remake/chapters/*.ecs) 점검: 화자 이름, 원작 줄 번호(=N)가 그 장의 원작 장면에 있는지, 원작 줄 중 빠진 것.
+"""개선판 대본(content/remake/chapters/*.ecs, epilogue.ecs, banter.ecs) 점검: 화자 이름, 원작 줄 번호(=N)가 그 장의 원작 장면에 있는지, 원작 줄 중 빠진 것.
 엔진 문법 검사는 src/core/script.ts (게임이 불러올 때). 사용: python tools/ecs_check.py"""
 import glob, json, os, re
 
@@ -28,9 +28,10 @@ def who_ok(w):
 
 
 bad = 0
-for path in sorted(glob.glob(os.path.join(R, 'content', 'remake', 'chapters', '*.ecs'))):
-    n = int(re.search(r'(\d+)\.ecs$', path)[1])
-    own, used, new = chapter_lines(n), set(), 0
+EPI = os.path.join(R, 'content', 'remake', 'epilogue.ecs')
+for path in sorted(glob.glob(os.path.join(R, 'content', 'remake', 'chapters', '*.ecs'))) + [EPI]:
+    n = int(re.search(r'(\d+)\.ecs$', path)[1]) if path != EPI else 0   # 에필로그 = 0장 (원작 줄 없음)
+    own, used, new = chapter_lines(n) if n else {}, set(), 0
     for i, raw in enumerate(open(path, encoding='utf-8'), 1):
         line = re.sub(r'\s+#.*$|^#.*$', '', raw).strip()
         if line.startswith('=='):   # 블록 머리: dead·hp 의 인물, 조건의 in/party 인물
@@ -52,4 +53,11 @@ for path in sorted(glob.glob(os.path.join(R, 'content', 'remake', 'chapters', '*
         else: new += 1
     miss = sorted(l for l, br in own.items() if l not in used and br != 2)
     print(f'{n:02}장: 원작 {len(own)}줄 중 {len(used)} 사용, 새 줄 {new}' + (f', 안 쓴 원작 줄 {miss}' if miss else ''))
+# 동료 한마디: @ 인물 이름, 시점 이름
+for i, raw in enumerate(open(os.path.join(R, 'content', 'remake', 'banter.ecs'), encoding='utf-8'), 1):
+    line = re.sub(r'\s+#.*$|^#.*$', '', raw).strip()
+    if not line: continue
+    if line.startswith('@'):
+        if not who_ok(line[1:].strip()): print(f'banter.ecs:{i}: 모르는 인물 {line[1:].strip()}'); bad += 1
+    elif not re.match(r'^(start|boss|win):\s*\S', line): print(f'banter.ecs:{i}: 형식'); bad += 1
 print('문제', bad)

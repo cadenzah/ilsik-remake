@@ -10,7 +10,7 @@ import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
-import { blocksAt, chapter, goalStates, initScript, ownsSteps, story, type When } from './script'
+import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { hideMenu, playDialogue, showForecast, showGoals, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
@@ -105,6 +105,7 @@ async function start() {
   S.fired.clear()
   told.clear()
   woke.length = 0
+  resetTalk()
   S.turn = 1
   S.active = []
   S.mode = { kind: 'busy' }
@@ -114,6 +115,7 @@ async function start() {
   if (card) await toast(`${S.def.n}장 · ${card[0]}${card[1] ? ` — ${card[1]}` : ''}`, 'card', 2200)   // 장 카드 (S2 제안 4)
   renderGoals()
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
+  await banter('start')
   await runRounds()
 }
 
@@ -249,11 +251,13 @@ export async function checkEnd(): Promise<boolean> {
   if (result) { S.mode = { kind: 'busy' }; await sleep(400) }
   const won = result === 'win' || result === 'ending'
   const moments = scriptMoments()
+  const bossTalk = !result && bossHit()
   renderGoals()
-  if (deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || moments.length || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
+  if (bossTalk || deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || moments.length || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
     S.mode = { kind: 'busy' }
     for (const [who, keys] of deadScenes) await story('dead', keys, aliveMember, who)
     for (const [w, a] of moments) await story(w, [], aliveMember, a)
+    if (bossTalk) await banter('boss')
     if (won) await story('win', scenes, aliveMember, undefined, lines)
     else if (scenes.length || lines.length) await playDialogue([...sceneLines(scenes), ...lines])
     if (!result) S.mode = prev
@@ -261,6 +265,8 @@ export async function checkEnd(): Promise<boolean> {
   if (!result) return false
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, done.notes)
+  if (result === 'ending') await epilogue(aliveMember)
+  else await banter('win')   // 전투 후 장면 뒤 (보스의 마지막 말 다음). 마지막 전투는 에필로그만
   cleared(result === 'ending')
   return true
 }
@@ -282,6 +288,16 @@ function scriptMoments(): [When, string][] {
     } else if (b.when === 'dead' && [...S.units, ...S.reserve].some(u => named(b.arg!, u) && u.hp <= 0)) once('dead', b.arg)
   }
   return out
+}
+
+/** 보스(패배 조건이 아닌 사망 조건의 대상 = 적 우두머리)가 처음 피해를 입었나 — 동료 한마디 boss (한 전투에 한 번) */
+function bossHit() {
+  if (told.has('banter:boss')) return false
+  const bosses = S.cond.filter(r => 'dead' in r.if && !r.do.includes('lose'))
+    .flatMap(r => 'dead' in r.if ? r.if.dead : []).map(member)
+  if (!bosses.some(u => u && u.hp > 0 && u.hp < u.maxHp)) return false
+  told.add('banter:boss')
+  return true
 }
 
 /** 목표 창: 장 카드의 목표 + 보조 목표 상태 (개선판 대본이 있을 때만) */

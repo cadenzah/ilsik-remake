@@ -176,7 +176,7 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
   }
   const run = async (body: Entry[]) => {
     for (const e of body) {
-      if ('keep' in e) buf.push(...sceneLines(keep))
+      if ('keep' in e) { const ls = sceneLines(keep); ls.forEach(l => l.who && spoke.add(l.who.id)); buf.push(...ls) }
       else if ('do' in e) {
         const notes: Note[] = []
         e.do.forEach(s => applyStep(s, notes, alive))
@@ -189,6 +189,7 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
         const who = speaker(e.who, e.opt)
         if (who === null) continue
         last = who?.id
+        if (who) spoke.add(who.id)
         buf.push({ who, text: e.text ?? S.dialogue[e.ref!] ?? '' })
       }
     }
@@ -229,7 +230,7 @@ let names: ReturnType<typeof nameIndex> = () => undefined
 let loadedFor: object | null = null
 
 /** 판의 대본 파일을 한 번 해석해 둔다 (유닛 표가 있어야 이름을 번호로). 문법 오류는 그대로 던진다 */
-export function initScript(src: { files: Record<string, string>; aliases?: Record<string, string> } | undefined, types: UnitType[]) {
+export function initScript(src: ScriptSource | undefined, types: UnitType[]) {
   if (loadedFor === (src ?? null) && chapters.size) return
   loadedFor = src ?? null
   chapters = new Map()
@@ -238,14 +239,78 @@ export function initScript(src: { files: Record<string, string>; aliases?: Recor
     const n = Number(/(\d+)\.ecs$/.exec(path)?.[1])
     if (n) chapters.set(n, parseChapter(path, n, text, s => names(s)))
   }
+  banterLines = src?.banter ? parseBanter('banter.ecs', src.banter, s => names(s), types) : new Map()
+  epilogueCh = src?.epilogue ? parseChapter('epilogue.ecs', 0, src.epilogue, s => names(s)) : undefined
 }
+export interface ScriptSource { files: Record<string, string>; aliases?: Record<string, string>; banter?: string; epilogue?: string }
 
 export const chapter = (n = S.def.n) => chapters.get(n)
 
 /** 그 시점의 이야기를 재생: 대본 블록이 있으면 그것 (keep = 원작 장면), 없으면 원작 장면 그대로. extra = 끝에 붙일 줄 (합류 알림 등) */
 export async function story(when: When, keep: string[], alive: Alive, arg?: string, extra: Note[] = []) {
   const blocks = blocksAt(chapter(), when, arg)
-  if (!blocks.length) { if (keep.length || extra.length) await playDialogue([...sceneLines(keep), ...extra]); return }
+  if (!blocks.length) {
+    const ls = sceneLines(keep)
+    ls.forEach(l => l.who && spoke.add(l.who.id))
+    if (ls.length || extra.length) await playDialogue([...ls, ...extra])
+    return
+  }
   await runBlocks(blocks, keep, alive, names)
   if (extra.length) await playDialogue(extra)
+}
+
+// ---------- 동료 한마디 (banter.ecs, 제안 8) ----------
+
+export type BanterKind = 'start' | 'boss' | 'win'
+let banterLines = new Map<string, Record<BanterKind, string[]>>()   // 유닛 이름 ("이름#번호" 로 쓰면 "#번호") → 시점별 줄
+const spoke = new Set<number>()   // 이번 전투에 장면에서 말한 유닛 (한마디는 말이 없던 동료에게)
+let lastBanter = ''
+
+/** "@ 이름" 아래 "start|boss|win: 대사" 줄들 */
+export function parseBanter(file: string, src: string, name: (s: string) => number | undefined, types: UnitType[]) {
+  const out = new Map<string, Record<BanterKind, string[]>>()
+  let cur: Record<BanterKind, string[]> | null = null
+  src.split('\n').forEach((raw, i) => {
+    const line = raw.replace(/\s+#.*$|^#.*$/, '').trim()
+    if (!line) return
+    const err = (m: string): never => { throw new ScriptError(file, i + 1, m) }
+    if (line.startsWith('@')) {
+      const who = line.slice(1).trim()
+      const id = name(who) ?? err(`모르는 인물: ${who}`)
+      const key = who.includes('#') ? `#${id}` : types[id].name   // 소피아#28 = 합류한 소피아만 (1~8장 소피아#27 제외)
+      cur = out.get(key) ?? { start: [], boss: [], win: [] }
+      out.set(key, cur)
+      return
+    }
+    const m = /^(start|boss|win):\s*(.+)$/.exec(line) ?? err('"start|boss|win: 대사" 꼴이 아님')
+    if (!cur) err('@ 인물 줄이 먼저 와야 한다')
+    cur![m[1] as BanterKind].push(m[2])
+  })
+  return out
+}
+
+/** 새 전투: 장면에서 말한 사람 기록을 비운다 */
+export const resetTalk = () => spoke.clear()
+
+/** 출전한(살아 있는) 동료 중 한마디 줄이 있고 이번 전투 장면에서 말하지 않은 1명이 한 줄. 선두 제외, 같은 줄 연속 금지 */
+export async function banter(kind: BanterKind) {
+  const lead = PARTY[0]
+  const cands = S.units.filter(u => u.troop === 0 && u.hp > 0 && u.type.id !== lead && !spoke.has(u.type.id))
+    .map(u => ({ u, ls: ((banterLines.get(`#${u.type.id}`) ?? banterLines.get(u.type.name))?.[kind] ?? []).filter(l => l !== lastBanter) })).filter(c => c.ls.length)
+  if (!cands.length) return
+  const c = cands[Math.floor(Math.random() * cands.length)]
+  const text = c.ls[Math.floor(Math.random() * c.ls.length)]
+  lastBanter = text
+  spoke.add(c.u.type.id)
+  await playDialogue([{ who: c.u.type, text }])
+}
+
+// ---------- 에필로그 (epilogue.ecs, 제안 15) ----------
+
+let epilogueCh: Chapter | undefined
+
+/** 엔딩 뒤 후일담: epilogue.ecs 의 post 블록 (조건 = 일행·플래그 등 결과) */
+export async function epilogue(alive: Alive) {
+  const blocks = blocksAt(epilogueCh, 'post')
+  if (blocks.length) await runBlocks(blocks, [], alive, names)
 }
