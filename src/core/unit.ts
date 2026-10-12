@@ -11,6 +11,8 @@ export interface Unit {
   x: number; y: number
   hp: number; maxHp: number
   atk: number; def: number; spi: number; agi: number; mov: number
+  fatigue: number                // 피로 0~100 (런타임 +0x3a). 공격·이동으로 쌓이고 휴식으로 준다, 공격·방어력·행동 순서를 떨어뜨린다
+  steps: number                  // 이번 차례에 움직인 칸 (피로 계산)
   range: [number, number]
   acted: boolean
   moved: boolean                 // 이번 차례에 움직였다 (휴식 판정, 이동 취소 때 되돌린다)

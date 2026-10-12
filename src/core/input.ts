@@ -53,7 +53,11 @@ function onHover(t: Pos | null, sx: number, sy: number) {
   const aim = S.ed.features.forecast && there?.side === 'enemy' && (
     (md.kind === 'selected' && attackSpots(md.unit, md.moves, there).length > 0) ||
     (md.kind === 'targeting' && inRange(md.unit, md.unit, there)))
-  if (aim && (md.kind === 'selected' || md.kind === 'targeting')) showForecast(md.unit, there, S.ed.rules.damageRange(md.unit, there), sx, sy)
+  if (aim && (md.kind === 'selected' || md.kind === 'targeting')) {
+    // 이동 전이면 한 번에 이동+공격이 설 칸 (가장 가까운 공격 칸) 의 지형으로
+    const at = md.kind === 'selected' ? attackSpots(md.unit, md.moves, there).sort((a, b) => dist(a, md.unit) - dist(b, md.unit))[0] : md.unit
+    showForecast(md.unit, there, S.ed.rules.damageRange(S.map, md.unit, there, at), sx, sy)
+  }
   else showForecast(null, null)
 }
 

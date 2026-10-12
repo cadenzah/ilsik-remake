@@ -3,16 +3,20 @@ import type { Item, StageMap, UnitType } from './data'
 import type { Pos, Unit } from './unit'
 
 export interface Rules {
-  /** 피해 범위 [최소, 최대] */
-  damageRange(a: Unit, d: Unit): [number, number]
-  rollDamage(a: Unit, d: Unit): number
+  /** 피해 범위 [최소, 최대]. at = 공격자가 칠 자리 (없으면 지금 자리, 지형 보정용) */
+  damageRange(map: StageMap, a: Unit, d: Unit, at?: Pos): [number, number]
+  rollDamage(map: StageMap, a: Unit, d: Unit): number
   /** 사거리 [최소, 최대] */
   weaponRange(t: UnitType, items: Map<number, Item>): [number, number]
   /** 휴식 회복량 (최대HP 를 넘지 않게는 엔진이 자른다) */
   restHeal(u: Unit): number
+  /** 휴식 뒤 피로 */
+  restFatigue(u: Unit): number
+  /** 차례를 마칠 때 피로 (u.steps = 이번 차례에 움직인 칸, attacked = 공격했나) */
+  fatigueAfter(u: Unit, attacked: boolean): number
 }
 
-export interface AiPlan { unit: Unit; dest: Pos; target?: Unit }
+export interface AiPlan { unit: Unit; dest: Pos; target?: Unit; rest?: boolean }   // rest = 제자리 휴식
 
 export interface Edition {
   id: 'original' | 'remake'

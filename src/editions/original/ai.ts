@@ -32,6 +32,7 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
   const stay = { unit: u, dest: { x: u.x, y: u.y } }
   if (troopState[u.troop] === 1 && partyInReach(map, units, u)) troopState[u.troop] = 0
   if (troopState[u.troop] === 1 || troopState[u.troop] === 2) return stay
+  if (u.fatigue > 70) return { ...stay, rest: true }   // [추정] 원작 20ec:abe1 피로 > 70 분기 = 휴식 (세부 미분석)
   const foes = units.filter(o => o.hp > 0 && o.side !== u.side)
   const moves = reachable(map, units, u)
   let best: AiPlan | null = null
@@ -39,12 +40,12 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
   for (const f of foes) {
     const spots = attackSpots(u, moves, f)
     if (!spots.length) continue
-    const [lo, hi] = rules.damageRange(u, f)
+    // 같은 대상이면 이동이 적은 칸 우선
+    spots.sort((a, b) => dist(a, u) - dist(b, u))
+    const [lo, hi] = rules.damageRange(map, u, f, spots[0])
     const score = (lo >= f.hp ? 1000 : 0) + (lo + hi) / 2 - f.def * 0.1
     if (score > bestScore) {
       bestScore = score
-      // 같은 대상이면 이동이 적은 칸 우선
-      spots.sort((a, b) => dist(a, u) - dist(b, u))
       best = { unit: u, dest: spots[0], target: f }
     }
   }

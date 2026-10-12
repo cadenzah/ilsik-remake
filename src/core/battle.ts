@@ -23,7 +23,7 @@ function spawn(p: Placement, side: Unit['side']): Unit {
   const st = equippedStats(t, S.tables.items)
   if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
   return {
-    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st,
+    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: t.fatigue, steps: 0,
     range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
@@ -116,6 +116,7 @@ const sleep = (ms: number) => new Promise(ok => setTimeout(ok, ms))
 
 export async function walk(u: Unit, path: Pos[]) {
   if (path.length > 1) u.moved = true
+  u.steps += path.length - 1
   for (const p of path.slice(1)) {
     u.facing = p.x > u.x ? 'right' : p.x < u.x ? 'left' : p.y > u.y ? 'down' : 'up'
     const sx = u.x, sy = u.y, t0 = performance.now()
@@ -140,7 +141,7 @@ async function attack(a: Unit, d: Unit) {
   a.px += dx; a.py += dy
   await sleep(120)
   a.px = a.x; a.py = a.y
-  const dmg = S.ed.rules.rollDamage(a, d)
+  const dmg = S.ed.rules.rollDamage(S.map, a, d)
   d.hp = Math.max(0, d.hp - dmg)
   if (S.troopState[d.troop] === 1) S.troopState[d.troop] = 0   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
   d.flash = performance.now() + 160
@@ -155,12 +156,14 @@ async function attack(a: Unit, d: Unit) {
 function rest(u: Unit) {
   const heal = Math.min(S.ed.rules.restHeal(u), u.maxHp - u.hp)
   u.hp += heal
+  u.fatigue = S.ed.rules.restFatigue(u)
   S.floats.push({ x: u.x, y: u.y, text: heal ? `+${heal}` : '휴식', t0: performance.now(), color: '#7dff9a' })
 }
 
 /** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
 function finishUnit(u: Unit, attacked = false) {
   if (S.ed.features.autoRest && !attacked && !u.moved) rest(u)
+  else tire(u, attacked)
   u.acted = true
   S.mode = { kind: 'idle' }
   hideMenu()
@@ -169,6 +172,12 @@ function finishUnit(u: Unit, attacked = false) {
     if (over) stepDone?.(true)
     else if (S.active.every(a => a.acted || a.hp <= 0)) stepDone?.(false)
   })
+}
+
+/** 차례를 마칠 때 피로 (공격·이동). 휴식한 차례는 쌓지 않는다 */
+function tire(u: Unit, attacked: boolean) {
+  u.fatigue = S.ed.rules.fatigueAfter(u, attacked)
+  u.steps = 0
 }
 
 // ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
@@ -291,7 +300,7 @@ async function turnEvents() {
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다 */
 async function runRounds() {
   for (;;) {
-    for (const u of S.units) { u.acted = false; u.moved = false }
+    for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
     S.mode = { kind: 'busy' }
     await turnEvents()
     let bannered = false
@@ -336,6 +345,7 @@ export function endPlayerStep() {
   cancel()
   for (const u of S.active) {
     if (!u.acted && u.hp > 0 && S.ed.features.autoRest && !u.moved) rest(u)
+    else if (!u.acted && u.hp > 0) tire(u, false)
     u.acted = true
   }
   S.mode = { kind: 'busy' }
@@ -347,11 +357,14 @@ async function aiStep(units: Unit[]): Promise<boolean> {
   for (const u of units) {
     if (u.hp <= 0 || !S.units.includes(u)) continue
     const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
+    if (plan.rest) { rest(u); continue }
     const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
     const acts = path.length > 1 || (plan.target && plan.target.hp > 0)
     if (acts && units.length === 1) updatePhase(`${u.type.name} 차례`)
     if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
-    if (plan.target && plan.target.hp > 0) { centerOnIfOff(u); await attack(u, plan.target) }
+    const hits = !!plan.target && plan.target.hp > 0
+    if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
+    tire(u, hits)
     if (await checkEnd()) return true
   }
   return false
@@ -372,6 +385,7 @@ export function cancel() {
     md.unit.x = md.unit.px = md.from.x
     md.unit.y = md.unit.py = md.from.y
     md.unit.moved = false
+    md.unit.steps = 0
     select(md.unit)
   } else if (md.kind === 'selected') S.mode = { kind: 'idle' }
 }

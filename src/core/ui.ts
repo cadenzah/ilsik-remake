@@ -31,7 +31,7 @@ export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
          <div class="name">${u.type.name}<span class="lv">Lv ${u.type.lv}${npc ? ' · NPC (자동)' : ''}</span></div>
          <div class="bar"><i style="width:${(100 * u.hp) / u.maxHp}%"></i></div>
          <div style="font-size:13px">HP <b>${u.hp}</b> / ${u.maxHp}</div>
-         <div class="stats"><span>역량 <b>${u.atk}</b></span><span>방어 <b>${u.def}</b></span><span>정신 <b>${u.spi}</b></span><span>민첩 <b>${u.agi}</b></span><span>이동 <b>${u.mov}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
+         <div class="stats"><span>역량 <b>${u.atk}</b></span><span>방어 <b>${u.def}</b></span><span>정신 <b>${u.spi}</b></span><span>민첩 <b>${u.agi}</b></span><span>이동 <b>${u.mov}</b></span><span>피로 <b>${u.fatigue}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
          ${t ? loadout(u, t) : ''}
        </div>
        <div class="terrain">${terrain ?? ''}${u.acted ? ' · 행동 완료' : ''}</div>`
@@ -43,7 +43,8 @@ export function showForecast(a: Unit | null, d: Unit | null, range: [number, num
   if (!a || !d) { ui.forecast.hidden = true; return }
   const [lo, hi] = range
   const kill = lo >= d.hp ? '<div class="kill">확정 처치</div>' : hi >= d.hp ? '<div class="kill">처치 가능</div>' : ''
-  ui.forecast.innerHTML = `<b>${a.type.name}</b> → <b>${d.type.name}</b><br>피해 ${lo}~${hi} (남은 HP ${Math.max(0, d.hp - hi)}~${Math.max(0, d.hp - lo)})${kill}`
+  const span = (x: number, y: number) => x === y ? `${x}` : `${x}~${y}`   // 원작 공식은 난수가 없어 한 값
+  ui.forecast.innerHTML = `<b>${a.type.name}</b> → <b>${d.type.name}</b><br>피해 ${span(lo, hi)} (남은 HP ${span(Math.max(0, d.hp - hi), Math.max(0, d.hp - lo))})${kill}`
   ui.forecast.hidden = false
   ui.forecast.style.left = `${sx + 18}px`
   ui.forecast.style.top = `${sy + 18}px`
