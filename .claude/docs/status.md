@@ -1,6 +1,6 @@
 # 현재 상태 (덮어쓰기로 갱신)
-단계: 5.5단계. 정비 화면 도구 장착·해제·버리기 (원작 규칙, 무기·방어구 교체는 원작에 없음), 설정 메뉴 (원작 글꼴 = 모든 화면 웹 글꼴 eclipse-font.woff · 로고 효과음), 원작 전투 공식 두 판 반영 (난수 없음, 지형·피로, rules.md)
-다음: S3a (개선판 대본 쓰기) — 장 카드 43장 (제안 4), 표기·말투 통일 + 현대어 (13, names.json 표기), 화자 대체 (11), 진로 문구 (1), 광왕 언급 (10). 형식·엔진 완료 (script-format.md 6절)
-그 뒤 후보: 대본 시점 troop·dead·hp·win·lose 연결, goal 표시 / 경험치·레벨업 (DS 표 추출) / 마법·상태 이상 / 공격 유형 15~18 / 원작 전투 수치 DOSBox 대조
-실행: `pnpm dev` (5173) / `?ed=original&stage=N&route=R` 타이틀 건너뜀, `&party=..&items=..` 정비 화면부터. window.__game.{S,camp,checkEnd,planFor,reachable,toScreen}. 원작 대조 `tools/dosbox.py` (기록 누르지 말 것)
-테스트: 숨은 패널은 rAF 정지 → requestAnimationFrame 을 setTimeout 으로. 대화 넘기기 = keydown Escape. localStorage eclipse.* (테스트 전 백업·뒤에 지울 것)
+단계: 5.5단계. S3a 완료 — 개선판 대본 43장 전부 (`content/remake/chapters/NN.ecs`): 장 카드, 현대어·표기 통일, 화자 대체(`이름|출전`·`이름?`), 9장 금괴 선택지·세 갈래 길 대사, 광왕 언급. 전투 중 트리거 장면을 대본 `dead 이름`·`win` 에 연결 (script-format.md 6~8절)
+다음: S3b (대사 집필) — 3 루트 구멍 (B 32장 채스 합류 사연, A 20·22장 크란 전언, C 35장), 2 보조 목표 + goal 표시 연결, 5 빈 장 도입 (21·23·24·28·30·31·34), 7 소피아, 9 아티스 복선, 12 전투 중 대사 (troop·hp 시점 연결 필요)
+그 뒤 후보: 경험치·레벨업 (DS 표 추출) / 마법·상태 이상 / 공격 유형 15~18 / 원작 전투 수치 DOSBox 대조
+실행: `pnpm dev` (5173) / `?ed=remake&stage=N&route=R` 타이틀 건너뜀 (일행은 기본 3명이라 화자 대체 시험은 실제 진행으로), `&party=..&items=..` 정비 화면부터. window.__game.{S,camp,checkEnd,planFor,reachable,toScreen}. 점검 `tools/ecs_check.py`. 원작 대조 `tools/dosbox.py` (기록 누르지 말 것)
+테스트: 숨은 패널은 rAF 정지 → requestAnimationFrame 을 setTimeout 으로, `while(!window.__game)` 로 부팅 기다림. 대화 넘기기 = #dialogue click (Escape 는 전체 건너뛰기). localStorage eclipse.* (테스트 전 백업·뒤에 지울 것)
