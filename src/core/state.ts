@@ -19,6 +19,7 @@ export const S = {
   enemies: [] as Placement[],
   troopInit: [] as number[],   // 부대별 초기 상태 (+0x235)
   troopState: [] as number[],
+  routeTable: [] as number[][],  // 전투 순서표 route[i][루트] = i번째 전투의 장 번호
   cond: [] as CondRule[],
   turnEv: [] as TurnEvent[],
   fired: new Set<number>(),    // 이미 발동한 규칙 번호

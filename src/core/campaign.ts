@@ -20,3 +20,15 @@ export function postLines(stage: number) {
   return [...sceneLines(steps.flatMap(s => 'scene' in s ? [s.scene] : [])),
     ...steps.flatMap(s => 'join' in s ? [joinLine(s.join)] : [])]
 }
+
+export type Next = { n: number; route: number } | { choose: [number, number, number] } | null
+
+/** 전투 순서표로 다음 장을 찾는다. 진로 선택 장(9장) 뒤면 루트별 첫 장 3개, 마지막 장이면 null */
+export function nextStage(n: number, route: number): Next {
+  const T = S.routeTable
+  const i = T.findIndex((row, k) => k > 0 && row[route] === n)
+  const row = T[i + 1]
+  if (i < 0 || !row || row[route] === n) return null   // 29행은 43장 중복
+  if (n === S.scenes.routeSelectAfter) return { choose: [row[0], row[1], row[2]] }
+  return { n: row[route], route }
+}

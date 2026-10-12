@@ -39,7 +39,7 @@ export interface StageMap {
 export const TW = 56
 export const TH = 48
 
-const A = '/assets'
+export const A = '/assets'
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((ok, fail) => {

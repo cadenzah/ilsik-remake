@@ -6,7 +6,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 export const ui = {
   title: $('title'), phase: $('phase'),
-  btnEnd: $<HTMLButtonElement>('btn-end'), btnThreat: $<HTMLButtonElement>('btn-threat'),
+  btnEnd: $<HTMLButtonElement>('btn-end'), btnTitle: $<HTMLButtonElement>('btn-title'), btnThreat: $<HTMLButtonElement>('btn-threat'),
   card: $('card'), forecast: $('forecast'), menu: $('menu'), toast: $('toast'),
   dialogue: $('dialogue'), dlgPortrait: $<HTMLImageElement>('dlg-portrait'),
   dlgName: $('dlg-name'), dlgText: $('dlg-text'), result: $('result'),
@@ -100,8 +100,16 @@ export function playDialogue(lines: { who?: UnitType; text: string }[]): Promise
   })
 }
 
-export function showResult(title: string, body: string, onRetry: () => void) {
-  ui.result.innerHTML = `<h1>${title}</h1><div>${body}</div><button>다시 하기</button>`
+/** 결과·확인 화면. 버튼을 누르면 화면을 닫고 그 동작을 한다 */
+export function showResult(title: string, body: string, buttons: [string, () => void][], note = '') {
+  ui.result.innerHTML = `<h1>${title}</h1><div>${body}</div><div class="buttons"></div>${note ? `<div class="note">${note}</div>` : ''}`
+  const row = ui.result.querySelector('.buttons')!
+  for (const [label, fn] of buttons) {
+    const b = document.createElement('button')
+    b.textContent = label
+    b.onclick = () => { ui.result.hidden = true; fn() }
+    row.append(b)
+  }
   ui.result.hidden = false
-  ui.result.querySelector('button')!.onclick = () => { ui.result.hidden = true; onRetry() }
+  ;(row.firstElementChild as HTMLElement | null)?.focus()
 }

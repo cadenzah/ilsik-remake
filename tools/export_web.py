@@ -61,6 +61,13 @@ def export_portraits():
         Image.open(os.path.join(IMG, 'ECLIPSE.POR', f)).convert('RGB').save(os.path.join(d, f))
 
 
+def export_ui():
+    """타이틀 로고 (ECPMARK.MAR 0번 위쪽, 아래 발행 문구는 잘라냄), 원작 제작진 화면 (ECPPLANE.ECP 0번)."""
+    d = mkdir('ui')
+    Image.open(os.path.join(IMG, 'ECPMARK.MAR', '000.png')).convert('RGB').crop((0, 0, 640, 300)).save(os.path.join(d, 'title.png'))
+    Image.open(os.path.join(IMG, 'ECPPLANE.ECP', '000.png')).convert('RGB').save(os.path.join(d, 'staff.png'))
+
+
 def export_data():
     d = mkdir('data')
     fnt = open(os.path.join(ROOT, 'original', 'ECLIPSE.FNT'), 'rb').read()
@@ -115,6 +122,8 @@ def export_battles(d):
 if __name__ == '__main__':
     if sys.argv[1:] == ['data']:
         export_data()
+    elif sys.argv[1:] == ['ui']:
+        export_ui()
     else:
-        export_stages(); export_units(); export_portraits(); export_data()
+        export_stages(); export_units(); export_portraits(); export_ui(); export_data()
     print('ok')

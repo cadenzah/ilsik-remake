@@ -1,9 +1,9 @@
 // 마우스·키보드 입력
-import { actionMenu, cancel, doAttack, endPlayerStep, select, walk } from './battle'
+import { actionMenu, cancel, doAttack, endPlayerStep, select, toTitle, walk } from './battle'
 import { attackSpots, dist, inRange, key, pathTo, terrainName } from './grid'
 import { canvas, clampCam, toTile } from './render'
 import { canCommand, S, unitAt } from './state'
-import { showCard, showForecast, ui } from './ui'
+import { showCard, showForecast, showResult, ui } from './ui'
 import type { Pos } from './unit'
 
 async function onClick(t: Pos) {
@@ -96,7 +96,7 @@ export function bindInput() {
   }, { passive: false })
 
   addEventListener('keydown', e => {
-    if (!ui.dialogue.hidden || !S.map) return
+    if (!ui.dialogue.hidden || !ui.result.hidden || !S.map) return
     const k = e.key.toLowerCase()
     const pan = 48 / S.cam.scale
     if (k === 'escape') cancel()
@@ -113,6 +113,8 @@ export function bindInput() {
   ui.btnThreat.hidden = !S.ed.features.threat
   ui.btnThreat.onclick = toggleThreat
   ui.btnEnd.onclick = endPlayerStep
+  ui.btnTitle.onclick = () =>
+    showResult('타이틀로', '진행 중인 전투는 저장되지 않습니다.', [['계속하기', () => {}], ['타이틀로', toTitle]])
   // 원작판은 한 명씩 움직이므로 "턴 종료" = 지금 유닛 대기
   if (S.ed.id === 'original') {
     ui.btnEnd.innerHTML = '대기 <kbd>E</kbd>'

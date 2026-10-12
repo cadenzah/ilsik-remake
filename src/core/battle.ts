@@ -1,10 +1,11 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
-import { FLAGS, joinLine, postLines, sceneLines } from './campaign'
+import { FLAGS, joinLine, nextStage, postLines, sceneLines } from './campaign'
 import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
-import type { Placement, StageDef } from './stage'
+import { recordClear } from './save'
+import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
 import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
@@ -39,12 +40,16 @@ function placements(rec: BattleRecord) {
   return { allies, enemies, troopInit }
 }
 
+let looping = false
+
+/** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다 */
 export async function boot(ed: Edition, def: StageDef) {
   S.ed = ed
   S.def = def
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
   S.tables = tables
   S.scenes = scenes
+  S.routeTable = battles.route
   const rec = battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
   Object.assign(S, placements(rec))
   S.cond = battles.cond[def.n] ?? []
@@ -56,8 +61,9 @@ export async function boot(ed: Edition, def: StageDef) {
   const ids = new Set([...S.allies, ...S.enemies].map(p => p.type))
   await Promise.all([...ids].map(async id => S.sprites.set(id, await loadUnitSprite(id))))
   ui.title.textContent = `${def.title} · ${ed.name}`
+  S.floats = []
   resize()
-  requestAnimationFrame(frame)
+  if (!looping) { looping = true; requestAnimationFrame(frame) }
   await start()
 }
 
@@ -175,7 +181,7 @@ export async function checkEnd(): Promise<boolean> {
   if (!result && !enemiesLeft().length) result = 'win'
   if (result === 'lose') {
     S.mode = { kind: 'busy' }
-    showResult('패배', `${fallen.type.name}이(가) 쓰러졌다.`, () => void start())
+    showResult('패배', `${fallen.type.name}이(가) 쓰러졌다.`, [['다시 하기', () => void start()], ['타이틀로', toTitle]])
     return true
   }
   const prev = S.mode
@@ -187,9 +193,26 @@ export async function checkEnd(): Promise<boolean> {
   }
   if (!result) return false
   await playDialogue(postLines(S.def.n))
-  if (result === 'ending') showResult('엔딩', `${S.turn}턴 만에 ${S.def.title} 클리어 — 엔딩`, () => void start())
-  else showResult('승리', `${S.turn}턴 만에 ${S.def.title} 클리어 — 시험판은 여기까지입니다.`, () => void start())
+  cleared(result === 'ending')
   return true
+}
+
+/** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억) */
+export const toTitle = () => { location.href = location.pathname }
+
+function cleared(ending: boolean) {
+  const def = S.def, next = ending ? null : nextStage(def.n, def.route)
+  if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, [...FLAGS])
+  const go = (n: number, route: number) => {
+    if (def.campaign) recordClear(S.ed.id, def, { n, route }, [...FLAGS])   // 진로 선택 결과를 남긴다
+    void boot(S.ed, stageDef(n, route, true))
+  }
+  const buttons: [string, () => void][] = []
+  if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
+    showResult('진로 선택', '어느 길로 갈까?', S.ed.routeLabels.map((l, r): [string, () => void] => [l, () => go(next.choose[r], r)]))])
+  buttons.push(['다시 하기', () => void start()], ['타이틀로', toTitle])
+  showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons,
+    def.campaign && next ? '장 사이 연결(합류·소지품)은 아직 없어 다음 장도 처음 일행으로 시작합니다.' : '')
 }
 
 // ---------- 턴 ----------

@@ -1,31 +1,32 @@
-// 진입점: 판 선택 (?ed=original | remake, 기본 개선판) → 전투 시작
+// 진입점: 타이틀 화면 (판 선택·새로 시작·이어하기·장 선택·크레딧) → 판 dynamic import → 전투
+// 개발·자동 테스트: ?ed=original|remake&stage=N&route=R 이면 타이틀을 건너뛰고 그 장을 바로 시작한다
 import { boot, checkEnd } from './core/battle'
+import { FLAGS } from './core/campaign'
 import type { Edition } from './core/edition'
 import { reachable } from './core/grid'
 import { bindInput } from './core/input'
 import { resize, toScreen } from './core/render'
-import { stage01, type StageDef } from './core/stage'
+import { stageDef } from './core/stage'
 import { S } from './core/state'
-
-// ?stage=N&route=R 로 다른 장 배치를 시험할 수 있다 (진행은 아직 1장 기준)
-function pickStage(q: URLSearchParams): StageDef {
-  const n = Number(q.get('stage'))
-  if (!n || n === 1) return stage01
-  return { n, title: `${n}장`, route: Number(q.get('route') ?? 0) }
-}
+import { showTitle, type Launch } from './core/title'
 
 const loadEdition = (id: string | null): Promise<Edition> =>
   (id === 'original' ? import('./editions/original') : import('./editions/remake')).then(m => m.edition)
 
 async function main() {
   const q = new URLSearchParams(location.search)
-  const ed = await loadEdition(q.get('ed'))
+  const n = Number(q.get('stage'))
+  const go: Launch = n
+    ? { ed: q.get('ed') === 'original' ? 'original' : 'remake', def: stageDef(n, Number(q.get('route') ?? 0)), flags: [] }
+    : await showTitle()
+  const ed = await loadEdition(go.ed)
   S.ed = ed
+  go.flags.forEach(f => FLAGS.add(f))
   bindInput()
   addEventListener('resize', () => S.map && resize())
   // 개발 중 브라우저에서 상태 확인·자동 테스트용
   if (import.meta.env.DEV) Object.assign(window, { __game: { S, toScreen, reachable, planFor: ed.planFor, checkEnd } })
-  await boot(ed, pickStage(q))
+  await boot(ed, go.def)
 }
 
 main().catch(err => {

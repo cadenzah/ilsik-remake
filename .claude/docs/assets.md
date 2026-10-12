@@ -20,12 +20,15 @@
 - `ECLIPSE.WIN` 3, `ECLIPSE.BS` 3, `ECLIPSE.780` 14 × 640×480 — 화면 배경 추정
 - `ECPnn.MOV/FIG/MAG` (00~10) — 유닛 종류별 이동/공격/마법 애니메이션 (확인, formats.md)
 - `ECLIPSE1/2.SLI` 5 × 568×99 — 슬라이드/컷인 추정
-- `ECPFINAL.ECP` 28 × 62×64, `ECPMARK.MAR` 2 × 640×480
+- `ECPFINAL.ECP` 28 × 62×64
+- `ECPMARK.MAR` 2 × 640×480 — 0 = 타이틀 돌판 로고 「日蝕 Eclipse」+ 발행 문구, 1 = 두루마리 읽는 노인 (확인)
+- `ECPTIT.FAT` 12MB — 원작 타이틀 애니메이션 추정 (FAT 형식 미분석)
 
 ## 웹 자원 (`tools/export_web.py` → public/assets/, gitignore)
 - `stages/NN.png` 타일 아틀라스 (11열, 56×48), `stages/NN.json` {w,h,tiles,layer2,layer3,atlasCols}
 - `units/III.png` 이동 13프레임 가로띠 (56×48, 투명 처리) — 유닛 0~103
 - `portraits/NNN.png` 초상화 96×111
+- `ui/title.png` 타이틀 로고 (ECPMARK.MAR 0번 위쪽 640×300), `ui/staff.png` 원작 제작진 (ECPPLANE.ECP 0번). `export_web.py ui` 로 따로 생성
 - `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`

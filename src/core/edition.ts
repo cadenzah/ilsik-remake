@@ -23,4 +23,6 @@ export interface Edition {
   planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan
   /** 편의 기능: 적 위협 범위, 피해 예측, 적 클릭 한 번에 이동+공격 */
   features: { threat: boolean; forecast: boolean; quickAttack: boolean }
+  /** 9장 후 진로 선택지 문구 (루트 A·B·C) */
+  routeLabels: [string, string, string]
 }

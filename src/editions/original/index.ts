@@ -10,4 +10,6 @@ export const edition: Edition = {
   order,
   planFor,
   features: { threat: false, forecast: false, quickAttack: false },
+  // 원작 선택지 문구는 그래픽이라 아직 못 읽었다 (story.md) — 그때까지 중립 표기
+  routeLabels: ['첫째 길', '둘째 길', '셋째 길'],
 }
