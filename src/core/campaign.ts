@@ -1,9 +1,28 @@
-// 캠페인: 장 사이 플래그와 원작 장면 재생 목록
+// 캠페인: 장 사이에 이어지는 상태 (플래그·일행·소지품)와 원작 장면 재생 목록
+import type { PostStep } from './data'
 import { S } from './state'
 
-// 캠페인 플래그. 장 연결이 없는 동안 npc19 는 켜 둔다 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류,
-// black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
-export const FLAGS = new Set<string>(['npc19'])
+/** 장 사이 상태. 진행 저장(save.ts)에 그대로 들어간다 */
+export interface Camp { flags: string[]; party: number[]; items: number[] }
+
+// 캠페인 플래그 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류, black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
+export const FLAGS = new Set<string>()
+export const PARTY: number[] = []   // 일행 유닛 종류, 순서 = 출전 칸 순서 (0번 = 선두, 쓰러지면 패배)
+export const ITEMS: number[] = []   // 소지품 Item id
+
+export const snapshot = (): Camp => ({ flags: [...FLAGS], party: [...PARTY], items: [...ITEMS] })
+
+/** 상태를 바꿔 넣는다. 없는 값은 새 게임 기본값 — 빈 일행은 boot 가 원작 초기 일행으로 채운다 (scenes.json 로드 뒤).
+ *  캠페인 밖에서 바로 연 장(장 선택 옛 기록·?stage=N)은 npc19 를 켜 둬 36장 루이스 장면을 볼 수 있게 한다 */
+export function restore(c: Partial<Camp> | null) {
+  FLAGS.clear()
+  ;(c?.flags ?? (c ? [] : ['npc19'])).forEach(f => FLAGS.add(f))
+  PARTY.splice(0, PARTY.length, ...(c?.party ?? []))
+  ITEMS.splice(0, ITEMS.length, ...(c?.items ?? []))
+}
+
+/** 소지품이나 일행 장비에 그 도구가 있나 (원작 [bp-0x1a4] 소지품 + 일행 장비 +0x5e 검사) */
+export const hasItem = (id: number) => ITEMS.includes(id) || PARTY.some(t => S.types[t]?.equip.includes(id))
 
 export const joinLine = (type: number) => ({ text: `${S.types[type].name}이(가) 일행에 합류했다.` })
 
@@ -13,12 +32,29 @@ export function sceneLines(keys: string[]) {
     .map(([who, line]) => ({ who: who >= 0 ? S.types[who] : undefined, text: S.dialogue[line] }))
 }
 
-// 승리 후 장면. 원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에 보여 준다
-export function postLines(stage: number) {
-  const steps = (S.scenes.post[stage] ?? [])
-    .filter(s => (!s.routes || s.routes.includes(S.def.route)) && (!s.flag || FLAGS.has(s.flag)) && s.item === undefined)  // 장 사이 소지품은 아직 없음
-  return [...sceneLines(steps.flatMap(s => 'scene' in s ? [s.scene] : [])),
-    ...steps.flatMap(s => 'join' in s ? [joinLine(s.join)] : [])]
+const applies = (s: PostStep) => (!s.routes || s.routes.includes(S.def.route)) && (!s.flag || FLAGS.has(s.flag))
+  && (s.item === undefined || hasItem(s.item)) && (s.noItem === undefined || !hasItem(s.noItem))
+
+/** 승리 처리: 전투 중 합류(joined)·클리어 보상(reward, 추정)을 넣고, 전투 후 단계를 순서대로 실행해 일행·소지품·플래그를 고친다.
+ *  alive(부대, 번호) = 그 대원이 살아 있나. 돌려주는 대사는 장면 뒤에 알림 (원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에 보여 준다) */
+export function finishStage(joined: number[], reward: number[], alive: (troop: number, member: number) => boolean) {
+  PARTY.push(...joined)
+  ITEMS.push(...reward)
+  const scenes: string[] = [], notes: { text: string }[] = []
+  for (const s of S.scenes.post[S.def.n] ?? []) {
+    if (!applies(s)) continue
+    if ('scene' in s) scenes.push(s.scene)
+    else if ('join' in s) { PARTY.push(s.join); notes.push(joinLine(s.join)) }
+    else if ('leave' in s) PARTY.splice(0, PARTY.length, ...PARTY.filter(t => t !== s.leave))
+    else if ('swap' in s) PARTY.forEach((t, i) => { if (t === s.swap[0]) PARTY[i] = s.swap[1] })
+    else if ('count' in s) PARTY.length = s.count                // 일행 배열 직접 대입 (8장 후 2명으로 재설정)
+    else if ('set' in s) PARTY[s.set[0]] = s.set[1]
+    else if ('take' in s) { const i = ITEMS.indexOf(s.take); if (i >= 0) ITEMS.splice(i, 1) }
+    else if ('give' in s) ITEMS.push(s.give)
+    else if ('setFlag' in s) { if (alive(...s.alive)) FLAGS.add(s.setFlag) }
+    // promote (40장 레이몬 직업 단계 +0x62) 는 직업 단계가 아직 없어 건너뛴다
+  }
+  return [...sceneLines(scenes), ...notes]
 }
 
 export type Next = { n: number; route: number } | { choose: [number, number, number] } | null

@@ -1,7 +1,7 @@
 // 진입점: 타이틀 화면 (판 선택·새로 시작·이어하기·장 선택·크레딧) → 판 dynamic import → 전투
 // 개발·자동 테스트: ?ed=original|remake&stage=N&route=R 이면 타이틀을 건너뛰고 그 장을 바로 시작한다
 import { boot, checkEnd } from './core/battle'
-import { FLAGS } from './core/campaign'
+import { snapshot } from './core/campaign'
 import type { Edition } from './core/edition'
 import { reachable } from './core/grid'
 import { bindInput } from './core/input'
@@ -17,16 +17,15 @@ async function main() {
   const q = new URLSearchParams(location.search)
   const n = Number(q.get('stage'))
   const go: Launch = n
-    ? { ed: q.get('ed') === 'original' ? 'original' : 'remake', def: stageDef(n, Number(q.get('route') ?? 0)), flags: [] }
+    ? { ed: q.get('ed') === 'original' ? 'original' : 'remake', def: stageDef(n, Number(q.get('route') ?? 0)) }
     : await showTitle()
   const ed = await loadEdition(go.ed)
   S.ed = ed
-  go.flags.forEach(f => FLAGS.add(f))
   bindInput()
   addEventListener('resize', () => S.map && resize())
   // 개발 중 브라우저에서 상태 확인·자동 테스트용
-  if (import.meta.env.DEV) Object.assign(window, { __game: { S, toScreen, reachable, planFor: ed.planFor, checkEnd } })
-  await boot(ed, go.def)
+  if (import.meta.env.DEV) Object.assign(window, { __game: { S, camp: snapshot, toScreen, reachable, planFor: ed.planFor, checkEnd } })
+  await boot(ed, go.def, go.camp ?? null)
 }
 
 main().catch(err => {

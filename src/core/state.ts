@@ -24,6 +24,8 @@ export const S = {
   turnEv: [] as TurnEvent[],
   fired: new Set<number>(),    // 이미 발동한 규칙 번호
   reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다
+  joined: [] as number[],      // 이번 전투 중 합류한 유닛 종류 (38장 소피아). 승리하면 일행에 넣는다
+  reward: [] as number[],      // 클리어 보상 도구 (BAD, 추정)
   map: null as unknown as StageMap,
   atlas: null as unknown as HTMLImageElement,
   types: [] as UnitType[],

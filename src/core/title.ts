@@ -3,11 +3,12 @@
 // (460,0) 돌 창틀에 유랑천하·지난흔적·게임종료. 게임종료는 제작진·발행 화면(ECPPLANE)을 보여 주고 끝난다.
 // 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·인트로 소리·판 선택.
 // 화면은 640×480 을 통째로 확대
+import type { Camp } from './campaign'
 import { A } from './data'
-import { lastEdition, loadProgress, resetProgress, setLastEdition, type EditionId } from './save'
+import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, type EditionId } from './save'
 import { stageDef, type StageDef } from './stage'
 
-export interface Launch { ed: EditionId; def: StageDef; flags: string[] }
+export interface Launch { ed: EditionId; def: StageDef; camp?: Camp }  // camp 없음 = 캠페인 밖 기본 상태
 
 const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'original', name: '원작판', desc: '원작 규칙·조작 그대로' },
@@ -53,13 +54,13 @@ export function showTitle(): Promise<Launch> {
   let ed = lastEdition()
 
   return new Promise(done => {
-    const launch = (def: StageDef, flags: string[] = []) => {
+    const launch = (def: StageDef, camp?: Camp) => {
       setLastEdition(ed)
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey)
       root.hidden = true
       root.innerHTML = ''
-      done({ ed, def, flags })
+      done({ ed, def, camp })
     }
 
     // 창 안 항목 (글자 버튼)
@@ -88,9 +89,9 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true)) } },
+        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
         { label: '지난흔적', title: p ? `이어하기 — ${chapterName(p.next.n, p.next.route)}부터` : '이어하기 — 저장된 진행 없음',
-          on: p ? () => launch(stageDef(p.next.n, p.next.route, true), p.flags) : undefined },
+          on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
         { label: '제 작 진', on: () => credits(0) },
         { label: '인트로 소리', cls: 'opt', toggle: soundOn(), title: '로고 연출의 천둥 소리',
@@ -105,7 +106,7 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed)!
       const list = [...p.cleared].sort((a, b) => a.n - b.n || a.route - b.route)
       win.classList.add('wide')
-      rows([...list.map(c => ({ label: chapterName(c.n, c.route), on: () => launch(stageDef(c.n, c.route), p.flags) })),
+      rows([...list.map(c => ({ label: chapterName(c.n, c.route), on: () => launch(stageDef(c.n, c.route), c.at) })),
         { label: '돌아가기', cls: 'back', on: menu }])
     }
 

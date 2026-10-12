@@ -1,6 +1,6 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
-import { FLAGS, joinLine, nextStage, postLines, sceneLines } from './campaign'
+import { FLAGS, PARTY, finishStage, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
@@ -29,7 +29,8 @@ function spawn(p: Placement, side: Unit['side']): Unit {
 
 // 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
 function placements(rec: BattleRecord) {
-  const allies: Placement[] = S.scenes.party.slice(0, rec.slots.length)
+  // 일행이 출전 칸보다 많으면 앞에서부터 (원작 출전 선택은 아직 없음)
+  const allies: Placement[] = PARTY.slice(0, rec.slots.length)
     .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
   const troopInit = [0]
   if (rec.npc.length) troopInit.push(rec.npcState)
@@ -43,16 +44,23 @@ function placements(rec: BattleRecord) {
 
 let looping = false
 
-/** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다 */
-export async function boot(ed: Edition, def: StageDef) {
+let atStart: Camp   // 이 장을 시작할 때 장 사이 상태. 다시 하기는 여기로 되돌린다
+
+/** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
+ *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
+export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null) {
   S.ed = ed
   S.def = def
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
   S.tables = tables
   S.scenes = scenes
   S.routeTable = battles.route
+  if (camp !== undefined) restore(camp)
+  if (!PARTY.length) PARTY.push(...scenes.party)
+  atStart = snapshot()
   const rec = battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
   Object.assign(S, placements(rec))
+  S.reward = rec.reward
   S.cond = battles.cond[def.n] ?? []
   S.turnEv = battles.turn[def.n] ?? []
   S.types = tables.types
@@ -70,6 +78,8 @@ export async function boot(ed: Edition, def: StageDef) {
 
 async function start() {
   uidSeq = 0
+  restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
+  S.joined = []
   const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
@@ -186,7 +196,7 @@ export async function checkEnd(): Promise<boolean> {
       else if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
       else if ('scene' in d) scenes.push(d.scene)
       else if ('flag' in d) FLAGS.add(d.flag)
-      else lines.push(joinLine(d.join))
+      else { S.joined.push(d.join); lines.push(joinLine(d.join)) }
     }
   }
   if (!result && !enemiesLeft().length) result = 'win'
@@ -203,7 +213,7 @@ export async function checkEnd(): Promise<boolean> {
     if (!result) S.mode = prev
   }
   if (!result) return false
-  await playDialogue(postLines(S.def.n))
+  await playDialogue(finishStage(S.joined, S.reward, (t, m) => (member([t, m])?.hp ?? 0) > 0))
   cleared(result === 'ending')
   return true
 }
@@ -216,17 +226,16 @@ export const toTitle = () => {
 
 function cleared(ending: boolean) {
   const def = S.def, next = ending ? null : nextStage(def.n, def.route)
-  if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, [...FLAGS])
+  if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, atStart, snapshot())
   const go = (n: number, route: number) => {
-    if (def.campaign) recordClear(S.ed.id, def, { n, route }, [...FLAGS])   // 진로 선택 결과를 남긴다
+    if (def.campaign) recordClear(S.ed.id, def, { n, route }, atStart, snapshot())   // 진로 선택 결과를 남긴다
     void boot(S.ed, stageDef(n, route, true))
   }
   const buttons: [string, () => void][] = []
   if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
     showResult('진로 선택', '어느 길로 갈까?', S.ed.routeLabels.map((l, r): [string, () => void] => [l, () => go(next.choose[r], r)]))])
   buttons.push(['다시 하기', () => void start()], ['타이틀로', toTitle])
-  showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons,
-    def.campaign && next ? '장 사이 연결(합류·소지품)은 아직 없어 다음 장도 처음 일행으로 시작합니다.' : '')
+  showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons)
 }
 
 // ---------- 턴 ----------
