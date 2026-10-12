@@ -7,6 +7,7 @@
   --gold: #e3c06b;
   --ally: #4f8cff;
   --enemy: #ff5a5a;
+  --npc: #5ad28c;
   --hp: #55d17a;
 }
 * { box-sizing: border-box; }
@@ -31,6 +32,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #card img { width: 72px; height: 83px; border-radius: 6px; border: 2px solid var(--line); object-fit: cover; }
 #card.ally img { border-color: var(--ally); }
 #card.enemy img { border-color: var(--enemy); }
+#card.npc img { border-color: var(--npc); }
 #card .name { font-weight: 700; font-size: 16px; }
 #card .lv { color: var(--dim); font-size: 12px; margin-left: 6px; font-weight: 400; }
 .bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 6px 0 2px; }
@@ -53,7 +55,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #toast { position: fixed; top: 38%; left: 50%; transform: translate(-50%, -50%); padding: 14px 36px;
   font-size: 26px; font-weight: 700; letter-spacing: 4px; background: var(--panel); border: 1px solid var(--line);
   border-radius: 10px; pointer-events: none; }
-#toast.enemy { color: var(--enemy); } #toast.ally { color: var(--ally); }
+#toast.enemy { color: var(--enemy); } #toast.ally { color: var(--ally); } #toast.npc { color: var(--npc); }
 
 #dialogue { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(860px, calc(100% - 32px));
   display: flex; gap: 14px; padding: 14px; background: var(--panel); border: 1px solid var(--gold); border-radius: 12px; cursor: pointer; }

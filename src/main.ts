@@ -172,6 +172,10 @@ function toTile(cx: number, cy: number): Pos | null {
 
 const unitAt = (x: number, y: number) => S.units.find(u => u.hp > 0 && u.x === x && u.y === y)
 const alive = (side: Unit['side']) => S.units.filter(u => u.hp > 0 && u.side === side)
+// 플레이어가 조종하는 건 일행(부대 0)뿐. NPC 부대는 같은 편이지만 컴퓨터가 움직인다 (원작 +0x237: 일행 0, NPC 1, 적 2 → 2ff8:0ea0)
+const isNpc = (u: Unit) => u.side === 'ally' && u.troop !== 0
+const party = () => S.units.filter(u => u.hp > 0 && u.troop === 0)
+const canCommand = (u: Unit) => u.troop === 0 && u.hp > 0 && !u.acted
 
 function threatTiles(): Set<number> {
   const out = new Set<number>()
@@ -243,7 +247,7 @@ function frame(now: number) {
     const x = u.px * TW, y = u.py * TH
     ctx.globalAlpha = u.alpha
     // 진영 표시 받침
-    ctx.fillStyle = u.side === 'ally' ? 'rgba(79,140,255,0.55)' : 'rgba(255,90,90,0.55)'
+    ctx.fillStyle = isNpc(u) ? 'rgba(90,210,140,0.55)' : u.side === 'ally' ? 'rgba(79,140,255,0.55)' : 'rgba(255,90,90,0.55)'
     ctx.beginPath()
     ctx.ellipse(x + TW / 2, y + TH - 6, 20, 6, 0, 0, Math.PI * 2)
     ctx.fill()
@@ -342,7 +346,7 @@ function finishUnit(u: Unit) {
   hideMenu()
   showForecast(null, null)
   void checkEnd().then(over => {
-    if (!over && alive('ally').every(a => a.acted)) void endPlayerTurn()
+    if (!over && party().every(a => a.acted)) void endPlayerTurn()
   })
 }
 
@@ -461,19 +465,32 @@ async function endPlayerTurn() {
   if (S.mode.kind === 'busy') return
   cancel()
   S.mode = { kind: 'busy' }
+  // 원작은 라운드마다 모든 유닛을 행동 순서 키로 섞어 한 명씩 움직인다 (124e:26b7). 웹은 아직 아군 → NPC → 적 순서
+  const npcs = S.units.filter(u => u.hp > 0 && isNpc(u))
+  if (npcs.length) {
+    updatePhase('NPC 차례')
+    await toast('NPC 차례', 'npc', 600)
+    if (await aiPhase(npcs)) return
+  }
   updatePhase('적 차례')
   await toast('적 차례', 'enemy', 700)
-  for (const e of alive('enemy')) {
-    if (e.hp <= 0) continue
-    const plan = planFor(S.map, S.units, e, S.troopState)
-    const moves = reachable(S.map, S.units, e)
-    const path = pathTo(moves, plan.dest.x, plan.dest.y)
-    if (path.length > 1) { centerOnIfOff(e); await walk(e, path) }
-    if (plan.target && plan.target.hp > 0) { centerOnIfOff(e); await attack(e, plan.target) }
-    if (await checkEnd()) return
-  }
+  if (await aiPhase(alive('enemy'))) return
   S.turn++
   await beginPlayerTurn()
+}
+
+/** 컴퓨터 조종 유닛을 차례로 움직인다. 전투가 끝나면 true */
+async function aiPhase(units: Unit[]): Promise<boolean> {
+  for (const u of units) {
+    if (u.hp <= 0 || !S.units.includes(u)) continue
+    const plan = planFor(S.map, S.units, u, S.troopState)
+    const moves = reachable(S.map, S.units, u)
+    const path = pathTo(moves, plan.dest.x, plan.dest.y)
+    if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
+    if (plan.target && plan.target.hp > 0) { centerOnIfOff(u); await attack(u, plan.target) }
+    if (await checkEnd()) return true
+  }
+  return false
 }
 
 function centerOnIfOff(u: Unit) {
@@ -523,13 +540,13 @@ async function onClick(t: Pos) {
   const there = unitAt(t.x, t.y)
   if (md.kind === 'busy') return
   if (md.kind === 'idle') {
-    if (there?.side === 'ally' && !there.acted) select(there)
+    if (there && canCommand(there)) select(there)
     return
   }
   if (md.kind === 'selected') {
     const u = md.unit
     if (there === u) { actionMenu(u, { x: u.x, y: u.y }); return }
-    if (there?.side === 'ally' && !there.acted) { select(there); return }
+    if (there && canCommand(there)) { select(there); return }
     if (there?.side === 'enemy') {
       // 이동 + 공격을 한 번에: 대상에 닿는 칸 중 가장 가까운 곳으로
       const spots = attackSpots(u, md.moves, there).sort((a, b) => dist(a, u) - dist(b, u))

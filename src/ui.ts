@@ -23,11 +23,12 @@ function loadout(u: Unit, t: Tables): string {
 export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
   if (!u && !terrain) { ui.card.hidden = true; return }
   ui.card.hidden = false
-  ui.card.className = u ? u.side : ''
+  const npc = !!u && u.side === 'ally' && u.troop !== 0   // 같은 편 NPC 부대, 컴퓨터 조종
+  ui.card.className = u ? (npc ? 'npc' : u.side) : ''
   ui.card.innerHTML = u
     ? `<img src="${portraitUrl(u.type.por)}" alt="">
        <div>
-         <div class="name">${u.type.name}<span class="lv">Lv ${u.type.lv}</span></div>
+         <div class="name">${u.type.name}<span class="lv">Lv ${u.type.lv}${npc ? ' · NPC (자동)' : ''}</span></div>
          <div class="bar"><i style="width:${(100 * u.hp) / u.maxHp}%"></i></div>
          <div style="font-size:13px">HP <b>${u.hp}</b> / ${u.maxHp}</div>
          <div class="stats"><span>역량 <b>${u.atk}</b></span><span>방어 <b>${u.def}</b></span><span>정신 <b>${u.spi}</b></span><span>민첩 <b>${u.agi}</b></span><span>이동 <b>${u.mov}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
