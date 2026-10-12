@@ -1,0 +1,47 @@
+// 전투 상태 — 엔진 모듈들이 함께 읽고 쓴다
+import type { CondRule, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
+import type { Edition } from './edition'
+import type { Moves } from './grid'
+import type { Placement, StageDef } from './stage'
+import type { Pos, Side, Unit } from './unit'
+
+export type Mode =
+  | { kind: 'busy' }
+  | { kind: 'idle' }
+  | { kind: 'selected'; unit: Unit; moves: Moves }
+  | { kind: 'moved'; unit: Unit; from: Pos }
+  | { kind: 'targeting'; unit: Unit; from: Pos }
+
+export const S = {
+  ed: null as unknown as Edition,
+  def: null as unknown as StageDef,
+  allies: [] as Placement[],
+  enemies: [] as Placement[],
+  troopInit: [] as number[],   // 부대별 초기 상태 (+0x235)
+  troopState: [] as number[],
+  cond: [] as CondRule[],
+  turnEv: [] as TurnEvent[],
+  fired: new Set<number>(),    // 이미 발동한 규칙 번호
+  reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다
+  map: null as unknown as StageMap,
+  atlas: null as unknown as HTMLImageElement,
+  types: [] as UnitType[],
+  tables: null as unknown as Tables,
+  dialogue: [] as string[],
+  scenes: null as unknown as Scenes,
+  sprites: new Map<number, HTMLImageElement>(),
+  units: [] as Unit[],
+  turn: 1,
+  active: [] as Unit[],        // 지금 행동 단계에서 플레이어가 움직일 수 있는 일행 대원
+  mode: { kind: 'busy' } as Mode,
+  hover: null as Pos | null,
+  threat: false,
+  cam: { x: 0, y: 0, scale: 1 },
+  floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
+}
+
+export const unitAt = (x: number, y: number) => S.units.find(u => u.hp > 0 && u.x === x && u.y === y)
+export const alive = (side: Side) => S.units.filter(u => u.hp > 0 && u.side === side)
+// 플레이어가 조종하는 건 일행(부대 0)뿐. NPC 부대는 같은 편이지만 컴퓨터가 움직인다 (원작 +0x237: 일행 0, NPC 1, 적 2 → 2ff8:0ea0)
+export const isNpc = (u: Unit) => u.side === 'ally' && u.troop !== 0
+export const canCommand = (u: Unit) => S.active.includes(u) && u.hp > 0 && !u.acted

@@ -1,12 +1,11 @@
 // 적 AI. 행동 여부는 원작 부대 상태(+0x235) [확정, 20ec:a419]:
 //   0 행동 · 1 경계 대기 (일행이 닿으면 또는 맞으면 0) · 2 대기 (장 이벤트로만 풀림) · 3 행동, 이동력 0 · 4 숨김
-// 행동할 때의 대상 고르기는 근사: 공격 가능한 대상 중 가장 큰 피해(처치 우선), 없으면 가장 가까운 상대 쪽으로.
-import type { StageMap } from './data'
-import { attackSpots, damageRange, dist, inside, key, moveCost, reachable, type Pos, type Unit } from './rules'
-
-export interface AiPlan { unit: Unit; dest: Pos; target?: Unit }
-
-const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
+// 행동할 때의 대상 고르기는 근사 [근사]: 공격 가능한 대상 중 가장 큰 피해(처치 우선), 없으면 가장 가까운 상대 쪽으로.
+import type { StageMap } from '../../core/data'
+import type { AiPlan } from '../../core/edition'
+import { attackSpots, DIRS, dist, inside, key, moveCost, reachable } from '../../core/grid'
+import type { Pos, Unit } from '../../core/unit'
+import { rules } from './rules'
 
 /** 상태 1 깨어남: 이동력+1 걸음 안(지형 비용)에 일행(부대 0) 대원이 있다. 다른 유닛에 막히는지는 근사로 무시 */
 function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
@@ -40,7 +39,7 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
   for (const f of foes) {
     const spots = attackSpots(u, moves, f)
     if (!spots.length) continue
-    const [lo, hi] = damageRange(u, f)
+    const [lo, hi] = rules.damageRange(u, f)
     const score = (lo >= f.hp ? 1000 : 0) + (lo + hi) / 2 - f.def * 0.1
     if (score > bestScore) {
       bestScore = score

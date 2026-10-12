@@ -1,6 +1,6 @@
 // DOM 오버레이: 유닛 카드, 피해 예측, 행동 메뉴, 대화창, 알림
 import { portraitUrl, type Tables, type UnitType } from './data'
-import { damageRange, type Unit } from './rules'
+import type { Unit } from './unit'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -38,9 +38,10 @@ export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
     : `<div class="terrain" style="border:0;padding:0">${terrain}</div>`
 }
 
-export function showForecast(a: Unit | null, d: Unit | null, sx = 0, sy = 0) {
+/** 피해 예측. range = 판 규칙의 피해 범위 */
+export function showForecast(a: Unit | null, d: Unit | null, range: [number, number] = [0, 0], sx = 0, sy = 0) {
   if (!a || !d) { ui.forecast.hidden = true; return }
-  const [lo, hi] = damageRange(a, d)
+  const [lo, hi] = range
   const kill = lo >= d.hp ? '<div class="kill">확정 처치</div>' : hi >= d.hp ? '<div class="kill">처치 가능</div>' : ''
   ui.forecast.innerHTML = `<b>${a.type.name}</b> → <b>${d.type.name}</b><br>피해 ${lo}~${hi} (남은 HP ${Math.max(0, d.hp - hi)}~${Math.max(0, d.hp - lo)})${kill}`
   ui.forecast.hidden = false

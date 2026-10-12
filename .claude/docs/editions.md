@@ -29,13 +29,14 @@
 - 배치 변경은 원작 레코드 위에 덮어쓰기(`records["12-1"]` 의 그룹 추가·교체)로. 맵 자체는 원작 그대로 공유.
 
 ## 작업 순서 (안)
-1. **엔진 분리**: main.ts(651줄)에서 렌더·입력·대화 재생기와 "규칙·AI·캠페인 결정"을 떼어 `Rules`/`Ai`/`Campaign` 인터페이스 뒤로. 동작은 그대로.
+1. [x] **엔진 분리**: main.ts(651줄)에서 렌더·입력·대화 재생기와 "규칙·AI·캠페인 결정"을 떼어 `Rules`/`Ai`/`Campaign` 인터페이스 뒤로. 동작은 그대로.
    지금 코드는 작아서(총 1,068줄) 지금 나누는 게 가장 싸다.
-2. **원작판 = 현재 동작 + 확정된 원작 규칙**: 행동 순서를 원작 민첩 키로 (보류 중이던 결정이 에디션으로 풀림). 피해 공식 등 미확정 부분은 [근사] 표시를 달고 원작판에 둔 채
+2. [~] **원작판 = 현재 동작 + 확정된 원작 규칙**: 행동 순서를 원작 민첩 키로 (보류 중이던 결정이 에디션으로 풀림). 피해 공식 등 미확정 부분은 [근사] 표시를 달고 원작판에 둔 채
    EXE 역분석으로 채운다 → 원작판을 위해 4단계 역분석 범위가 전투 공식·경험치·AI 까지 늘어난다.
-3. **개선판 = 원작판 복제로 시작**: 처음엔 같은 데이터를 가리키고, S2 제안·6단계 재설계를 개선판에만 쌓는다.
-4. 타이틀 메뉴: 판 선택 → 새로 시작/이어하기/장 선택(클리어 후)/크레딧(팬 게임 고지).
-5. 확인: `pnpm check` + 두 판 각각 1장 자동 진행 스모크 테스트 (`?ed=original&stage=1`, `?ed=remake&stage=1`).
+   (행동 순서 키 적용 완료, 피로는 0. 남은 것 = 피해·명중·반격·경험치·AI 역분석)
+3. [x] **개선판 = 원작판 복제로 시작**: 처음엔 같은 데이터를 가리키고, S2 제안·6단계 재설계를 개선판에만 쌓는다.
+4. [ ] 타이틀 메뉴: 판 선택 → 새로 시작/이어하기/장 선택(클리어 후)/크레딧(팬 게임 고지).
+5. [x] 확인: `pnpm check` + 두 판 각각 1장 자동 진행 스모크 테스트 (`?ed=original&stage=1`, `?ed=remake&stage=1`).
 
 ## 결정 (2026-10-12 사용자)
 - 이 구조로 진행. 공통 코드를 최대한 많이. 원작판 = 원작 로직·메커니즘, 개선판 = 원작 바탕으로 개선한 분리된 메커니즘
@@ -43,27 +44,20 @@
 - 개선판 대사·데이터(`content/remake/`)는 커밋. 저장소는 나중에 공개 예정
 - 진엔딩 구조(세 루트가 다른 조각 → 숨은 장) 좋다고 함. "다른 길로" 때 능력치·장비를 얼마나 가져갈지는 미정 (아래 답변 참고)
 
-## V1 엔진 분리 설계 (다음 세션에서 바로 구현)
-현재 코드: main.ts 651 (상태 S·초기화·카메라·렌더·애니메이션·승패·턴·AI 진행·입력이 한 파일), rules.ts 129 (이동 탐색 + 피해 근사), ai.ts 62, ui.ts 106 (피해 예측이 rules.damageRange 직접 호출), data.ts 119, stages/stage01.ts.
-목표 배치:
+## V1 엔진 분리 — 완료 (2026-10-12)
 ```
-src/core/   data.ts (그대로 이동) · grid.ts (key·moveCost·reachable·pathTo·dist·inRange·attackSpots·terrainName — rules.ts 에서)
-            unit.ts (Unit·Pos·Side) · render.ts (frame·카메라) · ui.ts · battle.ts (상태·spawn·승패·턴 이벤트·부대 상태·애니메이션·입력)
-            campaign.ts (sceneLines·postLines·플래그 = 그래프 실행기) · edition.ts (Edition 인터페이스)
-src/editions/original/ · src/editions/remake/   (각 index.ts 가 Edition 객체 export, main.ts 가 ?ed= 또는 선택 화면으로 dynamic import)
+src/main.ts            ?ed=original|remake (기본 개선판) → 판 dynamic import → core/battle.boot
+src/core/   data · unit (Unit·Pos·equippedStats [확정]) · grid (이동·경로·사거리) · edition (Edition 인터페이스)
+            state (S·Mode·unitAt/alive/isNpc/canCommand) · render (캔버스·카메라) · ui (DOM 오버레이)
+            battle (초기화·동작·승패·턴 루프·플레이어 명령) · input (마우스·키보드) · campaign (플래그·장면 줄) · stage
+src/editions/original/   rules.ts (피해 [근사]·사거리 [추정]·순서 키 orderKey [확정]·order) · ai.ts (planFor [근사]) · index.ts
+src/editions/remake/     index.ts — 원작판을 펼쳐 order(페이즈제)·features 만 덮어쓴다
 ```
-Edition 인터페이스 (처음엔 최소로, 6단계에서 늘림):
-- `rules`: damageRange(a,d) / rollDamage, weaponRange(type, items), (이후 명중·반격·경험치)
-- `order(units, round)`: 행동 단계 목록 `Unit[][]` 을 돌려준다. 엔진은 단계마다 — 일행이면 그 유닛들만 플레이어 조작, 아니면 AI 실행.
-  개선판(현행) = [일행 전체, NPC 전체, 적 전체] 페이즈제. 원작판 = 순서 키 내림차순 한 명씩 ([u] 단계들, 같으면 부대·대원 순, 숨김·사망은 실행 때 건너뜀).
-  → 두 턴 방식이 같은 엔진 루프로 돌아간다. 원작판 "턴 종료" 버튼 = 현재 유닛 대기
-- `planFor` (AI): 원작판은 지금 ai.ts 를 그대로 쓰되 [근사] 표시, 개선판은 같은 함수를 import 해서 시작 (공통 최대화: 개선판은 원작판 모듈을 import·덮어쓰기)
-- `features`: { threat, forecast, quickAttack } — 원작판 모두 false, 개선판 true. 원작 UI 에 피해 예측이 있었는지는 [확인 필요]
-- `content`: 캠페인·장면 데이터 경로 (원작판 = public/assets/data, 개선판 = 같은 것 + content/remake 덮어쓰기, 처음엔 없음)
-- 원작판 순서 키 계산에 쓰는 피로는 아직 0 (마법·피로 미구현)
-확인: `pnpm check`, `?ed=original` · `?ed=remake` 로 1장 진행 (원작판은 한 명씩 차례), 개발 모드 window.__game 유지
-
-## 정할 것
-- 판 선택을 런타임(타이틀 메뉴, 배포 하나)으로 할지, 빌드 두 개(배포 두 곳)로 할지 — 추천: 런타임
-- 원작판의 충실도 목표: "원작 규칙 그대로" 인지 "원작 규칙 + 편의 기능(위협 범위 표시·되돌리기 등)" 인지 — 편의 기능은 엔진 공통이라 끄고 켜는 옵션으로 둘 수 있다
-- 개선판 대사 파일(`content/remake/`)을 커밋해도 되는지 (저장소 공개 여부)
+- Edition = { rules{damageRange, rollDamage, weaponRange}, order(units, round) → Unit[][], planFor, features{threat, forecast, quickAttack} }
+- 턴 루프 `battle.runRounds`: 라운드마다 턴 시작 이벤트 → order() 단계 차례로. 일행 단계는 플레이어 (단계 유닛이 다 행동하거나 E), 나머지는 AI.
+  order 에는 숨김(reserve)·사망 유닛도 넘기고 실행 때 건너뛴다 → 단계 중에 나타난 부대도 그 라운드에 움직인다 (원작 순서표와 같음)
+- 원작판: 한 명씩, 한 명짜리 일행 단계는 자동 선택, "턴 종료" 버튼 = "대기". 위협 범위 버튼 숨김, 피해 예측·적 클릭 이동+공격·공격 가능 적 표시 없음
+- 개선판: 페이즈제 [일행, NPC, 적], 편의 기능 켬. 알림은 단계가 2명 이상이면 페이즈마다, 아니면 라운드 첫 단계에 "턴 N"
+- `content` (개선판 대사 덮어쓰기 경로)는 S3 에서 대본 형식과 함께 추가
+- 확인: 두 판 1장 자동 진행 클리어 (원작판 12턴, 개선판 8턴), 원작판 7장 NPC 끼어들기, 재시작, 개선판 피해 예측, `pnpm build`
+- 테스트 팁: 브라우저 패널이 숨겨지면 rAF 가 멈춰 걷기 애니메이션이 멈춘다 → 로드 직후 `requestAnimationFrame = cb => setTimeout(() => cb(performance.now()), 16)`

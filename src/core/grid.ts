@@ -1,26 +1,6 @@
-// 전투 규칙. 현재는 근사치 — .claude/docs/rules.md 와 맞춰 유지한다.
-import type { Item, StageMap, UnitType } from './data'
-
-export type Side = 'ally' | 'enemy'
-
-export interface Unit {
-  uid: number
-  type: UnitType
-  side: Side
-  troop: number; member: number   // 원작 부대 번호·대원 번호 (U[troop.member])
-  x: number; y: number
-  hp: number; maxHp: number
-  atk: number; def: number; spi: number; agi: number; mov: number
-  range: [number, number]
-  acted: boolean
-  facing: 'down' | 'up' | 'left' | 'right'
-  // 렌더용 보간 위치
-  px: number; py: number
-  alpha: number
-  flash: number
-}
-
-export interface Pos { x: number; y: number }
+// 맵 격자: 이동 비용·이동 범위·경로·사거리 — 두 판 공통
+import type { StageMap } from './data'
+import type { Pos, Unit } from './unit'
 
 export const key = (x: number, y: number) => y * 1000 + x
 
@@ -38,7 +18,7 @@ export function terrainName(map: StageMap, x: number, y: number): string {
 }
 
 export const inside = (map: StageMap, x: number, y: number) => x >= 0 && y >= 0 && x < map.w && y < map.h
-const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
+export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
 
 /** 정지 가능한 칸 → 직전 칸. `chain` 은 통과만 가능한 칸까지 포함한 전체 경로 정보. */
 export type Moves = Map<number, number> & { chain: Map<number, number> }
@@ -83,39 +63,10 @@ export function pathTo(moves: Moves, x: number, y: number): Pos[] {
   return out
 }
 
-export type Stats = Pick<Unit, 'maxHp' | 'atk' | 'def' | 'spi' | 'agi' | 'mov'>
-
-/** PAD 기본값 + 장착 장비 보정 [확정]. 원작 0aa2:179d 와 같다 (전투 로드 시 모든 부대에 적용).
- *  능력치 번호 1 생명, 2 정신, 3 역량, 4 방어, 6 이동, 7 민첩, 9~16 = 1~8 감소. 5 마법·8 체력은 이 능력치들과 무관 */
-export function equippedStats(t: UnitType, items: Map<number, Item>): Stats {
-  const s: Stats = { maxHp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, mov: t.mov }
-  const field: (keyof Stats | null)[] = [null, 'maxHp', 'spi', 'atk', 'def', null, 'mov', 'agi', null]
-  for (const id of t.equip) {
-    const it = items.get(id)
-    if (!it) continue
-    for (const [n, v] of [it.stat, it.stat2]) {
-      const f = field[n > 8 ? n - 8 : n]
-      if (f) s[f] += n > 8 ? -v : v
-    }
-  }
-  return s
-}
-
 export const dist = (a: Pos, b: Pos) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 export const inRange = (u: Unit, from: Pos, t: Pos) => {
   const d = dist(from, t)
   return d >= u.range[0] && d <= u.range[1]
-}
-
-/** 피해 범위 [최소, 최대]. 공격력 - 방어력×0.7 을 기준으로 ±15%. */
-export function damageRange(a: Unit, d: Unit): [number, number] {
-  const base = Math.max(1, a.atk - d.def * 0.7)
-  return [Math.max(1, Math.floor(base * 0.85)), Math.max(1, Math.ceil(base * 1.15))]
-}
-
-export function rollDamage(a: Unit, d: Unit): number {
-  const [lo, hi] = damageRange(a, d)
-  return lo + Math.floor(Math.random() * (hi - lo + 1))
 }
 
 /** 공격자가 서 있을 수 있는 칸 집합 중 대상에게 닿는 칸들 */

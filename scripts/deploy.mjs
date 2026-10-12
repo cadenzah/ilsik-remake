@@ -11,7 +11,7 @@ const dry = process.argv.includes('--dry')
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit' })
 const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1) }
 
-// src/data.ts 가 시작 시 읽는 파일들
+// src/core/data.ts 가 시작 시 읽는 파일들
 const REQUIRED = ['units', 'items', 'magic', 'dialogue', 'battles', 'scenes'].map(n => `assets/data/${n}.json`)
   .concat(['assets/stages/01.json', 'assets/stages/01.png'])
 
