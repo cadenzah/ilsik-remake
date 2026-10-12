@@ -1,5 +1,5 @@
 # 현재 상태 (덮어쓰기로 갱신)
-단계: 4단계 E4 분석 완료. 승리 = 남은 적 수(+0x1d56) 0, 패배 = U[0.0] 아리크스 HP 0. 장별 호위 패배·보스 처치·목표 칸 도달(36·37장)·소피아 합류(38장)·엔딩(43장) → formats.md "전투 승패 조건"
-다음: 승패 조건을 battles.json(export_web.py)에 `cond` 로 내보내고 src/main.ts checkEnd 를 데이터 기반으로 (Unit 에 부대·대원 번호 필요: 부대 순서 = 일행, NPC, 적 무리). 그 뒤 능력치 번호 5~12
+단계: 4단계 E4 완료. 승패 조건이 battles.json `cond`(tools/cond.py COND)로 나가고 src/main.ts checkEnd 가 데이터 기반 (부대·대원 번호, 숨은 부대 reserve, 상태 변경·장면·합류·엔딩). `?stage=N&route=R` 로 다른 장 배치 시험
+다음: 능력치 번호 5~12 (EAD 장비 필드, formats.md D2) → 부대 상태 0~3 의미(AI 분기) → 37장 숨은 부대 출현 조건
 그 다음: 5단계 스토리 분석 (plan.md S1·S2) — scenes.json + dialogue.json 으로 장별 흐름 정리 가능
-실행: `pnpm start` / `pnpm dev` (포트 5173) / `pnpm run setup`. 데이터 재생성 `pnpm assets`. 장별 조건 `python tools/cond.py [stage]`. 개발 모드 window.__game.S
+실행: `pnpm start` / `pnpm dev` (5173) / `pnpm run setup`. 데이터 `pnpm assets`. 조건 `python tools/cond.py [stage|check]`. 개발 모드 window.__game.{S,checkEnd}

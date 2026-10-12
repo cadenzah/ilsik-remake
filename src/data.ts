@@ -61,11 +61,21 @@ export interface BattleUnit { type: number; at: [number, number] }
 export interface BattleRecord {
   slots: [number, number][]                 // 주인공 일행 출전 칸 (최대 8)
   npc: BattleUnit[]                          // 함께 싸우는 동료·NPC
-  groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active 0 = 처음엔 대기 (추정)
+  npcState: number                           // NPC 부대 초기 상태 (4 = 숨김)
+  groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active = 부대 상태 (4 = 숨김, 0~3 AI 분기·세부 미확인)
   treasure: { item: number; at: [number, number] }[] // 숨은 보물 (추정)
   reward: number[]                           // 클리어 보상 도구 (추정)
 }
-export interface Battles { route: number[][]; records: Record<string, BattleRecord> }
+/** 장별 승패 규칙 (tools/cond.py). 대원 = [부대, 번호], 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 groups */
+export type Member = [troop: number, member: number]
+export type CondIf =
+  | { dead: Member[] }               // 모두 HP 0
+  | { reach: [number, number] }      // U[0.0] 이 그 칸에 도달
+  | { hpBelow: [Member, number] }    // HP < 최대HP × 비율
+  | { onlyLeft: Member }             // 남은 적이 그 대원뿐
+export type CondDo = 'win' | 'lose' | 'ending' | { state: [number[], number] } | { scene: string } | { join: number }
+export interface CondRule { if: CondIf; do: CondDo[] }
+export interface Battles { route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]> }
 export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
 
 /** 원작 대화 장면과 전투 전후 흐름 (tools/script.py, EXE 하드코딩에서 추출).

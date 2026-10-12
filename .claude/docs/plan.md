@@ -33,7 +33,7 @@
 - [x] E1 ECP.EXE 로드 — Ghidra 대신 capstone 기반 `tools/exe.py` (순수 16비트 MZ라 충분)
 - [x] E2 배치 = `ECLIPSE.BAD` + 전투 순서표(3루트) → `battles.json`, 1장에 적용. 남음: 루트 결정 조건, 초기 일행, 능력치 번호 5~12
 - [x] E3 대화 순서·화자·발생 시점 → `scenes.json` (전/중/후 88장면, 합류, 초기 일행, 루트=9장 후 진로선택 메뉴). 남음: 전투 중 트리거 조건 상세, 선택지 UI
-- [x] E4 승리·패배 조건 분석 (formats.md "전투 승패 조건", `tools/cond.py`). 남음: 조건을 JSON 으로 내보내 웹에 적용, 부대 상태 0~3 의미
+- [x] E4 승리·패배 조건 분석 (formats.md "전투 승패 조건", `tools/cond.py`) → `battles.json` cond, 웹 checkEnd 데이터 기반 (`?stage=N&route=R` 로 시험). 남음: 부대 상태 0~3 의미, 27장 메시지 상자, 37장 숨은 부대 출현 조건
 
 ### 5단계 — 스토리 분석과 개선 제안 (사용자 요청)
 - [ ] S1 원작 스토리·캐릭터 구성·시나리오 연출 분석 → `docs/story.md` (줄거리, 장별 흐름, 인물별 등장 비중·대사량)

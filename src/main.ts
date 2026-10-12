@@ -1,4 +1,4 @@
-import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type Scenes, type StageMap, type Tables, type UnitType } from './data'
+import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type CondDo, type CondIf, type CondRule, type Member, type Scenes, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
 import { attackSpots, dist, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
@@ -18,10 +18,22 @@ type Mode =
   | { kind: 'moved'; unit: Unit; from: Pos }
   | { kind: 'targeting'; unit: Unit; from: Pos }
 
+// ?stage=N&route=R 로 다른 장 배치를 시험할 수 있다 (진행은 아직 1장 기준)
+function pickStage(): StageDef {
+  const q = new URLSearchParams(location.search), n = Number(q.get('stage'))
+  if (!n || n === 1) return stage01
+  return { n, title: `${n}장`, route: Number(q.get('route') ?? 0) }
+}
+
 const S = {
-  def: stage01 as StageDef,
+  def: pickStage(),
   allies: [] as Placement[],
   enemies: [] as Placement[],
+  troopInit: [] as number[],   // 부대별 초기 상태 (+0x235)
+  troopState: [] as number[],
+  cond: [] as CondRule[],
+  fired: new Set<number>(),    // 이미 발동한 규칙 번호
+  reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다
   map: null as unknown as StageMap,
   atlas: null as unknown as HTMLImageElement,
   types: [] as UnitType[],
@@ -44,7 +56,7 @@ let uidSeq = 0
 function spawn(p: Placement, side: Unit['side']): Unit {
   const t = S.types[p.type]
   return {
-    uid: uidSeq++, type: t, side, x: p.x, y: p.y, hp: t.hp, maxHp: t.hp,
+    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: t.hp, maxHp: t.hp,
     atk: t.atk, def: t.def, mov: t.mov, range: weaponRange(t), acted: false, awake: side === 'ally' || !!p.awake,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
@@ -56,20 +68,27 @@ function weaponRange(t: UnitType): [number, number] {
   return f2 >= 2 ? [1, f2] : [1, 1]
 }
 
+// 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
 function placements(rec: BattleRecord) {
   const allies: Placement[] = S.scenes.party.slice(0, rec.slots.length)
-    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], awake: true }))
-  for (const n of rec.npc) allies.push({ type: n.type, x: n.at[0], y: n.at[1], awake: true })
-  const enemies: Placement[] = rec.groups.flatMap(g =>
-    g.units.map(u => ({ type: u.type, x: u.at[0], y: u.at[1], awake: g.active === 1 })))
-  return { allies, enemies }
+    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i, awake: true }))
+  const troopInit = [0]
+  if (rec.npc.length) troopInit.push(rec.npcState)
+  rec.npc.forEach((n, i) => allies.push({ type: n.type, x: n.at[0], y: n.at[1], troop: 1, member: i, awake: true }))
+  const base = troopInit.length
+  const enemies: Placement[] = rec.groups.flatMap((g, k) =>
+    g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i, awake: g.active === 1 })))
+  troopInit.push(...rec.groups.map(g => g.active))
+  return { allies, enemies, troopInit }
 }
 
 async function boot() {
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(S.def.n), loadBattles(), loadScenes()])
   S.tables = tables
   S.scenes = scenes
-  Object.assign(S, placements(battles.records[`${S.def.n}-${S.def.route}`]))
+  const rec = battles.records[`${S.def.n}-${S.def.route}`] ?? battles.records[[0, 1, 2].map(r => `${S.def.n}-${r}`).find(k => k in battles.records)!]
+  Object.assign(S, placements(rec))
+  S.cond = battles.cond[S.def.n] ?? []
   S.types = tables.types
   S.dialogue = dialogue
   S.map = stage.map
@@ -84,7 +103,11 @@ async function boot() {
 
 async function start() {
   uidSeq = 0
-  S.units = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
+  const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
+  S.troopState = [...S.troopInit]
+  S.units = all.filter(u => S.troopState[u.troop] !== 4)
+  S.reserve = all.filter(u => S.troopState[u.troop] === 4)
+  S.fired.clear()
   S.turn = 1
   S.mode = { kind: 'busy' }
   centerOn(S.units[0])
@@ -318,21 +341,72 @@ function finishUnit(u: Unit) {
   })
 }
 
+// ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
+
+const member = ([t, m]: Member) => [...S.units, ...S.reserve].find(u => u.troop === t && u.member === m)
+const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
+// +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
+const enemiesLeft = () => [...S.units, ...S.reserve].filter(u => u.side === 'enemy' && u.hp > 0)
+
+function test(c: CondIf): boolean {
+  if ('dead' in c) return c.dead.every(dead)
+  const lead = member([0, 0])!
+  if ('reach' in c) return lead.x === c.reach[0] && lead.y === c.reach[1]
+  if ('hpBelow' in c) { const u = member(c.hpBelow[0]); return !!u && u.hp > 0 && u.hp < u.maxHp * c.hpBelow[1] }
+  const left = enemiesLeft()
+  return left.length === 1 && left[0] === member(c.onlyLeft)
+}
+
+// 부대 상태를 바꾼다. 숨김(4)에서 풀리면 맵에 나오고, 이벤트로 바뀐 부대는 곧바로 움직인다 (0~3 세부 미확인)
+function setTroop(t: number, v: number) {
+  S.troopState[t] = v
+  for (const u of [...S.units, ...S.reserve]) if (u.troop === t) u.awake = true
+  if (v === 4) return
+  for (const u of S.reserve.filter(u => u.troop === t)) {
+    S.reserve.splice(S.reserve.indexOf(u), 1)
+    S.units.push(u)
+  }
+}
+
 async function checkEnd(): Promise<boolean> {
-  const leader = S.units.find(u => u.side === 'ally' && u.type.id === S.def.leader)
-  if (!leader || leader.hp <= 0 || !alive('ally').length) {
+  const lead = member([0, 0])!
+  let result: 'win' | 'lose' | 'ending' | null = lead.hp <= 0 ? 'lose' : null
+  const lines: { text: string }[] = [], scenes: string[] = []
+  let fallen = lead
+  for (const [i, rule] of S.cond.entries()) {
+    if (result || S.fired.has(i) || !test(rule.if)) continue
+    S.fired.add(i)
+    for (const d of rule.do as CondDo[]) {
+      if (typeof d === 'string') {
+        result = d
+        if (d === 'lose' && 'dead' in rule.if) fallen = member(rule.if.dead[0])!
+      }
+      else if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
+      else if ('scene' in d) scenes.push(d.scene)
+      else lines.push({ text: `${S.types[d.join].name}이(가) 일행에 합류했다.` })
+    }
+  }
+  if (!result && !enemiesLeft().length) result = 'win'
+  if (result === 'lose') {
     S.mode = { kind: 'busy' }
-    showResult('패배', `${leader?.type.name ?? '아군'}이(가) 쓰러졌다.`, () => void start())
+    showResult('패배', `${fallen.type.name}이(가) 쓰러졌다.`, () => void start())
     return true
   }
-  if (!alive('enemy').length) {
+  const prev = S.mode
+  if (result) { S.mode = { kind: 'busy' }; await sleep(400) }
+  if (scenes.length || lines.length) {
     S.mode = { kind: 'busy' }
-    await sleep(400)
-    await playDialogue(postLines(S.def.n))
-    showResult('승리', `${S.turn}턴 만에 ${S.def.title} 클리어 — 시험판은 여기까지입니다.`, () => void start())
+    await playDialogue([...sceneLines(scenes), ...lines])
+    if (!result) S.mode = prev
+  }
+  if (!result) return false
+  if (result === 'ending') {
+    showResult('엔딩', `${S.turn}턴 만에 ${S.def.title} 클리어 — 엔딩`, () => void start())
     return true
   }
-  return false
+  await playDialogue(postLines(S.def.n))
+  showResult('승리', `${S.turn}턴 만에 ${S.def.title} 클리어 — 시험판은 여기까지입니다.`, () => void start())
+  return true
 }
 
 // ---------- 턴 ----------
@@ -517,7 +591,7 @@ ui.btnThreat.onclick = toggleThreat
 ui.btnEnd.onclick = () => void endPlayerTurn()
 
 // 개발 중 브라우저에서 상태 확인·자동 테스트용
-if (import.meta.env.DEV) Object.assign(window, { __game: { S, toScreen, reachable, planFor } })
+if (import.meta.env.DEV) Object.assign(window, { __game: { S, toScreen, reachable, planFor, checkEnd } })
 
 boot().catch(err => {
   document.body.innerHTML = `<pre style="color:#f88;padding:20px">${err}\n\n자원이 없으면: .venv/bin/python -I tools/export_web.py</pre>`

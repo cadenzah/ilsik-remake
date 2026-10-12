@@ -3,7 +3,7 @@
 import json, os, struct, sys
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__))
-import stage, units, tables, bad, script
+import stage, units, tables, bad, script, cond
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 IMG = os.path.join(ROOT, 'build', 'img')
@@ -87,6 +87,7 @@ def export_data():
 
 
 def export_battles(d):
+    # 부대 순서 = [0 일행, (npc 있으면) 1 npc, 이후 groups]. 상태(npcState·active) 4 = 처음엔 숨김
     # route[i] = i번째 전투의 [루트0, 루트1, 루트2] 스테이지 번호 (i=1~29). records["s-r"] = 배치 (x, y 칸 좌표)
     R, S, RT = bad.load(), bad.lml_sizes(), bad.route_table()
     recs = {}
@@ -96,11 +97,15 @@ def export_battles(d):
         recs[f'{s}-{r}'] = {
             'slots': xy(p['slots']),
             'npc': [{'type': t, 'at': a} for t, a in zip(p['npc']['types'], xy(p['npc']['pos']))],
+            'npcState': p['npc']['flag'],
             'groups': [{'active': g['active'], 'units': [{'type': t, 'at': a} for t, a in zip(g['types'], xy(g['pos']))]}
                        for g in p['groups']],
             'treasure': [{'item': t['item'], 'at': bad.to_xy(t['pos'], W)} for t in p['treasure']],
             'reward': p['reward']}
-    json.dump({'route': RT, 'records': recs}, open(os.path.join(d, 'battles.json'), 'w'),
+    # cond[stage] = 장별 승패 규칙 (tools/cond.py COND). reach 는 [x, y] 로 바꿔 둔다
+    cnd = {s: [{**c, 'if': {'reach': bad.to_xy(c['if']['reach'], S[s - 1][0])}} if 'reach' in c['if'] else c for c in rules]
+           for s, rules in cond.COND.items()}
+    json.dump({'route': RT, 'records': recs, 'cond': cnd}, open(os.path.join(d, 'battles.json'), 'w'),
               ensure_ascii=False, separators=(',', ':'))
 
 

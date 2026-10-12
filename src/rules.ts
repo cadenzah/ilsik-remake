@@ -7,6 +7,7 @@ export interface Unit {
   uid: number
   type: UnitType
   side: Side
+  troop: number; member: number   // 원작 부대 번호·대원 번호 (U[troop.member])
   x: number; y: number
   hp: number; maxHp: number
   atk: number; def: number; mov: number
