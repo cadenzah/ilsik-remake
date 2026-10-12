@@ -35,4 +35,4 @@
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`
 - 효과음: build/snd/ (아직 웹으로 안 옮김)
-- `FULLSOFT.FNT` — 한글 16×15 · 영문 8×15 비트맵 글꼴, KS 완성형 (formats.md). 웹 `ui/font.png`+`font.json`, 원작판 화면 글자
+- `FULLSOFT.FNT` — 한글 16×15 · 영문 8×15 비트맵 글꼴, KS 완성형 (formats.md). 웹 글꼴 `ui/eclipse-font.woff`, 설정 '원작 글꼴'

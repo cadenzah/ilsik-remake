@@ -1,5 +1,6 @@
 """FULLSOFT.FNT (한글/영문 비트맵 글꼴) 해석·렌더·웹 내보내기. 형식은 .claude/docs/formats.md 'FULLSOFT.FNT' 절.
 사용: python tools/font.py render OUT.png "문자열" [--scale N]   |   python tools/font.py export
+  export = public/assets/ui/eclipse-font.woff (픽셀을 사각형 윤곽으로 옮긴 웹 글꼴, 1px = 64 단위, 16px 에서 원작 크기)
   - 영문(1바이트 <0x80): 0x7483 + c*15, 8×15 (행당 1바이트, MSB 왼쪽), 진행 8
   - 한글(CP949 KS X 1001 2바이트, 행 A1~C8): 0x6dc8d + ((hi-0xA1)*94 + lo-0xA1)*30, 16×15 (행당 2바이트 big-endian), 진행 16
   (EXE 3821:0114 한국어 모드 [0x2706]=1, 3821:02ea 글리프 읽기, 3821:06bb 찍기, 3821:079b 문자열)"""
@@ -84,23 +85,70 @@ def charset():
     return out
 
 
-def export(outdir=None, cols=64):
-    """public/assets/ui/font.png (흰 글자, 나머지 투명) + font.json.
-    font.json = {"h":15, "cell":[16,15], "cols":64, "chars":"…", "glyphs":{문자:[x,y,w]}}
-    chars[i] 의 위치 = ((i%cols)*16, (i//cols)*15). glyphs 는 같은 정보의 사전 (편의)."""
+UNIT = 64        # 글꼴 단위 / 픽셀. 1em = 16px = 1024
+ASCENT = 13      # 기준선 위 줄 수 (영문 A 가 0~12행, g 의 꼬리가 13행)
+
+
+def outline(w, rows):
+    """비트맵을 합친 윤곽 (구멍 포함) 목록으로. 픽셀마다 시계 방향 네 변을 내고, 이웃과 겹치는 변을 지운 뒤 이어 붙인다."""
+    edges = {}
+    for r, bits in enumerate(rows):
+        for c in range(w):
+            if not bits >> (w - 1 - c) & 1: continue
+            x0, x1, top, bot = c, c + 1, ASCENT - r, ASCENT - r - 1
+            for a, b in (((x0, top), (x1, top)), ((x1, top), (x1, bot)), ((x1, bot), (x0, bot)), ((x0, bot), (x0, top))):
+                if (b, a) in edges: del edges[(b, a)]
+                else: edges[(a, b)] = True
+    nxt = {}
+    for a, b in edges: nxt.setdefault(a, []).append(b)
+    loops = []
+    while nxt:
+        a = next(iter(nxt)); loop = [a]
+        while True:
+            b = nxt[a].pop()
+            if not nxt[a]: del nxt[a]
+            if b == loop[0]: break
+            loop.append(b); a = b
+        # 같은 방향으로 이어지는 점은 뺀다
+        pts = [p for i, p in enumerate(loop)
+               if (loop[i - 1][0] - p[0]) * (loop[(i + 1) % len(loop)][1] - p[1]) != (loop[i - 1][1] - p[1]) * (loop[(i + 1) % len(loop)][0] - p[0])]
+        loops.append([(x * UNIT, y * UNIT) for x, y in pts])
+    return loops
+
+
+def export(outdir=None):
+    """원작 글꼴을 웹 글꼴로 (eclipse-font.woff). 글자 = charset() (ASCII + KS 기호 + 한글 2350)."""
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.pens.ttGlyphPen import TTGlyphPen
     outdir = outdir or os.path.join(ROOT, 'public', 'assets', 'ui')
     os.makedirs(outdir, exist_ok=True)
-    chars = charset()
-    rows = (len(chars) + cols - 1) // cols
-    im = Image.new('RGBA', (cols * 16, rows * H), (0, 0, 0, 0))
-    glyphs = {}
-    for i, ch in enumerate(chars):
-        x, y = (i % cols) * 16, (i // cols) * H
-        glyphs[ch] = [x, y, blit(im, x, y, ch, (255, 255, 255, 255))]
-    im.save(os.path.join(outdir, 'font.png'), optimize=True)
-    json.dump({'h': H, 'cell': [16, H], 'cols': cols, 'chars': ''.join(chars), 'glyphs': glyphs},
-              open(os.path.join(outdir, 'font.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
-    return len(chars), im.size
+    order, cmap, metrics, glyphs = ['.notdef'], {}, {'.notdef': (1024, 0)}, {'.notdef': TTGlyphPen(None).glyph()}
+    for ch in charset():
+        w, rows = glyph(ch)
+        name = f'u{ord(ch):04X}'
+        pen = TTGlyphPen(None)
+        for loop in outline(w, rows):
+            pen.moveTo(loop[0])
+            for p in loop[1:]: pen.lineTo(p)
+            pen.closePath()
+        g = pen.glyph()
+        g.recalcBounds(None)
+        order.append(name); cmap[ord(ch)] = name; glyphs[name] = g
+        metrics[name] = (w * UNIT, getattr(g, 'xMin', 0))
+    fb = FontBuilder(16 * UNIT, isTTF=True)
+    fb.setupGlyphOrder(order)
+    fb.setupCharacterMap(cmap)
+    fb.setupGlyf(glyphs)
+    fb.setupHorizontalMetrics(metrics)
+    asc, desc = ASCENT * UNIT, (H - ASCENT) * UNIT
+    fb.setupHorizontalHeader(ascent=asc, descent=-desc)
+    fb.setupNameTable({'familyName': 'Eclipse Bitmap', 'styleName': 'Regular'})
+    fb.setupOS2(sTypoAscender=asc, sTypoDescender=-desc, sTypoLineGap=0, usWinAscent=asc, usWinDescent=desc)
+    fb.setupPost()
+    fb.font.flavor = 'woff'
+    out = os.path.join(outdir, 'eclipse-font.woff')
+    fb.save(out)
+    return len(cmap), os.path.getsize(out)
 
 
 if __name__ == '__main__':

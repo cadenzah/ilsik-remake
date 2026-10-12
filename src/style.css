@@ -9,10 +9,17 @@
   --enemy: #ff5a5a;
   --npc: #5ad28c;
   --hp: #55d17a;
+  --font: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
+/* 설정 '원작 글꼴': 원작 FULLSOFT.FNT 를 옮긴 웹 글꼴 (tools/font.py export). 글꼴에 없는 글자는 시스템 글꼴로. 굵게·기울임 흉내 안 함 */
+@font-face { font-family: "Eclipse Bitmap"; src: url(/assets/ui/eclipse-font.woff) format("woff"); font-display: block; }
+html.bmfont { --font: "Eclipse Bitmap", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; font-synthesis: none; }
+html.bmfont * { font-synthesis: none; }
+html.bmfont #camp .stage { font-size: 16px; line-height: 15px; }   /* 정비 화면 = 원작 픽셀 크기 */
+html.bmfont #camp .desc .say { font-size: 16px; line-height: 16px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-  font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; overflow: hidden; }
+  font-family: var(--font); overflow: hidden; }
 canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: default; }
 button { font: inherit; color: var(--text); background: #262c3d; border: 1px solid var(--line);
   border-radius: 6px; padding: 6px 12px; cursor: pointer; }
@@ -98,7 +105,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .body { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; padding: 0 0 6px; margin-top: -10px;
   max-height: 360px; overflow-y: auto; scrollbar-width: none; }
 #titlescreen .row { all: unset; box-sizing: border-box; cursor: pointer; width: 120px; height: 24px; flex: none; text-align: center;
-  font: 700 16px/24px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; letter-spacing: 2px;
+  font: 700 16px/24px var(--font); letter-spacing: 2px;
   color: #9c9c90; text-shadow: 1px 1px 0 #3c3c3c; }
 #titlescreen .row:hover:not(:disabled), #titlescreen .row:focus-visible { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
 #titlescreen .row.opt { font-size: 12px; height: 20px; line-height: 20px; letter-spacing: 0; margin-top: 4px; color: #6c846c; }
@@ -116,13 +123,13 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
   gap: 14px; padding: 8px; background: rgba(0,0,0,.75); }
 #titlescreen .page nav span { color: #9c9c90; font-size: 13px; min-width: 40px; text-align: center; }
 #titlescreen .page nav button { all: unset; cursor: pointer; padding: 2px 8px; color: #9c9c90; text-shadow: 1px 1px 0 #3c3c3c;
-  font: 700 14px/20px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  font: 700 14px/20px var(--font); }
 #titlescreen .page nav button:hover:not(:disabled), #titlescreen .page nav button:focus-visible { color: #fcfcfc; }
 #titlescreen .page nav button:disabled { opacity: .35; cursor: default; }
 #titlescreen .page nav .close { position: absolute; right: 12px; }
 #titlescreen .page img { width: 640px; height: 480px; }
 #titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: #fcfcfc; text-align: center; font: 16px/1.7 "Apple SD Gothic Neo", "Malgun Gothic", serif; }
+  color: #fcfcfc; text-align: center; font: 16px/1.7 var(--font); }
 #titlescreen .notice h2 { font-size: 20px; margin: 0 0 18px; letter-spacing: 4px; }
 #titlescreen .notice p { margin: 0 0 14px; }
 #menu .menu-title { color: var(--gold); font-weight: 700; padding: 2px 6px 4px; }
@@ -139,7 +146,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #camp { position: fixed; inset: 0; z-index: 20; background: #000; overflow: hidden; }
 #camp .stage { position: absolute; left: 50%; top: 50%; width: 640px; height: 480px; transform-origin: 50% 50%;
   image-rendering: pixelated; user-select: none; cursor: default;
-  font: 14px/16px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
+  font: 14px/16px var(--font); }
 #camp .stage > *, #camp .status > *, #camp .desc > * { position: absolute; }
 #camp .bg { left: 0; top: 0; width: 640px; height: 480px; }
 #camp.editing:not(.remake) .stage { cursor: ew-resize; }   /* 원작: 편성 중 커서 = ⟺ */
@@ -157,9 +164,6 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #camp button { all: unset; position: absolute; box-sizing: border-box; cursor: inherit; }
 #camp .mb.full { opacity: .55; }
 #camp .mb .x { position: absolute; left: 0; top: 0; }   /* 원작 STA 11: 고른 도구를 못 쓰는 인물 */
-#camp .bmp { display: block; image-rendering: pixelated; }   /* 원작 비트맵 글꼴 (font.ts) */
-#camp .num.cur .bmp { margin-left: auto; }
-#camp .dlg .bmp { margin: 0 auto; position: relative; top: 3px; }
 #camp.remake .it.picked { outline: 2px solid #c86414; }
 #camp .hit:focus-visible, #camp .mb:focus-visible, #camp .sb:focus-visible, #camp .it:focus-visible, #camp .eq:focus-visible { outline: 1px dotted #000; }
 /* 개선판: 마우스 올림·남은 칸·선두 표시 */

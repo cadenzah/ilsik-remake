@@ -160,7 +160,8 @@ export function frame(now: number) {
   }
 
   // 떠오르는 피해 숫자
-  ctx.font = 'bold 22px sans-serif'
+  // 원작 글꼴이면 16 의 배수 크기로 (픽셀이 고르게)
+  ctx.font = document.documentElement.classList.contains('bmfont') ? '32px "Eclipse Bitmap", sans-serif' : 'bold 22px sans-serif'
   ctx.textAlign = 'center'
   S.floats = S.floats.filter(f => now - f.t0 < 900)
   for (const f of S.floats) {

@@ -7,8 +7,6 @@
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { fadeIn, fadeOut } from './fade'
-import { bitmapize } from './font'
-import { setting } from './settings'
 import { equippedStats } from './unit'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
@@ -97,9 +95,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   // 정비 화면에서 고치는 사본 (원래 표·캠페인 상태는 전투로 갈 때만 바뀐다)
   const party = o.party.map(t => ({ ...t, equip: [...t.equip] as UnitType['equip'] }))
   const items = [...o.items]
-  const bitmap = setting('bitmapFont')
   let picked: number | null = null   // 고른 소지품 칸 (원작 [bp-0xb7c], 없음 = 0x65)
-  const font = (el: Element) => { if (bitmap) void bitmapize(el, '.txt, .num, .say, .t, button') }   // 설정 '원작 글꼴' = 원작 비트맵 글꼴 (두 판 공통)
 
   // 원작판: 처음엔 편성 아님 (출전 줄 빔). 개선판: 처음부터 편성, 앞에서부터 채워 둠
   let editing = o.remake
@@ -144,7 +140,6 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       b.onclick = show
       b.onmouseenter = show
     })
-    font(status)
   }
 
   // ---- 도구설명 (358,19) ----
@@ -158,7 +153,6 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     }).join('')
     desc.innerHTML = `<span class="ico" style="${px(17, 0, 48, 56)}">${icon(it.id)}</span>` +
       `<span class="txt b" style="${px(72, 3)}">${esc(it.name)}</span>${fx}`
-    font(desc)
   }
   const describeMagic = (id: number) => {
     const m = o.tables.magic.get(id)
@@ -167,9 +161,8 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       `<span class="txt b" style="${px(72, 3)}">${esc(m.name)}</span>` +
       `<span class="txt" style="${px(72, 22)}">${MAGIC_EFFECTS[m.effect] ?? ''}</span>` +
       `<span class="txt" style="${px(72, 41)}">피로 +${m.fatigue}</span>`
-    font(desc)
   }
-  const say = (text: string) => { desc.innerHTML = `<p class="say" data-wrap="190">${esc(text)}</p>`; font(desc) }
+  const say = (text: string) => { desc.innerHTML = `<p class="say">${esc(text)}</p>` }
 
   // ---- 도구 목록 12칸 ----
   const drawItems = () => {
@@ -271,7 +264,6 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.style.cssText = px(x, y, 136, 66)
     dialog.innerHTML = `<div class="t">${title}</div><button class="ok">결정</button><button class="no">취소</button>`
     stage.append(dialog)
-    font(dialog)
     const close = () => { dialog?.remove(); dialog = null }
     dialog.querySelector<HTMLButtonElement>('.ok')!.onclick = () => { close(); ok() }
     dialog.querySelector<HTMLButtonElement>('.no')!.onclick = close

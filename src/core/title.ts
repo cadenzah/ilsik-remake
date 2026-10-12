@@ -7,6 +7,7 @@ import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
 import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, type EditionId } from './save'
+import { applyFont } from './font'
 import { setSetting, setting, type Setting } from './settings'
 import { stageDef, type StageDef } from './stage'
 
@@ -129,7 +130,7 @@ export function showTitle(): Promise<Launch> {
     const settings = (focus = 0) => {
       win.classList.add('wide')
       rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.title,
-        on: () => { setSetting(o.k, !setting(o.k)); settings(SETTINGS.indexOf(o)) } })),
+        on: () => { setSetting(o.k, !setting(o.k)); applyFont(); settings(SETTINGS.indexOf(o)) } })),
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('.opt')[focus]?.focus()
     }

@@ -5,6 +5,7 @@ import { boot, checkEnd } from './core/battle'
 import { snapshot } from './core/campaign'
 import type { Edition } from './core/edition'
 import { reachable } from './core/grid'
+import { applyFont } from './core/font'
 import { bindInput } from './core/input'
 import { resize, toScreen } from './core/render'
 import { stageDef } from './core/stage'
@@ -15,6 +16,7 @@ const loadEdition = (id: string | null): Promise<Edition> =>
   (id === 'original' ? import('./editions/original') : import('./editions/remake')).then(m => m.edition)
 
 async function main() {
+  applyFont()
   const q = new URLSearchParams(location.search)
   const n = Number(q.get('stage'))
   const ids = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean).map(Number)
