@@ -100,6 +100,44 @@ export function playDialogue(lines: { who?: UnitType; text: string }[]): Promise
   })
 }
 
+/** 출전 선택 (원작 124e:8994 정비 화면 [출전]). party 순서 = 일행 배열, 0번(선두)은 뺄 수 없다.
+ *  picked = 처음 고른 일행 인덱스. 돌려주는 목록은 고른 순서 = 출전 칸 순서 (원작도 목록 끝에 붙인다) */
+export function pickDeploy(party: UnitType[], max: number, picked: number[]): Promise<number[]> {
+  return new Promise(done => {
+    const sel = [...picked]
+    ui.result.innerHTML = `<h1>출전</h1><div class="deploy-count"></div><div class="deploy"></div>
+      <div class="buttons"><button class="go">출전</button></div><div class="note">대원을 눌러 넣고 뺀다. 선두는 뺄 수 없다.</div>`
+    const grid = ui.result.querySelector<HTMLElement>('.deploy')!, count = ui.result.querySelector<HTMLElement>('.deploy-count')!
+    const render = () => {
+      count.textContent = `${sel.length} / ${max}`
+      grid.querySelectorAll<HTMLButtonElement>('button').forEach((b, i) => {
+        const k = sel.indexOf(i)
+        b.setAttribute('aria-pressed', String(k >= 0))
+        b.querySelector('.ord')!.textContent = k >= 0 ? String(k + 1) : ''
+        b.disabled = k < 0 && sel.length >= max
+      })
+    }
+    party.forEach((t, i) => {
+      const b = document.createElement('button')
+      b.innerHTML = `<img src="${portraitUrl(t.por)}" alt=""><span>${t.name}</span><i class="ord"></i>`
+      if (i === 0) { b.setAttribute('aria-disabled', 'true'); b.title = '선두는 뺄 수 없다' }
+      b.onclick = () => {
+        if (i === 0) return
+        const k = sel.indexOf(i)
+        if (k >= 0) sel.splice(k, 1)
+        else if (sel.length < max) sel.push(i)
+        render()
+      }
+      grid.append(b)
+    })
+    const go = ui.result.querySelector<HTMLButtonElement>('.go')!
+    go.onclick = () => { ui.result.hidden = true; done(sel) }
+    render()
+    ui.result.hidden = false
+    go.focus()
+  })
+}
+
 /** 결과·확인 화면. 버튼을 누르면 화면을 닫고 그 동작을 한다 */
 export function showResult(title: string, body: string, buttons: [string, () => void][], note = '') {
   ui.result.innerHTML = `<h1>${title}</h1><div>${body}</div><div class="buttons"></div>${note ? `<div class="note">${note}</div>` : ''}`

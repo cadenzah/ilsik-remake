@@ -8,7 +8,7 @@ import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
-import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
+import { hideMenu, pickDeploy, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
 const STEP_MS = 110
@@ -29,9 +29,8 @@ function spawn(p: Placement, side: Unit['side']): Unit {
 
 // 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
 function placements(rec: BattleRecord) {
-  // 일행이 출전 칸보다 많으면 앞에서부터 (원작 출전 선택은 아직 없음)
-  const allies: Placement[] = PARTY.slice(0, rec.slots.length)
-    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
+  // 출전 대원 = 고른 일행 인덱스 순서대로 출전 칸에
+  const allies: Placement[] = S.deploy.map((k, i) => ({ type: PARTY[k], x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
   const troopInit = [0]
   if (rec.npc.length) troopInit.push(rec.npcState)
   rec.npc.forEach((n, i) => allies.push({ type: n.type, x: n.at[0], y: n.at[1], troop: 1, member: i }))
@@ -45,6 +44,7 @@ function placements(rec: BattleRecord) {
 let looping = false
 
 let atStart: Camp   // 이 장을 시작할 때 장 사이 상태. 다시 하기는 여기로 되돌린다
+let askDeploy = true   // ?stage=N 로 바로 연 판은 출전 선택 없이 앞에서부터
 
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
@@ -56,9 +56,15 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.scenes = scenes
   S.routeTable = battles.route
   if (camp !== undefined) restore(camp)
+  if (camp === null) askDeploy = false
   if (!PARTY.length) PARTY.push(...scenes.party)
   atStart = snapshot()
   const rec = battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
+  // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
+  const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
+  S.deploy = askDeploy && (ed.features.alwaysDeploy || PARTY.length > max)
+    ? await pickDeploy(PARTY.map(t => tables.types[t]), max, ed.features.alwaysDeploy ? [0] : first)
+    : first
   Object.assign(S, placements(rec))
   S.reward = rec.reward
   S.cond = battles.cond[def.n] ?? []
