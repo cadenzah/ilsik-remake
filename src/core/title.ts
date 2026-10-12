@@ -5,6 +5,7 @@
 // 화면은 640×480 을 통째로 확대
 import type { Camp } from './campaign'
 import { A } from './data'
+import { fadeOut } from './fade'
 import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, type EditionId } from './save'
 import { stageDef, type StageDef } from './stage'
 
@@ -78,9 +79,11 @@ export function showTitle(): Promise<Launch> {
       setLastEdition(ed)
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey)
-      root.hidden = true
-      root.innerHTML = ''
-      done({ ed, def, camp })
+      void fadeOut().then(() => {   // 원작처럼 어두워진 뒤 다음 화면 (boot·정비 화면이 밝힌다)
+        root.hidden = true
+        root.innerHTML = ''
+        done({ ed, def, camp })
+      })
     }
 
     // 창 안 항목 (글자 버튼)
@@ -187,6 +190,7 @@ export function showTitle(): Promise<Launch> {
       let skip = false
       try { skip = sessionStorage.getItem(SKIP_INTRO) === '1'; sessionStorage.removeItem(SKIP_INTRO) } catch { /* 무시 */ }
       if (!skip) await intro(stage, bg)
+      else { stage.classList.add('cut', 'dark'); void stage.offsetWidth; stage.classList.remove('cut') }   // 타이틀로 돌아올 때도 밝아지며
       showMenu()
     })()
   })

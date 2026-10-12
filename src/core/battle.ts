@@ -4,6 +4,7 @@ import { FLAGS, ITEMS, PARTY, finishStage, joinLine, nextStage, restore, sceneLi
 import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
 import { campScreen } from './camp'
+import { fadeIn, fadeOut } from './fade'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
 import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
@@ -50,6 +51,7 @@ let askDeploy = true   // ?stage=N 로 바로 연 판은 출전 선택 없이 �
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
 export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null) {
+  await fadeOut()   // 결과 화면·타이틀에서 넘어올 때 (이미 어두우면 바로)
   S.ed = ed
   S.def = def
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
@@ -64,8 +66,8 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
-  if (askDeploy && (ed.features.alwaysDeploy || PARTY.length > max)) {
-    const r = await campScreen({ party: PARTY.map(t => tables.types[t]), items: [...ITEMS], tables, max, remake: !ed.features.alwaysDeploy, initial: first })
+  if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
+    const r = await campScreen({ party: PARTY.map(t => tables.types[t]), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first })
     if (r.go === 'title') { toTitle(); return }
     S.deploy = r.deploy
   }
@@ -87,6 +89,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
 }
 
 async function start() {
+  await fadeOut()   // 다시 하기 (boot 에서 오면 이미 어둡다)
   uidSeq = 0
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
   S.joined = []
@@ -99,6 +102,7 @@ async function start() {
   S.active = []
   S.mode = { kind: 'busy' }
   centerOn(S.units[0])
+  await fadeIn()
   await playDialogue(sceneLines(S.scenes.pre[S.def.n] ?? []))
   await runRounds()
 }
@@ -231,7 +235,7 @@ export async function checkEnd(): Promise<boolean> {
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
   try { sessionStorage.setItem(SKIP_INTRO, '1') } catch { /* 무시 */ }
-  location.href = location.pathname
+  void fadeOut().then(() => { location.href = location.pathname })
 }
 
 function cleared(ending: boolean) {

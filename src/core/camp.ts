@@ -6,6 +6,7 @@
 //   행동·Enter = 곧바로 전투, ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
+import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 
 export type CampResult = { go: 'battle'; deploy: number[] } | { go: 'title' }
@@ -222,8 +223,8 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     const finish = (r: CampResult) => {
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey, true)
-      root.remove()
-      done(r)
+      if (r.go === 'title') { done(r); return }   // 타이틀로는 toTitle 이 어둡게 한 뒤 새로 불러온다
+      void fadeOut().then(() => { root.remove(); done(r) })
     }
     const fight = () => finish({ go: 'battle', deploy: [...sel] })
     const act = () => {
@@ -267,6 +268,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     showStatus(0)
     drawItems()
     draw()
+    void fadeIn()
     if (o.remake) say('대기인물 클릭 = 출전, 출전인물 클릭 = 빼기. 행동(Enter) = 출발')
   })
 }

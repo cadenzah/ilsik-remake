@@ -26,8 +26,8 @@ export interface Edition {
   /** 편의 기능: 적 위협 범위, 피해 예측, 적 클릭 한 번에 이동+공격.
    *  commandFirst = 유닛을 눌러 명령(이동/전투)을 먼저 고른다 (원작), 아니면 차례가 오면 이동 범위를 바로 보인다.
    *  autoRest = 이동·공격 없이 차례를 마치면 휴식, 아니면 휴식은 "휴식?" 확인으로만 (원작)
-   *  alwaysDeploy = 전투마다 출전 선택, 기본 선두만 (원작 정비 화면 [출전]), 아니면 일행이 출전 칸보다 많을 때만·앞에서부터 채워 둠 */
-  features: { threat: boolean; forecast: boolean; quickAttack: boolean; commandFirst: boolean; autoRest: boolean; alwaysDeploy: boolean }
+   *  originalCamp = 정비 화면을 원작 동작으로 (⟺ 로 편성 시작·선두만, 뒤까지 빼기, '여행계속' 확인), 아니면 개선판 (앞에서부터 채워 둠). 정비 화면은 두 판 모두 전투마다 */
+  features: { threat: boolean; forecast: boolean; quickAttack: boolean; commandFirst: boolean; autoRest: boolean; originalCamp: boolean }
   /** 9장 후 진로 선택지 문구 (루트 A·B·C) */
   routeLabels: [string, string, string]
 }
