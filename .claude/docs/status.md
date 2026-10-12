@@ -1,5 +1,6 @@
 # 현재 상태 (덮어쓰기로 갱신)
-단계: 5.5단계. S3a·S3b 완료 — 개선판 대본 43장 (`content/remake/chapters/NN.ecs`): 현대어·화자 대체·장 카드, 루트 구멍·보조 목표(목표 창 ◇✓✗)·빈 장 도입·소피아·아티스 복선·전투 중 대사. 시점 pre/post/turn/troop/hp/dead/win 연결 (script-format.md 6~9절)
-다음: S3c (6단계와 함께) — 8 동료 한마디 (banter.ecs), 14 고대 병기 회수 (39·41·42장), 15 에필로그 (epilogue.ecs, 생존·합류 결과 반영), 6 분기점 저장·장 지도·장 다시 하기·진엔딩. 또는 6단계 시스템 (경험치·레벨업 DS 표 / 마법·상태 이상 / 30장 '악마 두 배' 규칙)
-실행: `pnpm dev` (5173) / `?ed=remake&stage=N&route=R` 타이틀 건너뜀 (일행은 기본 3명이라 화자 대체 시험은 실제 진행으로), `&party=..&items=..` 정비 화면부터. window.__game.{S,camp,checkEnd,planFor,reachable,toScreen}. 점검 `tools/ecs_check.py`, 초안 `tools/ecs_draft.py`. 원작 대조 `tools/dosbox.py` (기록 누르지 말 것)
-테스트: 숨은 패널은 rAF 정지 → requestAnimationFrame 을 setTimeout 으로, `while(!window.__game)` 로 부팅 기다림. 대화 넘기기 = #dialogue click (Escape 는 전체 건너뛰기). 유닛 hp 를 바꾸고 __game.checkEnd() 로 troop·hp·dead 시점 시험. localStorage eclipse.* (테스트 전 백업·뒤에 지울 것)
+단계: 5.5단계. S3a·S3b 완료, S3c 중 8 동료 한마디(banter.ecs)·14 고대 병기 회수·15 에필로그(epilogue.ecs) 완료 (script-format.md 4·10절)
+다음: S3c 6 다시 하기·진엔딩 — 설계안 `replay-design.md` 사용자 확인 대기 (숨은 장 구성 / 루트 정보 나누기 / 도감 / 장 지도 공개 범위). 확인 뒤 그 문서의 구현 순서대로
+그 뒤 후보: 6단계 U1 원작 UI 분석 / 경험치·레벨업 (DS 표 추출) / 마법·상태 이상 / 30장 '악마 두 배' 규칙
+실행: `pnpm dev` (5173) / `?ed=remake&stage=N&route=R&party=1,2,…&items=` 정비 화면부터 (계속 → 여행계속 '결정' 클릭). window.__game.{S,camp,checkEnd,…}. 점검 `tools/ecs_check.py`, 초안 `tools/ecs_draft.py`
+테스트: 숨은 패널은 rAF 정지 → requestAnimationFrame 을 setTimeout 으로, `while(!window.__game)` 로 부팅 기다림. 대화 넘기기 = #dialogue click. 유닛 hp 를 바꾸고 __game.checkEnd() 로 troop·hp·dead·한마디 시험. localStorage eclipse.* (테스트 전 백업·뒤에 지울 것)
