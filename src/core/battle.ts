@@ -1,14 +1,15 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
-import { FLAGS, PARTY, finishStage, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import { FLAGS, ITEMS, PARTY, finishStage, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
 import { inRange, pathTo, reachable } from './grid'
+import { campScreen } from './camp'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
 import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
-import { hideMenu, pickDeploy, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
+import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
 const STEP_MS = 110
@@ -62,9 +63,12 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   const rec = battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
   // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
-  S.deploy = askDeploy && (ed.features.alwaysDeploy || PARTY.length > max)
-    ? await pickDeploy(PARTY.map(t => tables.types[t]), max, ed.features.alwaysDeploy ? [0] : first)
-    : first
+  S.deploy = first
+  if (askDeploy && (ed.features.alwaysDeploy || PARTY.length > max)) {
+    const r = await campScreen({ party: PARTY.map(t => tables.types[t]), items: [...ITEMS], tables, max, remake: !ed.features.alwaysDeploy, initial: first })
+    if (r.go === 'title') { toTitle(); return }
+    S.deploy = r.deploy
+  }
   Object.assign(S, placements(rec))
   S.reward = rec.reward
   S.cond = battles.cond[def.n] ?? []

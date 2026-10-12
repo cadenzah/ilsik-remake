@@ -82,6 +82,61 @@ def export_ui():
     shutil.copy(os.path.join(ROOT, 'build', 'snd', 'ECPMARK.FVT', '001.wav'), os.path.join(d, 'thunder.wav'))
     for old in ('title.png', 'btn-new.png', 'btn-load.png', 'btn-quit.png'):
         if os.path.exists(os.path.join(d, old)): os.remove(os.path.join(d, old))
+    export_camp()
+
+
+def export_camp():
+    """정비 화면 (원작 124e:8994, formats.md "정비 화면"). 화면 = 창틀 ECPMAI "tactics" 8조각 + WIN 2 를 (25,12) 에 (DOSBox 로 확정).
+    camp-bg 640×480 (창틀 + WIN 2), camp-status = WIN 1 인물기본자료 바탕 330×330 (화면 (25,12)),
+    camp-face = BS 1 출전 줄 얼굴 56×48 (11열, 간격 57), camp-mini = BS 2 대기 격자 46×39 (13열, 간격 47), 둘 다 칸 = 유닛 번호 0~28,
+    equip = ECLIPSE.EQU 아이콘 182개 48×56 를 13열로 (칸 = 품목 id − 1), camp-por = 초상 96×111 12열 (칸 = por). 팔레트 255 = 투명"""
+    import frtwnd
+    d = mkdir('ui')
+    pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECLIPSE.WIN'), 2)
+    E = {k: frtwnd.image(w, h, px, pal).convert('RGB')
+         for _, n, k, w, h, px in frtwnd.entries(open(os.path.join(ROOT, 'original', 'ECPMAI.ECP'), 'rb').read()) if n == 'tactics'}
+    bg = Image.new('RGB', (640, 480))
+    for k, xy in ((0x203, (0, 0)), (0x103, (25, 0)), (0x303, (615, 0)), (0x703, (0, 12)),
+                  (0x803, (615, 12)), (0x403, (0, 468)), (0x603, (25, 468)), (0x503, (615, 468))):
+        bg.paste(E[k], xy)
+    bg.paste(Image.open(os.path.join(IMG, 'ECLIPSE.WIN', '002.png')).convert('RGB'), (25, 12))
+    bg.save(os.path.join(d, 'camp-bg.png'))
+    Image.open(os.path.join(IMG, 'ECLIPSE.WIN', '001.png')).convert('RGB').save(os.path.join(d, 'camp-status.png'))
+    for name, src, (w, h), cols in (('camp-face', '001', (56, 48), 11), ('camp-mini', '002', (46, 39), 13)):
+        sheet = rgba(os.path.join(IMG, 'ECLIPSE.BS', src + '.png'))
+        out = Image.new('RGBA', (w * 29, h))
+        for i in range(29):
+            r, c = divmod(i, cols)
+            out.paste(sheet.crop((1 + c * (w + 1), 1 + r * (h + 1), 1 + c * (w + 1) + w, 1 + r * (h + 1) + h)), (i * w, 0))
+        out.save(os.path.join(d, name + '.png'))
+    eq = sorted(os.listdir(os.path.join(IMG, 'ECLIPSE.EQU')))
+    atlas = Image.new('RGBA', (13 * 48, ((len(eq) + 12) // 13) * 56))
+    for i, f in enumerate(eq):
+        atlas.paste(rgba(os.path.join(IMG, 'ECLIPSE.EQU', f)), ((i % 13) * 48, (i // 13) * 56))
+    atlas.save(os.path.join(d, 'equip.png'))
+    # 초상 (ECLIPSE.POR 96×111) 을 투명 배경으로 12열 — 원작은 255 번 자리에 WIN 1 바탕이 보인다
+    por = sorted(os.listdir(os.path.join(IMG, 'ECLIPSE.POR')))
+    atlas = Image.new('RGBA', (12 * 96, ((len(por) + 11) // 12) * 111))
+    for i, f in enumerate(por):
+        atlas.paste(rgba(os.path.join(IMG, 'ECLIPSE.POR', f)), ((i % 12) * 96, (i // 12) * 111))
+    atlas.save(os.path.join(d, 'camp-por.png'))
+
+
+def export_status_icons():
+    """인물 상태창 아이콘 (124e:7c18, formats.md "정비 화면").
+    magic-icons = ECLIPSE.MAR 9번 시트 (19열 × 4줄, 32×40, 간격 33) 를 한 줄로 32×40 × 74, 칸 = MAD id (−1 없음).
+    status-icons = ECLIPSE.OTH 0 (혼수 추정, ZZ) · 1 (중독 추정, 해골) 13×12 를 가로로. 팔레트 255 = 투명"""
+    d = mkdir('ui')
+    sheet = rgba(os.path.join(IMG, 'ECLIPSE.MAR', '009.png'))
+    out = Image.new('RGBA', (32 * 74, 40))
+    for i in range(74):
+        r, c = divmod(i, 19)
+        out.paste(sheet.crop((1 + c * 33, 1 + r * 41, 1 + c * 33 + 32, 1 + r * 41 + 40)), (i * 32, 0))
+    out.save(os.path.join(d, 'magic-icons.png'))
+    st = Image.new('RGBA', (26, 12))
+    for i in range(2):
+        st.paste(rgba(os.path.join(IMG, 'ECLIPSE.OTH', f'{i:03d}.png')), (i * 13, 0))
+    st.save(os.path.join(d, 'status-icons.png'))
 
 
 def export_data():
@@ -94,10 +149,16 @@ def export_data():
         p += 2 + n
     json.dump(lines, open(os.path.join(d, 'dialogue.json'), 'w'), ensure_ascii=False, indent=0)
     # 능력치는 PAD 기본값 (장비 보정 전). equip = [무기, 방어구, 도구] EAD id (0 = 없음), magic = MAD id 목록
-    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'atk', 'spi', 'agi', 'mov', 'magic')}
-          | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'canMagic': u['can_magic']}
+    # 상태창 필드 (124e:7c18): race·sex·job·moveKind·rank 는 labels.json 의 같은 이름 표 색인 (rank = 부하상태 "A +" 등),
+    # lv = 등급, fatigue = 피로도, exp = 경험치. cls 는 race 와 같은 값 (예전 이름)
+    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'atk', 'spi', 'agi', 'mov', 'magic',
+                             'race', 'sex', 'job', 'rank', 'fatigue', 'exp')}
+          | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'canMagic': u['can_magic'], 'moveKind': u['move_kind']}
           for u in units.load()]
     json.dump(us, open(os.path.join(d, 'units.json'), 'w'), ensure_ascii=False, indent=0)
+    lb = units.labels()
+    lb['moveKind'] = lb.pop('move_kind')
+    json.dump(lb, open(os.path.join(d, 'labels.json'), 'w'), ensure_ascii=False, indent=0)
     json.dump(tables.load_magic(), open(os.path.join(d, 'magic.json'), 'w'), ensure_ascii=False, indent=0)
     # stat/stat2 = [능력치 번호, 보정량], 번호 의미는 tables.STATS (9~16 = 1~8 감소)
     items = [{k: it[k] for k in ('id', 'cat', 'sub', 'name', 'f1', 'f2', 'f3')}
@@ -140,6 +201,8 @@ if __name__ == '__main__':
         export_data()
     elif sys.argv[1:] == ['ui']:
         export_ui()
+    elif sys.argv[1:] == ['icons']:
+        export_status_icons()
     else:
-        export_stages(); export_units(); export_portraits(); export_ui(); export_data()
+        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_data()
     print('ok')

@@ -30,6 +30,7 @@
 - `units/III.png` 이동 13프레임 가로띠 (56×48, 투명 처리) — 유닛 0~103
 - `portraits/NNN.png` 초상화 96×111
 - `ui/` 메인 메뉴: mark0·mark1 (ECPMARK.MAR 0·1), staff·publish (ECPPLANE.ECP 0·1), menu-frame (MAIN.ECP face 9조각 합본), thunder.wav (ECPMARK.FVT 1). `export_web.py ui` 로 따로 생성
+- `ui/` 정비 화면 (camp.ts): camp-bg (ECPMAI tactics 창틀 + WIN 2), camp-status (WIN 1), camp-face·camp-mini (BS 1·2, 칸 = 유닛 0~28), equip (EQU 182, 칸 = 품목 id−1), camp-por (POR 투명 배경, 12열), magic-icons (MAR 9, 칸 = MAD id), status-icons (OTH 0·1). `export_web.py ui` 에 포함 (magic/status 아이콘은 `icons`)
 - `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`

@@ -6,7 +6,12 @@ export interface UnitType {
   lv: number; hp: number; atk: number; def: number; spi: number; agi: number; mov: number
   equip: [number, number, number]   // 무기·방어구·도구 Item id, 0 = 없음
   canMagic: number; magic: number[] // Magic id
+  // 인물 상태창 글자 (labels.json 색인, formats.md "정비 화면"). rank = 부하상태, moveKind = 이동방식
+  race: number; sex: number; job: number; rank: number; moveKind: number; fatigue: number; exp: number
 }
+
+/** 상태창 문자열 표 (EXE DS:0x1076~). UnitType 의 같은 이름 필드로 색인 */
+export interface Labels { race: string[]; sex: string[]; job: string[]; moveKind: string[]; rank: string[] }
 
 /** ECLIPSE.EAD. cat 0 무기 / 1 방어구 / 2 도구. stat·stat2 = [능력치 번호, 보정량], 번호는 STAT_NAMES (9~16 = 1~8 감소) */
 export interface Item {
@@ -29,7 +34,7 @@ export const MAGIC_EFFECTS = ['생명회복', '공격증가', '방어증가', '�
   '공격감소', '방어감소', '민첩감소', '정신감소', '중독', '혼수', '상태회복', '피로증가']
 
 /** 게임 데이터 표. items·magic 은 id 로 바로 찾도록 Map */
-export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic> }
+export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic>; labels: Labels }
 
 export interface StageMap {
   w: number; h: number; atlasCols: number
@@ -57,10 +62,11 @@ async function json<T>(src: string): Promise<T> {
 }
 
 export async function loadTables(): Promise<Tables> {
-  const [types, items, magic] = await Promise.all([
+  const [types, items, magic, labels] = await Promise.all([
     json<UnitType[]>(`${A}/data/units.json`), json<Item[]>(`${A}/data/items.json`), json<Magic[]>(`${A}/data/magic.json`),
+    json<Labels>(`${A}/data/labels.json`),
   ])
-  return { types, items: new Map(items.map(i => [i.id, i])), magic: new Map(magic.map(m => [m.id, m])) }
+  return { types, items: new Map(items.map(i => [i.id, i])), magic: new Map(magic.map(m => [m.id, m])), labels }
 }
 export const loadDialogue = () => json<string[]>(`${A}/data/dialogue.json`)
 

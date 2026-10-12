@@ -79,17 +79,6 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #result .buttons button { padding: 10px 20px; font-size: 16px; }
 #result .note { font-size: 13px; color: var(--dim); }
 /* 출전 선택 */
-#result .deploy-count { color: var(--gold); font-size: 16px; }
-#result .deploy { display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: 8px; justify-content: center;
-  width: min(720px, calc(100% - 32px)); }
-#result .deploy button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px;
-  font-size: 13px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--dim); cursor: pointer; }
-#result .deploy button img { width: 64px; height: 74px; border-radius: 4px; opacity: .45; }
-#result .deploy button[aria-pressed=true] { border-color: var(--gold); color: var(--text); }
-#result .deploy button[aria-pressed=true] img { opacity: 1; }
-#result .deploy button:disabled, #result .deploy button[aria-disabled=true] { cursor: default; }
-#result .deploy button:disabled[aria-pressed=false] { opacity: .5; }
-#result .deploy .ord { position: absolute; top: 4px; left: 6px; font-style: normal; font-weight: 700; color: var(--gold); }
 
 /* 타이틀 화면 — 원작 640×480 을 통째로 확대 (title.ts) */
 #titlescreen { position: fixed; inset: 0; background: #000; overflow: hidden; }
@@ -143,3 +132,42 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
   background: #9c9c90; transition: left .15s, background .15s; }
 #titlescreen [aria-checked=true] .switch { background: #6c846c; }
 #titlescreen [aria-checked=true] .switch::after { left: 12px; background: #fcfcfc; }
+
+/* 정비 화면 (출전 선택) — 원작 124e:8994, 640×480 을 통째로 확대 (camp.ts). 좌표는 화면 좌표 */
+#camp { position: fixed; inset: 0; z-index: 20; background: #000; overflow: hidden; }
+#camp .stage { position: absolute; left: 50%; top: 50%; width: 640px; height: 480px; transform-origin: 50% 50%;
+  image-rendering: pixelated; user-select: none; cursor: default;
+  font: 14px/16px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; }
+#camp .stage > *, #camp .status > *, #camp .desc > * { position: absolute; }
+#camp .bg { left: 0; top: 0; width: 640px; height: 480px; }
+#camp.editing:not(.remake) .stage { cursor: ew-resize; }   /* 원작: 편성 중 커서 = ⟺ */
+/* 원작 글자: 색 7 로 x, 색 0 으로 x+1 → 왼쪽에 회색 그림자. 현재값은 색 9/1 (파랑) */
+#camp .txt, #camp .num { color: #000; text-shadow: -1px 0 #aaa; white-space: nowrap; }
+#camp .num.cur { color: #0000aa; text-shadow: -1px 0 #5555ff; text-align: right; }
+#camp .b { font-weight: 700; }
+#camp .txt.pos { color: #0000aa; text-shadow: -1px 0 #5555ff; }
+#camp .txt.neg { color: #aa0000; text-shadow: -1px 0 #ff5555; }
+#camp .desc .say { position: static; width: 152px; margin: 4px 6px; font-size: 12px; line-height: 16px; color: #000; text-shadow: -1px 0 #aaa; }
+#camp .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
+#camp .spr { display: block; }
+#camp .por { display: block; background: url(/assets/ui/camp-por.png); }
+#camp .mg, #camp .mgi { background-image: url(/assets/ui/magic-icons.png); }
+#camp button { all: unset; position: absolute; box-sizing: border-box; cursor: inherit; }
+#camp .mb.full { opacity: .55; }
+#camp .hit:focus-visible, #camp .mb:focus-visible, #camp .sb:focus-visible, #camp .it:focus-visible, #camp .eq:focus-visible { outline: 1px dotted #000; }
+/* 개선판: 마우스 올림·남은 칸·선두 표시 */
+#camp.remake .mb:hover:not(.gone), #camp.remake .sb:hover, #camp.remake .it:hover, #camp.remake .eq:hover { outline: 1px solid #c86414; }
+#camp.remake .hit:hover { outline: 1px solid #fff; }
+#camp.remake .mb.shown:not(.gone) { outline: 1px dashed #c86414; }
+#camp .empty { box-sizing: border-box; border: 1px dashed rgba(120, 80, 30, .7); border-radius: 3px; }
+#camp.remake .sb.lead::after { content: "선두"; position: absolute; right: 0; bottom: 0; padding: 0 2px; font-size: 9px; line-height: 11px;
+  color: #fff; background: #c86414; }
+#camp .count { left: 548px; top: 352px; width: 60px; text-align: right; font-weight: 700; color: #000; }
+/* 확인창 (원작 0aa2:0c58): 주황 띠 제목 + [결정][취소] */
+#camp .dlg { box-sizing: border-box; background: #fff7c3; border: 3px double #6b4416; box-shadow: 2px 2px 0 rgba(0,0,0,.4); }
+#camp .dlg .t { position: absolute; left: 4px; right: 4px; top: 4px; height: 20px; text-align: center; font-weight: 700; line-height: 20px;
+  background: #ffba75; border: 1px solid #6b4416; color: #000; }
+#camp .dlg button { top: 32px; width: 54px; height: 24px; text-align: center; line-height: 22px; font-weight: 700; cursor: pointer;
+  background: linear-gradient(#f0c08a, #c87a3c); border: 1px solid #5a3410; color: #2a1600; text-shadow: -1px 0 #e8b080; }
+#camp .dlg .ok { left: 9px; } #camp .dlg .no { left: 67px; }
+#camp .dlg button:hover, #camp .dlg button:focus-visible { filter: brightness(1.12); }

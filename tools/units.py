@@ -3,7 +3,23 @@ import os, struct, sys
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 R = 118
 # 이름 기준 +N = 런타임 유닛 구조체 +N+6. 능력치 이름은 EXE 장비 능력치 표 (formats.md)
-F = dict(id=10, por=12, cls=16, lv=24, hp=26, atk=30, def_=34, spi=42, agi=46, mov=50)
+# cls = 종족 (예전 이름 유지, race 와 같은 값). 아래 race~exp 는 인물 상태창 124e:7c18 이 그리는 필드 (formats.md)
+F = dict(id=10, por=12, cls=16, lv=24, hp=26, atk=30, def_=34, spi=42, agi=46, mov=50,
+         race=16, sex=18, job=22, fatigue=52, exp=54, move_kind=56, rank=60)
+# 상태창 글자 표: EXE DS 의 far 포인터 배열 (DS 오프셋, 개수). 값 = 위 필드로 그대로 색인
+LABELS = dict(race=(0x1076, 14), sex=(0x10b2, 3), job=(0x10c2, 21), move_kind=(0x111a, 5), rank=(0x1132, 7))
+
+
+def labels(exe='ECP.EXE'):
+    """ECP.EXE 에서 상태창 문자열 표 (종족·성별·직업·이동방식·부하상태) 를 CP949 로 읽는다."""
+    raw = open(os.path.join(ROOT, 'original', exe), 'rb').read()
+    img = raw[struct.unpack_from('<H', raw, 8)[0] * 16:]
+    ds = 0x573a * 16
+    out = {}
+    for k, (off, n) in LABELS.items():
+        ptrs = [struct.unpack_from('<HH', img, ds + off + 4 * i) for i in range(n)]
+        out[k] = [img[s * 16 + o: img.index(b'\0', s * 16 + o)].decode('cp949').strip() for o, s in ptrs]
+    return out
 
 
 def load(path='ECLIPSE1.PAD'):
