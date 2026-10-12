@@ -12,7 +12,7 @@ export const ui = {
   dlgName: $('dlg-name'), dlgText: $('dlg-text'), result: $('result'),
 }
 
-/** 원작 표 기준 장비·마법 이름. 전투 수치에는 아직 반영하지 않는다 (6단계 재설계) */
+/** 원작 표 기준 장비·마법 이름. 장비 능력치 보정은 spawn 때 반영됨 */
 function loadout(u: Unit, t: Tables): string {
   const eq = u.type.equip.filter(id => id).map(id => t.items.get(id)?.name ?? `#${id}`)
   const mg = u.type.magic.map(id => t.magic.get(id)?.name ?? `#${id}`)
@@ -30,7 +30,7 @@ export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
          <div class="name">${u.type.name}<span class="lv">Lv ${u.type.lv}</span></div>
          <div class="bar"><i style="width:${(100 * u.hp) / u.maxHp}%"></i></div>
          <div style="font-size:13px">HP <b>${u.hp}</b> / ${u.maxHp}</div>
-         <div class="stats"><span>공 <b>${u.atk}</b></span><span>방 <b>${u.def}</b></span><span>이동 <b>${u.mov}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
+         <div class="stats"><span>역량 <b>${u.atk}</b></span><span>방어 <b>${u.def}</b></span><span>정신 <b>${u.spi}</b></span><span>민첩 <b>${u.agi}</b></span><span>이동 <b>${u.mov}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
          ${t ? loadout(u, t) : ''}
        </div>
        <div class="terrain">${terrain ?? ''}${u.acted ? ' · 행동 완료' : ''}</div>`

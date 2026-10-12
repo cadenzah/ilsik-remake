@@ -1,6 +1,6 @@
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type CondDo, type CondIf, type CondRule, type Member, type Scenes, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
-import { attackSpots, dist, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
+import { attackSpots, dist, equippedStats, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
 import { hideMenu, playDialogue, showCard, showForecast, showMenu, showResult, toast, ui } from './ui'
 
@@ -55,9 +55,10 @@ const S = {
 let uidSeq = 0
 function spawn(p: Placement, side: Unit['side']): Unit {
   const t = S.types[p.type]
+  const st = equippedStats(t, S.tables.items)
   return {
-    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: t.hp, maxHp: t.hp,
-    atk: t.atk, def: t.def, mov: t.mov, range: weaponRange(t), acted: false, awake: side === 'ally' || !!p.awake,
+    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st,
+    range: weaponRange(t), acted: false, awake: side === 'ally' || !!p.awake,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
 }

@@ -70,13 +70,13 @@ def export_data():
         lines.append(fnt[p + 2:p + 2 + n].decode('cp949', 'replace'))
         p += 2 + n
     json.dump(lines, open(os.path.join(d, 'dialogue.json'), 'w'), ensure_ascii=False, indent=0)
-    # equip = [무기, 방어구, 도구] EAD id (0 = 없음), magic = MAD id 목록
-    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'mp', 'atk', 'mov', 'magic')}
+    # 능력치는 PAD 기본값 (장비 보정 전). equip = [무기, 방어구, 도구] EAD id (0 = 없음), magic = MAD id 목록
+    us = [{k: u[k] for k in ('id', 'name', 'por', 'cls', 'lv', 'hp', 'atk', 'spi', 'agi', 'mov', 'magic')}
           | {'def': u['def_'], 'equip': [e[1] for e in u['equip']], 'canMagic': u['can_magic']}
           for u in units.load()]
     json.dump(us, open(os.path.join(d, 'units.json'), 'w'), ensure_ascii=False, indent=0)
     json.dump(tables.load_magic(), open(os.path.join(d, 'magic.json'), 'w'), ensure_ascii=False, indent=0)
-    # stat/sub = [능력치 번호, 보정량], 번호 의미는 formats.md
+    # stat/stat2 = [능력치 번호, 보정량], 번호 의미는 tables.STATS (9~16 = 1~8 감소)
     items = [{k: it[k] for k in ('id', 'cat', 'sub', 'name', 'f1', 'f2', 'f3')}
              | {'stat': [it['kind'], it['value']], 'stat2': [it['x1'], it['x2']]}
              for it in tables.load_items()]

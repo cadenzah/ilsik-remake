@@ -2,23 +2,31 @@
 
 export interface UnitType {
   id: number; name: string; por: number; cls: number
-  lv: number; hp: number; mp: number; atk: number; def: number; mov: number
+  // PAD 기본 능력치 (장비 보정 전). atk 역량 · def 방어 · spi 정신 · agi 민첩 (formats.md)
+  lv: number; hp: number; atk: number; def: number; spi: number; agi: number; mov: number
   equip: [number, number, number]   // 무기·방어구·도구 Item id, 0 = 없음
   canMagic: number; magic: number[] // Magic id
 }
 
-/** ECLIPSE.EAD. cat 0 무기 / 1 방어구 / 2 도구. stat·stat2 = [능력치 번호, 보정량] (formats.md) */
+/** ECLIPSE.EAD. cat 0 무기 / 1 방어구 / 2 도구. stat·stat2 = [능력치 번호, 보정량], 번호는 STAT_NAMES (9~16 = 1~8 감소) */
 export interface Item {
   id: number; cat: number; sub: number; name: string
   f1: number; f2: number; f3: number
   stat: [number, number]; stat2: [number, number]
 }
 
-/** ECLIPSE.MAD. effect 7 = 공격, 0 = 회복 (formats.md) */
+/** 장비 능력치 번호 이름 (EXE DS:0x1194) */
+export const STAT_NAMES = ['없음', '생명', '정신', '역량', '방어', '마법', '이동', '민첩', '체력']
+
+/** ECLIPSE.MAD. effect = MAGIC_EFFECTS 번호. fatigue = 시전 시 피로 증가량 (피로+fatigue ≤ 90 이면 시전 가능, MP 없음) */
 export interface Magic {
   id: number; school: number; name: string
-  range: number; area: number; effect: number; power: number; mp: number
+  range: number; area: number; effect: number; power: number; fatigue: number
 }
+
+/** 마법 효과 번호 이름 (EXE DS:0x1266) */
+export const MAGIC_EFFECTS = ['생명회복', '공격증가', '방어증가', '민첩증가', '정신증가', '해독', '혼수해제', '생명상해',
+  '공격감소', '방어감소', '민첩감소', '정신감소', '중독', '혼수', '상태회복', '피로증가']
 
 /** 게임 데이터 표. items·magic 은 id 로 바로 찾도록 Map */
 export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic> }

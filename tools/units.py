@@ -2,7 +2,8 @@
 import os, struct, sys
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 R = 118
-F = dict(id=10, por=12, cls=16, lv=24, hp=26, mp=30, x34=34, atk=42, def_=46, mov=50)
+# 이름 기준 +N = 런타임 유닛 구조체 +N+6. 능력치 이름은 EXE 장비 능력치 표 (formats.md)
+F = dict(id=10, por=12, cls=16, lv=24, hp=26, atk=30, def_=34, spi=42, agi=46, mov=50)
 
 
 def load(path='ECLIPSE1.PAD'):
@@ -24,4 +25,4 @@ def load(path='ECLIPSE1.PAD'):
 
 if __name__ == '__main__':
     for u in load(*sys.argv[1:]):
-        print(f"{u['id']:3d} {u['name']:6s} por{u['por']:3d} cls{u['cls']:3d} lv{u['lv']:3d} hp{u['hp']:4d} mp{u['mp']:4d} x{u['x34']:3d} atk{u['atk']:3d} def{u['def_']:3d} mov{u['mov']:2d} eq{[e[1] for e in u['equip']]} mag{u['magic']}")
+        print(f"{u['id']:3d} {u['name']:6s} por{u['por']:3d} cls{u['cls']:3d} lv{u['lv']:3d} hp{u['hp']:4d} atk{u['atk']:3d} def{u['def_']:3d} spi{u['spi']:3d} agi{u['agi']:3d} mov{u['mov']:2d} eq{[e[1] for e in u['equip']]} mag{u['magic']}")

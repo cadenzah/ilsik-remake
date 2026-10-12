@@ -3,8 +3,15 @@
 import os, struct, sys
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 SCHOOLS = ['빛', '어둠', '바람', '물', '불', '땅', '소환', '노래', '기원']
-# 장비 (kind,value)·(x1,x2) 의 능력치 번호. 이름 기준 추정, 5·6·8~12 미상
-STATS = {1: 'HP', 2: 'MP', 3: '공격', 4: '방어', 7: '민첩'}
+# 장비 (kind,value)·(x1,x2) 의 능력치 번호 = EXE DS:0x1194 이름표, 9~16 = 1~8 감소 (formats.md)
+STATS = ['없음', '생명', '정신', '역량', '방어', '마법', '이동', '민첩', '체력']
+# 마법 효과 번호 = EXE DS:0x1266 이름표 (MAD +0x12 로 색인)
+EFFECTS = ['생명회복', '공격증가', '방어증가', '민첩증가', '정신증가', '해독', '혼수해제', '생명상해',
+           '공격감소', '방어감소', '민첩감소', '정신감소', '중독', '혼수', '상태회복', '피로증가']
+
+
+def stat_name(n):
+    return STATS[n] if n <= 8 else STATS[n - 8] + '−'
 
 
 def _read(name):
@@ -17,9 +24,10 @@ def load_magic():
     for i in range(struct.unpack_from('<H', d, 0)[0]):
         r = d[2 + i * 24:2 + (i + 1) * 24]
         school, = struct.unpack_from('<H', r, 0)
-        id_, rng, area, effect, power, mp = struct.unpack_from('<6H', r, 12)
+        # fatigue = 시전 시 유닛 피로(+0x3a)에 더하는 값. 피로+fatigue ≤ 90 이어야 시전 (MP 아님)
+        id_, rng, area, effect, power, fatigue = struct.unpack_from('<6H', r, 12)
         out.append(dict(id=id_, school=school, name=r[2:12].decode('cp949', 'replace').strip(),
-                        range=rng, area=area, effect=effect, power=power, mp=mp))
+                        range=rng, area=area, effect=effect, power=power, fatigue=fatigue))
     return out
 
 
@@ -38,4 +46,6 @@ def load_items():
 if __name__ == '__main__':
     which = sys.argv[1] if len(sys.argv) > 1 else 'magic'
     for m in (load_magic() if which == 'magic' else load_items()):
+        if which == 'magic': m['effect'] = EFFECTS[m['effect']]
+        else: m['kind'], m['x1'] = stat_name(m['kind']), stat_name(m['x1'])
         print(m)
