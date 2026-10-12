@@ -106,7 +106,7 @@ export function pickDeploy(party: UnitType[], max: number, picked: number[]): Pr
   return new Promise(done => {
     const sel = [...picked]
     ui.result.innerHTML = `<h1>출전</h1><div class="deploy-count"></div><div class="deploy"></div>
-      <div class="buttons"><button class="go">출전</button></div><div class="note">대원을 눌러 넣고 뺀다. 선두는 뺄 수 없다.</div>`
+      <div class="buttons"><button class="go">출전</button></div>`
     const grid = ui.result.querySelector<HTMLElement>('.deploy')!, count = ui.result.querySelector<HTMLElement>('.deploy-count')!
     const render = () => {
       count.textContent = `${sel.length} / ${max}`
