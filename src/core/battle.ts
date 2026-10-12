@@ -10,7 +10,7 @@ import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
-import { chapter, initScript, ownsSteps, story } from './script'
+import { blocksAt, chapter, initScript, ownsSteps, story } from './script'
 import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
@@ -103,6 +103,7 @@ async function start() {
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
   S.reserve = all.filter(u => S.troopState[u.troop] === 4)
   S.fired.clear()
+  toldDead.clear()
   S.turn = 1
   S.active = []
   S.mode = { kind: 'busy' }
@@ -186,6 +187,8 @@ function tire(u: Unit, attacked: boolean) {
 
 // ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
 
+// 대본 dead 장면은 이름마다 한 번 (43장: 사바카 1단·최종 모두 사망 조건)
+const toldDead = new Set<string>()
 const member = ([t, m]: Member) => [...S.units, ...S.reserve].find(u => u.troop === t && u.member === m)
 const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
 // +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
@@ -213,18 +216,21 @@ function setTroop(t: number, v: number) {
 export async function checkEnd(): Promise<boolean> {
   const lead = member([0, 0])!
   let result: 'win' | 'lose' | 'ending' | null = lead.hp <= 0 ? 'lose' : null
-  const lines: { text: string }[] = [], scenes: string[] = []
+  // 장면: 대원 사망 조건의 장면은 대본 시점 dead <이름>, 나머지(마지막 1명 남기기 등)는 승리와 함께 win 으로
+  const lines: { text: string }[] = [], deadScenes: [string, string[]][] = [], scenes: string[] = []
   let fallen = lead
   for (const [i, rule] of S.cond.entries()) {
     if (result || S.fired.has(i) || !test(rule.if)) continue
     S.fired.add(i)
+    const dname = 'dead' in rule.if ? member(rule.if.dead[0])!.type.name : ''
+    const into = dname && !toldDead.has(dname) ? (toldDead.add(dname), deadScenes.push([dname, []]), deadScenes.at(-1)![1]) : scenes
     for (const d of rule.do as CondDo[]) {
       if (typeof d === 'string') {
         result = d
         if (d === 'lose' && 'dead' in rule.if) fallen = member(rule.if.dead[0])!
       }
       else if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
-      else if ('scene' in d) scenes.push(d.scene)
+      else if ('scene' in d) into.push(d.scene)
       else if ('flag' in d) FLAGS.add(d.flag)
       else { S.joined.push(d.join); lines.push(joinLine(d.join)) }
     }
@@ -237,9 +243,12 @@ export async function checkEnd(): Promise<boolean> {
   }
   const prev = S.mode
   if (result) { S.mode = { kind: 'busy' }; await sleep(400) }
-  if (scenes.length || lines.length) {
+  const won = result === 'win' || result === 'ending'
+  if (deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
     S.mode = { kind: 'busy' }
-    await playDialogue([...sceneLines(scenes), ...lines])
+    for (const [who, keys] of deadScenes) await story('dead', keys, aliveMember, who)
+    if (won) await story('win', scenes, aliveMember, undefined, lines)
+    else if (scenes.length || lines.length) await playDialogue([...sceneLines(scenes), ...lines])
     if (!result) S.mode = prev
   }
   if (!result) return false

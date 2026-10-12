@@ -15,7 +15,7 @@ export interface Cond {
   in?: string[]; party?: string[]; alive?: [number, number][]
 }
 export type Entry =
-  | { line: number; who: string[]; text?: string; ref?: number }   // who = 화자 후보 ('-' 초상 없음, '출전' 출전 동료). ref = 원작 줄
+  | { line: number; who: string[]; opt?: boolean; text?: string; ref?: number }   // who = 화자 후보 ('-' 초상 없음, '출전' 출전 동료). opt = "이름?" (없으면 생략). ref = 원작 줄
   | { line: number; keep: true }
   | { line: number; do: PostStep[] }
   | { line: number; choose: string[]; branches: Entry[][] }
@@ -107,13 +107,15 @@ export function parseChapter(file: string, n: number, src: string, name: (s: str
       else if (line.startsWith('do ')) into.push({ line: no, do: parseDo(line.slice(3), id, err) })
       else {
         const m = /^([^:]+):\s*(.*)$/.exec(line) ?? err('"화자: 대사" 꼴이 아님')
-        const who = m[1].split('|').map(s => s.trim())
+        const opt = m[1].trim().endsWith('?')
+        const who = m[1].trim().replace(/\?$/, '').split('|').map(s => s.trim())
         who.forEach(w => { if (w !== '-' && w !== '출전') id(w) })
         const r = /^=(\d+)(?:\s*~\s*(.*))?$/.exec(m[2])
-        if (r && r[2] === undefined) into.push({ line: no, who, ref: Number(r[1]) })
-        else if (r) into.push({ line: no, who, ref: Number(r[1]), text: r[2] })
+        const o = opt ? { opt } : {}
+        if (r && r[2] === undefined) into.push({ line: no, who, ...o, ref: Number(r[1]) })
+        else if (r) into.push({ line: no, who, ...o, ref: Number(r[1]), text: r[2] })
         else if (!m[2]) err('대사가 비었다')
-        else into.push({ line: no, who, text: m[2] })
+        else into.push({ line: no, who, ...o, text: m[2] })
       }
     }
   })
@@ -136,7 +138,9 @@ export function nameIndex(types: UnitType[], aliases: Record<string, string> = {
 
 // ---------- 실행 ----------
 
-const deployed = () => S.units.filter(u => u.troop === 0 && u.hp > 0).map(u => u.type.id)
+// 출전 중인 일행. 전투 후(post)에는 쓰러진 대원도 그 자리에 있던 것으로 본다 (원작은 쓰러져도 일행에 남는다)
+let afterBattle = false
+const deployed = () => S.units.filter(u => u.troop === 0 && (afterBattle || u.hp > 0)).map(u => u.type.id)
 
 function test(c: Cond, name: (s: string, prefer?: number[]) => number | undefined, alive: Alive) {
   const inParty = (s: string) => { const id = name(s, PARTY); return id !== undefined && PARTY.includes(id) }
@@ -153,8 +157,8 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
   let buf: Line[] = []
   const flush = async () => { if (buf.length) { const b = buf; buf = []; await playDialogue(b) } }
   let last: number | undefined
-  const speaker = (who: string[]): UnitType | null | undefined => {   // null = 줄 생략
-    if (who.length === 1 && who[0] !== '출전') return who[0] === '-' ? undefined : S.types[name(who[0], [...deployed(), ...PARTY])!]
+  const speaker = (who: string[], opt?: boolean): UnitType | null | undefined => {   // null = 줄 생략
+    if (who.length === 1 && !opt && who[0] !== '출전') return who[0] === '-' ? undefined : S.types[name(who[0], [...deployed(), ...PARTY])!]
     for (const w of who) {
       if (w === '-') return undefined
       if (w === '출전') {   // 출전 동료 중 하나 (선두·직전 화자 말고, 출전 순서대로)
@@ -179,14 +183,18 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
         const k = await new Promise<number>(ok => showResult('선택', '', e.choose.map((c, i): [string, () => void] => [c, () => ok(i)])))
         await run(e.branches[k] ?? [])
       } else {
-        const who = speaker(e.who)
+        const who = speaker(e.who, e.opt)
         if (who === null) continue
         last = who?.id
         buf.push({ who, text: e.text ?? S.dialogue[e.ref!] ?? '' })
       }
     }
   }
-  for (const b of blocks) if (test(b.cond, name, alive)) await run(b.body)
+  for (const b of blocks) {
+    afterBattle = b.when === 'post'
+    if (test(b.cond, name, alive)) await run(b.body)
+  }
+  afterBattle = false
   await flush()
 }
 
