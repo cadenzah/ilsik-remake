@@ -25,7 +25,6 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #title { font-weight: 700; color: var(--gold); }
 #phase { color: var(--dim); }
 .spacer { flex: 1; }
-#notice { position: fixed; right: 10px; bottom: 2px; font-size: 11px; color: var(--dim); opacity: .7; pointer-events: none; }
 
 #card { position: fixed; left: 12px; bottom: 12px; width: 280px; padding: 12px; background: var(--panel);
   border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: 72px 1fr; gap: 10px; }
