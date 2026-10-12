@@ -37,6 +37,32 @@
 4. 타이틀 메뉴: 판 선택 → 새로 시작/이어하기/장 선택(클리어 후)/크레딧(팬 게임 고지).
 5. 확인: `pnpm check` + 두 판 각각 1장 자동 진행 스모크 테스트 (`?ed=original&stage=1`, `?ed=remake&stage=1`).
 
+## 결정 (2026-10-12 사용자)
+- 이 구조로 진행. 공통 코드를 최대한 많이. 원작판 = 원작 로직·메커니즘, 개선판 = 원작 바탕으로 개선한 분리된 메커니즘
+- 판 선택 = 런타임. 원작판은 원작 그대로, 편의 기능(위협 범위·피해 예측·이동+공격 한 번에 등)은 개선판만
+- 개선판 대사·데이터(`content/remake/`)는 커밋. 저장소는 나중에 공개 예정
+- 진엔딩 구조(세 루트가 다른 조각 → 숨은 장) 좋다고 함. "다른 길로" 때 능력치·장비를 얼마나 가져갈지는 미정 (아래 답변 참고)
+
+## V1 엔진 분리 설계 (다음 세션에서 바로 구현)
+현재 코드: main.ts 651 (상태 S·초기화·카메라·렌더·애니메이션·승패·턴·AI 진행·입력이 한 파일), rules.ts 129 (이동 탐색 + 피해 근사), ai.ts 62, ui.ts 106 (피해 예측이 rules.damageRange 직접 호출), data.ts 119, stages/stage01.ts.
+목표 배치:
+```
+src/core/   data.ts (그대로 이동) · grid.ts (key·moveCost·reachable·pathTo·dist·inRange·attackSpots·terrainName — rules.ts 에서)
+            unit.ts (Unit·Pos·Side) · render.ts (frame·카메라) · ui.ts · battle.ts (상태·spawn·승패·턴 이벤트·부대 상태·애니메이션·입력)
+            campaign.ts (sceneLines·postLines·플래그 = 그래프 실행기) · edition.ts (Edition 인터페이스)
+src/editions/original/ · src/editions/remake/   (각 index.ts 가 Edition 객체 export, main.ts 가 ?ed= 또는 선택 화면으로 dynamic import)
+```
+Edition 인터페이스 (처음엔 최소로, 6단계에서 늘림):
+- `rules`: damageRange(a,d) / rollDamage, weaponRange(type, items), (이후 명중·반격·경험치)
+- `order(units, round)`: 행동 단계 목록 `Unit[][]` 을 돌려준다. 엔진은 단계마다 — 일행이면 그 유닛들만 플레이어 조작, 아니면 AI 실행.
+  개선판(현행) = [일행 전체, NPC 전체, 적 전체] 페이즈제. 원작판 = 순서 키 내림차순 한 명씩 ([u] 단계들, 같으면 부대·대원 순, 숨김·사망은 실행 때 건너뜀).
+  → 두 턴 방식이 같은 엔진 루프로 돌아간다. 원작판 "턴 종료" 버튼 = 현재 유닛 대기
+- `planFor` (AI): 원작판은 지금 ai.ts 를 그대로 쓰되 [근사] 표시, 개선판은 같은 함수를 import 해서 시작 (공통 최대화: 개선판은 원작판 모듈을 import·덮어쓰기)
+- `features`: { threat, forecast, quickAttack } — 원작판 모두 false, 개선판 true. 원작 UI 에 피해 예측이 있었는지는 [확인 필요]
+- `content`: 캠페인·장면 데이터 경로 (원작판 = public/assets/data, 개선판 = 같은 것 + content/remake 덮어쓰기, 처음엔 없음)
+- 원작판 순서 키 계산에 쓰는 피로는 아직 0 (마법·피로 미구현)
+확인: `pnpm check`, `?ed=original` · `?ed=remake` 로 1장 진행 (원작판은 한 명씩 차례), 개발 모드 window.__game 유지
+
 ## 정할 것
 - 판 선택을 런타임(타이틀 메뉴, 배포 하나)으로 할지, 빌드 두 개(배포 두 곳)로 할지 — 추천: 런타임
 - 원작판의 충실도 목표: "원작 규칙 그대로" 인지 "원작 규칙 + 편의 기능(위협 범위 표시·되돌리기 등)" 인지 — 편의 기능은 엔진 공통이라 끄고 켜는 옵션으로 둘 수 있다
