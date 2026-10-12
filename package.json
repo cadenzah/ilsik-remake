@@ -11,6 +11,8 @@
     "start": "node scripts/setup.mjs && vite --open",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:check": "node scripts/deploy.mjs --dry",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
