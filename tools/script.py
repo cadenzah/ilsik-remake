@@ -139,25 +139,55 @@ def prebattle():
     return out
 
 
+# 캠페인 플래그 = 캠페인 루프 지역 (전투구조체 +0x1d3c / +0x1d3e 와 같은 칸)
+FLAG_NAME = {'13c': 'npc19',    # 19장 끝에 용왕(U[1.0]) 생존 (2ff8:28a3) → 36장 루이스(23) 출현·합류
+             '13a': 'black27'}  # 27장 아리크스 HP < 25% 로 흑기사 출현 → 27장 후 아보라한(24) 합류·장면 272
+POST_FLAG = {}
+
+
 def postbattle():
-    """2ff8:1925~ 전투 후: '현재 스테이지 == S' 블록마다 [('join', 유닛) | ('scene', scene, phase) | ('cond', ..)]."""
+    """2ff8:1925~ 전투 후: '현재 스테이지 == S' 블록마다 [('join', 유닛, 루트) | ('scene', scene, phase, 루트) | ('cond', ..)].
+    루트 = 그 사건을 감싼 'cmp [bp-0x13e], N' 블록들의 루트 집합 (None = 모든 루트). je 로 이어진 비교는 OR.
+    캠페인 플래그 블록 'cmp [bp-0x13c|0x13a], 1; jne' 안의 join·scene 은 POST_FLAG[(장, 순번)] 에 플래그 이름."""
     seg, lo, hi = 0x2ff8, 0x1925, 0x3b91
     out, cur, prev = {}, None, []
+    blocks, pend = [], set()  # 루트 블록 [(루트 집합, 끝 주소)], je 로 모으는 중인 루트
+    flags = []                # 플래그 블록 [(이름, 끝 주소)]
     ins = list(md.disasm(bytes(img[seg*16 + lo: seg*16 + hi]), lo))
+
+    def routes(a):
+        blocks[:] = [b for b in blocks if a < b[1]]
+        rs = {0, 1, 2}
+        for r, _ in blocks: rs &= r
+        flags[:] = [f for f in flags if a < f[1]]
+        if flags: POST_FLAG[(cur, len(out[cur]))] = flags[-1][0]
+        return None if rs == {0, 1, 2} else sorted(rs)
     for k, i in enumerate(ins):
-        if i.mnemonic == 'cmp' and i.op_str.startswith('byte ptr ss:[bx], '):
-            cur = int(i.op_str.split(', ')[1], 0); out.setdefault(cur, [])
+        if i.mnemonic == 'cmp' and i.op_str.startswith('byte ptr ss:[bx], ') and ins[k-2].op_str == 'ax, [bp - 0x21fe]':
+            # 전투 순서표[전투][루트] == S (같은 꼴의 [bp-0x1a4] 비교는 소지품 검사)
+            cur = int(i.op_str.split(', ')[1], 0); out.setdefault(cur, []); blocks.clear(); pend = set()
         elif cur is None: pass
+        elif i.mnemonic == 'mov' and i.op_str == 'al, byte ptr [bp - 0x216f]':
+            # 2ff8:3947 장 블록 다음: 전투 결과 == 2 (43장 엔딩, 124e:d4a7 반환 2) → 엔딩 장면 2:43
+            cur = 43; out.setdefault(cur, []); blocks.clear(); pend = set()
+        elif i.mnemonic == 'cmp' and (m := re.fullmatch(r'word ptr \[bp - 0x(13c|13a)\], 1', i.op_str)) \
+                and ins[k+1].mnemonic == 'jne':
+            flags.append((FLAG_NAME[m.group(1)], int(ins[k+1].op_str, 0)))
+            out[cur].append(('cond', i.op_str, hex(i.address)))
+        elif i.mnemonic == 'cmp' and (m := re.fullmatch(r'word ptr \[bp - 0x13e\], (\d)', i.op_str)):
+            pend.add(int(m.group(1))); j = ins[k+1]
+            if j.mnemonic == 'jne': blocks.append((set(pend), int(j.op_str, 0))); pend = set()
+            out[cur].append(('cond', i.op_str, hex(i.address)))
         elif i.mnemonic == 'inc' and i.op_str == 'word ptr [bp - 0x1c3]':
             # 일행 수 +1 후 일행[수] = 유닛
             m = next(p for p in ins[k+1:k+8] if p.op_str.startswith('word ptr ss:[bx], '))
-            out[cur].append(('join', int(m.op_str.split(', ')[1], 0)))
+            out[cur].append(('join', int(m.op_str.split(', ')[1], 0), routes(i.address)))
         elif i.mnemonic == 'mov' and (m := re.fullmatch(r'word ptr \[bp - 0x(1c3|1c1|1bf|1bd|1bb|1b9|1b7|1b5|1b3)\], (\w+)', i.op_str)):
             # 일행 배열 직접 대입: [bp-0x1c3] = 수, [bp-0x1c1-2k] = k번째 유닛 (2ff8:1681 이 초기값)
             k = (0x1c1 - int(m.group(1), 16)) // 2
             out[cur].append(('count', int(m.group(2), 0)) if k < 0 else ('set', k, int(m.group(2), 0)))
         elif i.mnemonic == 'lcall' and i.op_str == '0xaa2, 0x4138':
-            out[cur].append(('scene',) + (_scene_call(prev) or ('?', '?')))
+            out[cur].append(('scene',) + (_scene_call(prev) or ('?', '?')) + (routes(i.address),))
         elif i.mnemonic == 'cmp':
             out[cur].append(('cond', i.op_str, hex(i.address)))
         prev = (prev + [i])[-6:]
@@ -173,6 +203,19 @@ def triggers():
     return out
 
 
+def _post(e, key):
+    """postbattle 사건 → scenes.json post 항목. routes 가 있으면 그 루트(0~2)에서만."""
+    d = ({'join': e[1]} if e[0] == 'join' else {'count': e[1]} if e[0] == 'count'
+         else {'set': list(e[1:])} if e[0] == 'set' else {'scene': f'{e[2]}:{e[1]}'})
+    r = e[2] if e[0] == 'join' else e[3] if e[0] == 'scene' else None
+    if r is not None: d['routes'] = r
+    if f := POST_FLAG.get(key): d['flag'] = f
+    if key[0] == 13 and e[0] in ('join', 'scene'):
+        # 2ff8:23fb 소지품·장비에 요정피리(168, 9장 금괴 선택 '예') → 수호자(19) 합류·장면 131·132, 없으면 장면 13
+        d['noItem' if e[0] == 'scene' and e[1] == 13 else 'item'] = 168
+    return d
+
+
 def export():
     """웹용 scenes.json 구조."""
     sc = scenes()
@@ -180,16 +223,12 @@ def export():
         'scenes': {f'{ph}:{n}': [list(x) for x in ls] for (ph, n), ls in sorted(sc.items())},
         'pre': {st: [f'{ph}:{n}' for n, ph in v if (ph, n) in sc] for st, v in prebattle().items()},
         'party': INITIAL_PARTY,
-        'post': {st: [{'join': e[1]} if e[0] == 'join' else {'count': e[1]} if e[0] == 'count'
-                      else {'set': e[1:]} if e[0] == 'set' else {'scene': f'{e[2]}:{e[1]}'}
-                      for e in v if e[0] in ('join', 'count', 'set') or (e[0] == 'scene' and (e[2], e[1]) in sc)]
+        'post': {st: [_post(e, (st, k)) for k, e in enumerate(v)
+                      if e[0] in ('join', 'count', 'set') or (e[0] == 'scene' and (e[2], e[1]) in sc)]
                  for st, v in postbattle().items()},
         'routeSelectAfter': 9,  # 9장 후 '진로선택' 메뉴 (0aa2:0b0d) 결과 = 루트 0~2
         'trigger': sorted({f'1:{n}' for n, _ in triggers() if (1, n) in sc}),
     }
-    # 36장 후 루이스(23) 합류는 19장 끝에 용왕(U[1.0]) 이 살아 있어야 한다 (플래그 +0x1d3c, 2ff8:28a3 → 2ff8:332a)
-    for e in out['post'].get(36, []):
-        if e.get('join') == 23: e['flag'] = 'npc19'
     return out
 
 

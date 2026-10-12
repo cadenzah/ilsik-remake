@@ -129,9 +129,10 @@ function sceneLines(keys: string[]) {
 
 // 승리 후 장면. 원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에 보여 준다
 function postLines(stage: number) {
-  const steps = S.scenes.post[stage] ?? []
+  const steps = (S.scenes.post[stage] ?? [])
+    .filter(s => (!s.routes || s.routes.includes(S.def.route)) && (!s.flag || FLAGS.has(s.flag)) && s.item === undefined)  // 장 사이 소지품은 아직 없음
   return [...sceneLines(steps.flatMap(s => 'scene' in s ? [s.scene] : [])),
-    ...steps.flatMap(s => 'join' in s && (!s.flag || FLAGS.has(s.flag)) ? [{ text: `${S.types[s.join].name}이(가) 일행에 합류했다.` }] : [])]
+    ...steps.flatMap(s => 'join' in s ? [{ text: `${S.types[s.join].name}이(가) 일행에 합류했다.` }] : [])]
 }
 
 // ---------- 카메라 ----------
@@ -391,6 +392,7 @@ async function checkEnd(): Promise<boolean> {
       }
       else if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
       else if ('scene' in d) scenes.push(d.scene)
+      else if ('flag' in d) FLAGS.add(d.flag)
       else lines.push({ text: `${S.types[d.join].name}이(가) 일행에 합류했다.` })
     }
   }
@@ -409,6 +411,7 @@ async function checkEnd(): Promise<boolean> {
   }
   if (!result) return false
   if (result === 'ending') {
+    await playDialogue(postLines(S.def.n))
     showResult('엔딩', `${S.turn}턴 만에 ${S.def.title} 클리어 — 엔딩`, () => void start())
     return true
   }
@@ -424,8 +427,9 @@ function updatePhase(text: string) {
   ui.btnEnd.disabled = S.mode.kind === 'busy'
 }
 
-// 캠페인 플래그. 장 연결이 없는 동안은 켜 둔다 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류)
-const FLAGS = new Set(['npc19'])
+// 캠페인 플래그. 장 연결이 없는 동안 npc19 는 켜 둔다 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류,
+// black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
+const FLAGS = new Set<string>(['npc19'])
 
 // 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후)
 async function turnEvents() {
