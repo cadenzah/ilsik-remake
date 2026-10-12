@@ -3,7 +3,7 @@
 // 원작판: 원작 동작 그대로 — 처음엔 출전 줄이 비어 있고 ⟺ 를 눌러야 편성 (선두가 0번 칸), 대기 대원 클릭 = 끝에 붙임,
 //   출전 j 번 클릭 = j 번부터 뒤가 모두 빠짐, 오른쪽 클릭·Esc = 편성 취소, 행동 = '여행계속' 확인 뒤 전투.
 // 개선판: 같은 화면에서 바로 편성 (앞에서부터 채워 둠), 대원 하나씩 넣고 빼기, 마우스 올리면 능력치, 남은 칸 표시,
-//   행동·Enter = 곧바로 전투, ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
+//   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { fadeIn, fadeOut } from './fade'
@@ -229,8 +229,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     const fight = () => finish({ go: 'battle', deploy: [...sel] })
     const act = () => {
       if (!sel.length) return   // 원작: 출전 수 0 이면 아무 반응 없음
-      if (o.remake) fight()
-      else confirm('여행계속', 313, fight)
+      confirm('여행계속', 313, fight)   // 두 판 모두 확인 뒤 전투
     }
     const cancelEdit = () => {   // 원작 오른쪽 클릭: 편성 끝, 출전 줄 비움
       if (o.remake || !editing) return
@@ -269,7 +268,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     drawItems()
     draw()
     void fadeIn()
-    if (o.remake) say('대기인물 클릭 = 출전, 출전인물 클릭 = 빼기. 행동(Enter) = 출발')
+    if (o.remake) say('대기인물 클릭 = 출전, 출전인물 클릭 = 빼기. 행동(Enter) = 출발 확인')
   })
 }
 
