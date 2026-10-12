@@ -1,5 +1,5 @@
 # 현재 상태 (덮어쓰기로 갱신)
-단계: 4단계 E3 완료. 대화 = EXE 0aa2:4138 장면 함수 → tools/script.py → scenes.json (88장면, 전/중/후, 합류, 초기 일행 아리크스·레스다·소피아). 루트 = 9장 후 진로선택 메뉴. 1장이 원작 대화·일행 사용
-다음: E4 승패 조건 (124e:d4a7 전투 중 트리거 함수 = 유닛 HP 0 검사, 그 주변에서 승리/패배 판정 찾기) + 능력치 번호 5~12
+단계: 4단계 E4 분석 완료. 승리 = 남은 적 수(+0x1d56) 0, 패배 = U[0.0] 아리크스 HP 0. 장별 호위 패배·보스 처치·목표 칸 도달(36·37장)·소피아 합류(38장)·엔딩(43장) → formats.md "전투 승패 조건"
+다음: 승패 조건을 battles.json(export_web.py)에 `cond` 로 내보내고 src/main.ts checkEnd 를 데이터 기반으로 (Unit 에 부대·대원 번호 필요: 부대 순서 = 일행, NPC, 적 무리). 그 뒤 능력치 번호 5~12
 그 다음: 5단계 스토리 분석 (plan.md S1·S2) — scenes.json + dialogue.json 으로 장별 흐름 정리 가능
-실행: `pnpm start` / `pnpm dev` (포트 5173) / `pnpm run setup`. 데이터 재생성 `pnpm assets`. 대화 확인 `python tools/script.py list|flow|gaps`. 개발 모드 window.__game.S
+실행: `pnpm start` / `pnpm dev` (포트 5173) / `pnpm run setup`. 데이터 재생성 `pnpm assets`. 장별 조건 `python tools/cond.py [stage]`. 개발 모드 window.__game.S
