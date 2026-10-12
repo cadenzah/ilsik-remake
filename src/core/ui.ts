@@ -49,8 +49,8 @@ export function showForecast(a: Unit | null, d: Unit | null, range: [number, num
   ui.forecast.style.top = `${sy + 18}px`
 }
 
-export function showMenu(items: [string, () => void][], sx: number, sy: number) {
-  ui.menu.innerHTML = ''
+export function showMenu(items: [string, () => void][], sx: number, sy: number, title = '') {
+  ui.menu.innerHTML = title ? `<div class="menu-title">${title}</div>` : ''
   for (const [label, fn] of items) {
     const b = document.createElement('button')
     b.textContent = label

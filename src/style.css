@@ -79,23 +79,38 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #result .buttons button { padding: 10px 20px; font-size: 16px; }
 #result .note { font-size: 13px; color: var(--dim); }
 
-/* 타이틀 화면 */
-#titlescreen { position: fixed; inset: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center;
-  gap: 20px; padding: 32px 16px; background: radial-gradient(ellipse at 50% 30%, #23262d, var(--bg) 70%); }
-#titlescreen .logo { width: min(640px, 100%); border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); flex: none; }
-#titlescreen .panel { width: min(480px, 100%); display: flex; flex-direction: column; gap: 14px; }
-#titlescreen h2 { margin: 6px 0 0; font-size: 16px; color: var(--gold); }
-#titlescreen button small { display: block; font-size: 12px; color: var(--dim); font-weight: 400; margin-top: 2px; }
-#titlescreen .editions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-#titlescreen .editions button { padding: 10px; text-align: center; }
-#titlescreen .editions button.on { border-color: var(--gold); background: #3a3524; color: var(--text); }
-#titlescreen .items, #titlescreen .chapters { display: flex; flex-direction: column; gap: 8px; }
-#titlescreen .items button, #titlescreen .chapters button { padding: 12px; font-size: 17px; }
-#titlescreen .chapters { max-height: 50vh; overflow-y: auto; }
-#titlescreen button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-#titlescreen .credits { font-size: 14px; line-height: 1.6; }
-#titlescreen .credits ul { padding-left: 20px; margin: 6px 0; }
-#titlescreen .credits p { margin: 6px 0; }
-#titlescreen .credits figure { margin: 8px 0; }
-#titlescreen .credits img { width: 100%; border: 1px solid var(--line); border-radius: 6px; }
-#titlescreen .credits figcaption { font-size: 12px; color: var(--dim); }
+/* 타이틀 화면 — 원작 640×480 을 통째로 확대 (title.ts) */
+#titlescreen { position: fixed; inset: 0; background: #000; overflow: hidden; }
+#titlescreen .stage { position: absolute; left: 50%; top: 50%; width: 640px; height: 480px; transform-origin: 50% 50%;
+  image-rendering: pixelated; user-select: none; }
+#titlescreen .stage::after { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+  transition: opacity .6s; }
+#titlescreen .stage.dark::after { opacity: 1; }
+#titlescreen .stage.cut::after { transition: none; }
+#titlescreen .bg { position: absolute; inset: 0; width: 640px; height: 480px; }
+/* 돌 창틀 (MAIN.ECP face 9조각 → menu-frame.png 172×199: 위 60, 좌우 26, 아래 26) */
+#titlescreen .win { position: absolute; left: 460px; top: 0; width: 172px; border-style: solid; border-width: 60px 26px 26px;
+  border-image: url(/assets/ui/menu-frame.png) 60 26 26 fill / 60px 26px 26px round; }
+#titlescreen .win.wide { left: 400px; width: 232px; }
+#titlescreen .body { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; padding: 0 0 6px; margin-top: -10px;
+  max-height: 360px; overflow-y: auto; scrollbar-width: none; }
+#titlescreen .row { all: unset; box-sizing: border-box; cursor: pointer; width: 120px; height: 24px; flex: none; text-align: center;
+  font: 700 15px/24px "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; letter-spacing: 1px;
+  color: #9c9c90; text-shadow: 1px 1px 0 #3c3c3c; }
+#titlescreen .row.pic { background: no-repeat 0 0; }
+#titlescreen .row.pic:hover:not(:disabled), #titlescreen .row.pic:focus-visible { background-position: 0 -24px; }
+#titlescreen .row.txt:hover:not(:disabled), #titlescreen .row.txt:focus-visible { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
+#titlescreen .row:disabled { cursor: default; opacity: .45; }
+#titlescreen .row.ed { width: 56px; font-size: 13px; height: 20px; line-height: 20px; color: #6c846c; }
+#titlescreen .row.ed.on { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
+#titlescreen .row.ed { margin-top: 6px; }
+#titlescreen .wide .row { width: 180px; font-size: 14px; }
+#titlescreen .row.back { margin-top: 6px; }
+/* 제작진 화면 (원작 게임종료 때의 ECPPLANE 화면과 같은 검은 바탕 흰 글자) */
+#titlescreen .page { position: absolute; inset: 0; background: #000; cursor: pointer; }
+#titlescreen .page img { width: 640px; height: 480px; }
+#titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fcfcfc; text-align: center; font: 16px/1.7 "Apple SD Gothic Neo", "Malgun Gothic", serif; }
+#titlescreen .notice h2 { font-size: 20px; margin: 0 0 18px; letter-spacing: 4px; }
+#titlescreen .notice p { margin: 0 0 14px; }
+#menu .menu-title { color: var(--gold); font-weight: 700; padding: 2px 6px 4px; }

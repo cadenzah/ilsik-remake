@@ -1,5 +1,5 @@
 // 마우스·키보드 입력
-import { actionMenu, cancel, doAttack, endPlayerStep, select, toTitle, walk } from './battle'
+import { actionMenu, back, commandMenu, doAttack, endPlayerStep, restPrompt, select, toTitle, walk } from './battle'
 import { attackSpots, dist, inRange, key, pathTo, terrainName } from './grid'
 import { canvas, clampCam, toTile } from './render'
 import { canCommand, S, unitAt } from './state'
@@ -11,7 +11,7 @@ async function onClick(t: Pos) {
   const there = unitAt(t.x, t.y)
   if (md.kind === 'busy') return
   if (md.kind === 'idle') {
-    if (there && canCommand(there)) select(there)
+    if (there && canCommand(there)) S.ed.features.commandFirst ? commandMenu(there) : select(there)
     return
   }
   if (md.kind === 'selected') {
@@ -66,7 +66,7 @@ function toggleThreat() {
 export function bindInput() {
   let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null
   canvas.addEventListener('pointerdown', e => {
-    if (e.button === 2) { e.preventDefault(); cancel(); return }
+    if (e.button === 2) { e.preventDefault(); back(); return }
     drag = { x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false }
   })
   addEventListener('pointermove', e => {
@@ -99,8 +99,8 @@ export function bindInput() {
     if (!ui.dialogue.hidden || !ui.result.hidden || !S.map) return
     const k = e.key.toLowerCase()
     const pan = 48 / S.cam.scale
-    if (k === 'escape') cancel()
-    else if (k === 'e') endPlayerStep()
+    if (k === 'escape') back()
+    else if (k === 'e') S.ed.features.autoRest ? endPlayerStep() : restPrompt()
     else if (k === 't') toggleThreat()
     else if (k === 'arrowleft' || k === 'a') S.cam.x -= pan
     else if (k === 'arrowright' || k === 'd') S.cam.x += pan
@@ -112,12 +112,12 @@ export function bindInput() {
 
   ui.btnThreat.hidden = !S.ed.features.threat
   ui.btnThreat.onclick = toggleThreat
-  ui.btnEnd.onclick = endPlayerStep
+  ui.btnEnd.onclick = () => S.ed.features.autoRest ? endPlayerStep() : restPrompt()
   ui.btnTitle.onclick = () =>
     showResult('타이틀로', '진행 중인 전투는 저장되지 않습니다.', [['계속하기', () => {}], ['타이틀로', toTitle]])
-  // 원작판은 한 명씩 움직이므로 "턴 종료" = 지금 유닛 대기
-  if (S.ed.id === 'original') {
-    ui.btnEnd.innerHTML = '대기 <kbd>E</kbd>'
-    ui.btnEnd.title = '지금 유닛 대기 (E)'
+  // 원작판은 한 명씩 움직이고, 움직이지 않고 차례를 넘기는 길은 휴식뿐 (원작 "휴식?" 확인)
+  if (!S.ed.features.autoRest) {
+    ui.btnEnd.innerHTML = '휴식 <kbd>E</kbd>'
+    ui.btnEnd.title = '지금 유닛 휴식: 생명 회복하고 차례 끝 (E, Esc·우클릭도)'
   }
 }

@@ -21,7 +21,7 @@ function spawn(p: Placement, side: Unit['side']): Unit {
   if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
   return {
     uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st,
-    range: S.ed.rules.weaponRange(t, S.tables.items), acted: false,
+    range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
 }
@@ -87,6 +87,7 @@ async function start() {
 const sleep = (ms: number) => new Promise(ok => setTimeout(ok, ms))
 
 export async function walk(u: Unit, path: Pos[]) {
+  if (path.length > 1) u.moved = true
   for (const p of path.slice(1)) {
     u.facing = p.x > u.x ? 'right' : p.x < u.x ? 'left' : p.y > u.y ? 'down' : 'up'
     const sx = u.x, sy = u.y, t0 = performance.now()
@@ -122,7 +123,16 @@ async function attack(a: Unit, d: Unit) {
   }
 }
 
-function finishUnit(u: Unit) {
+/** 휴식 [확정 20ec:038e]: HP 를 판 규칙만큼 (최대HP 까지) 회복 */
+function rest(u: Unit) {
+  const heal = Math.min(S.ed.rules.restHeal(u), u.maxHp - u.hp)
+  u.hp += heal
+  S.floats.push({ x: u.x, y: u.y, text: heal ? `+${heal}` : '휴식', t0: performance.now(), color: '#7dff9a' })
+}
+
+/** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
+function finishUnit(u: Unit, attacked = false) {
+  if (S.ed.features.autoRest && !attacked && !u.moved) rest(u)
   u.acted = true
   S.mode = { kind: 'idle' }
   hideMenu()
@@ -251,7 +261,7 @@ async function turnEvents() {
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다 */
 async function runRounds() {
   for (;;) {
-    for (const u of S.units) u.acted = false
+    for (const u of S.units) { u.acted = false; u.moved = false }
     S.mode = { kind: 'busy' }
     await turnEvents()
     let bannered = false
@@ -285,7 +295,7 @@ function playerStep(units: Unit[]): Promise<boolean> {
     S.mode = { kind: 'idle' }
     if (units.length === 1) {
       centerOnIfOff(units[0])
-      select(units[0])
+      if (!S.ed.features.commandFirst) select(units[0])   // 원작판은 유닛을 눌러 명령부터 고른다
     }
     updatePhase(units.length > 1 ? '아군 차례' : `${units[0].type.name} 차례`)
   })
@@ -294,7 +304,10 @@ function playerStep(units: Unit[]): Promise<boolean> {
 export function endPlayerStep() {
   if (S.mode.kind === 'busy' || !stepDone) return
   cancel()
-  for (const u of S.active) u.acted = true
+  for (const u of S.active) {
+    if (!u.acted && u.hp > 0 && S.ed.features.autoRest && !u.moved) rest(u)
+    u.acted = true
+  }
   S.mode = { kind: 'busy' }
   stepDone(false)
 }
@@ -328,8 +341,44 @@ export function cancel() {
     // 행동 전이면 이동 취소 (원위치)
     md.unit.x = md.unit.px = md.from.x
     md.unit.y = md.unit.py = md.from.y
+    md.unit.moved = false
     select(md.unit)
   } else if (md.kind === 'selected') S.mode = { kind: 'idle' }
+}
+
+/** 원작판: 차례인 유닛을 누르면 여는 명령창 (원작 20ec:eb81 → 0 이동 20ec:cb07, 제자리 행동 20ec:d900). 아이콘 5개 중 확인된 것만 */
+export function commandMenu(u: Unit) {
+  const here = { x: u.x, y: u.y }
+  const targets = alive('enemy').filter(e => inRange(u, u, e))
+  const { sx, sy } = toScreen(u.x + 1, u.y)
+  const items: [string, () => void][] = [['이동', () => { hideMenu(); select(u) }]]
+  if (targets.length) items.push(['전투', () => { hideMenu(); S.mode = { kind: 'targeting', unit: u, from: here } }])
+  items.push(['취소', () => { hideMenu(); S.mode = { kind: 'idle' } }])
+  S.mode = { kind: 'idle' }
+  showMenu(items, sx + 4, sy, u.type.name)
+}
+
+/** 원작판 휴식: 움직이기 전에 취소하면 "휴식?" (20ec:c25c, 예 → 회복하고 차례 끝). 움직였으면 먼저 제자리로 */
+export function restPrompt() {
+  if (S.mode.kind === 'busy' || !stepDone) return
+  const u = S.active.find(a => !a.acted && a.hp > 0)
+  if (!u) return
+  if (S.mode.kind === 'moved' || S.mode.kind === 'targeting') cancel()
+  hideMenu()
+  showForecast(null, null)
+  S.mode = { kind: 'idle' }
+  const { sx, sy } = toScreen(u.x + 1, u.y)
+  showMenu([['예', () => { rest(u); finishUnit(u) }], ['아니오', () => hideMenu()]], sx + 4, sy, '휴식?')
+}
+
+/** Esc·우클릭. 원작판은 이동을 되돌리고, 제자리면 휴식을 묻는다 (원작 취소 흐름) */
+export function back() {
+  if (!S.ed.features.commandFirst) { cancel(); return }
+  const md = S.mode
+  if (!ui.menu.hidden && md.kind === 'idle') { hideMenu(); return }
+  if (md.kind === 'moved' || md.kind === 'targeting') { cancel(); S.mode = { kind: 'idle' }; return }
+  if (md.kind === 'selected') { S.mode = { kind: 'idle' }; return }
+  if (md.kind === 'idle') restPrompt()
 }
 
 export function actionMenu(u: Unit, from: Pos) {
@@ -337,7 +386,7 @@ export function actionMenu(u: Unit, from: Pos) {
   const targets = alive('enemy').filter(e => inRange(u, u, e))
   const { sx, sy } = toScreen(u.x + 1, u.y)
   const items: [string, () => void][] = []
-  if (targets.length) items.push(['공격', () => { hideMenu(); S.mode = { kind: 'targeting', unit: u, from } }])
+  if (targets.length) items.push([S.ed.features.commandFirst ? '전투' : '공격', () => { hideMenu(); S.mode = { kind: 'targeting', unit: u, from } }])
   items.push(['대기', () => finishUnit(u)], ['취소', () => cancel()])
   showMenu(items, sx + 4, sy)
 }
@@ -347,5 +396,5 @@ export async function doAttack(u: Unit, target: Unit) {
   hideMenu()
   showForecast(null, null)
   await attack(u, target)
-  finishUnit(u)
+  finishUnit(u, true)
 }

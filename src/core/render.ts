@@ -110,6 +110,13 @@ export function frame(now: number) {
   }
   if (md.kind === 'targeting')
     for (const e of alive('enemy')) if (inRange(md.unit, md.unit, e)) fill(e.x, e.y, 'rgba(255,70,70,0.5)')
+  // 원작판: 명령을 고르기 전, 차례인 유닛 칸을 깜빡여 알린다
+  if (md.kind === 'idle' && S.ed.features.commandFirst)
+    for (const u of S.active) if (!u.acted && u.hp > 0) {
+      ctx.strokeStyle = `rgba(227,192,107,${0.55 + 0.45 * Math.sin(now / 180)})`
+      ctx.lineWidth = 3
+      ctx.strokeRect(u.x * TW + 2, u.y * TH + 2, TW - 4, TH - 4)
+    }
 
   // 유닛 (y 순으로 그려 겹침 자연스럽게)
   const sorted = S.units.filter(u => u.alpha > 0).sort((a, b) => a.py - b.py)

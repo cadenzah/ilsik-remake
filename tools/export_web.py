@@ -62,10 +62,31 @@ def export_portraits():
 
 
 def export_ui():
-    """타이틀 로고 (ECPMARK.MAR 0번 위쪽, 아래 발행 문구는 잘라냄), 원작 제작진 화면 (ECPPLANE.ECP 0번)."""
+    """타이틀·메인 메뉴 (원작 124e:e404 재현용, formats.md "메인 메뉴").
+    mark0 돌판 로고, mark1 두루마리 노인 (메뉴 배경), staff/publish 제작진·발행 화면 (ECPPLANE 0·1),
+    menu-frame = MAIN.ECP face 9조각을 합친 172×199 (ECPMARK 1번 팔레트), btn-new/btn-load = 버튼 120×48 (위 보통, 아래 강조),
+    thunder.wav = ECPMARK.FVT 1번 (로고 번쩍일 때)"""
+    import shutil, frtwnd
     d = mkdir('ui')
-    Image.open(os.path.join(IMG, 'ECPMARK.MAR', '000.png')).convert('RGB').crop((0, 0, 640, 300)).save(os.path.join(d, 'title.png'))
-    Image.open(os.path.join(IMG, 'ECPPLANE.ECP', '000.png')).convert('RGB').save(os.path.join(d, 'staff.png'))
+    for name, src in (('mark0', 'ECPMARK.MAR/000'), ('mark1', 'ECPMARK.MAR/001'), ('staff', 'ECPPLANE.ECP/000'), ('publish', 'ECPPLANE.ECP/001')):
+        Image.open(os.path.join(IMG, src + '.png')).convert('RGB').save(os.path.join(d, name + '.png'))
+    pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECPMARK.MAR'), 1)
+    E = {(n, k): frtwnd.image(w, h, px, pal).convert('RGB')
+         for _, n, k, w, h, px in frtwnd.entries(open(os.path.join(ROOT, 'original', 'MAIN.ECP'), 'rb').read())}
+    f = lambda k: E[('face', k)]
+    fr = Image.new('RGB', (172, 199))
+    for k, xy in ((0x203, (0, 0)), (0x103, (26, 0)), (0x303, (146, 0)), (0x703, (0, 60)), (0x003, (26, 60)),
+                  (0x803, (146, 60)), (0x403, (0, 173)), (0x603, (26, 173)), (0x503, (146, 173))):
+        fr.paste(f(k), xy)
+    fr.save(os.path.join(d, 'menu-frame.png'))
+    for b, name in (('b2', 'new'), ('b1', 'load'), ('b3', 'quit')):
+        im = Image.new('RGB', (120, 48))
+        for k, xy in ((0x000, (0, 0)), (0x100, (60, 0)), (0x300, (0, 24)), (0x400, (60, 24))):
+            im.paste(E[(b, k)], xy)
+        im.save(os.path.join(d, f'btn-{name}.png'))
+    shutil.copy(os.path.join(ROOT, 'build', 'snd', 'ECPMARK.FVT', '001.wav'), os.path.join(d, 'thunder.wav'))
+    for old in ('title.png',):
+        if os.path.exists(os.path.join(d, old)): os.remove(os.path.join(d, old))
 
 
 def export_data():

@@ -13,6 +13,7 @@ export interface Unit {
   atk: number; def: number; spi: number; agi: number; mov: number
   range: [number, number]
   acted: boolean
+  moved: boolean                 // 이번 차례에 움직였다 (휴식 판정, 이동 취소 때 되돌린다)
   facing: 'down' | 'up' | 'left' | 'right'
   // 렌더용 보간 위치
   px: number; py: number

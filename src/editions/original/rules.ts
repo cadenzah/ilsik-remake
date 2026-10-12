@@ -19,6 +19,8 @@ export const rules: Rules = {
     const f2 = items.get(t.equip[0])?.f2 ?? 1
     return f2 >= 2 ? [1, f2] : [1, 1]
   },
+  // [확정] 20ec:038e: int(최대HP × 0.1 + 2), 최대HP 까지. 피로도 30 줄인다 (피로는 아직 미구현)
+  restHeal: u => Math.trunc(u.maxHp * 0.1 + 2),
 }
 
 /** 행동 순서 키 [확정] 0aa2:0e17(유닛, 0) = int(100 × (1.1 − 0.01×피로) × (1.2 − 0.01×피로) × (0.3×HP% + 0.7×민첩)).

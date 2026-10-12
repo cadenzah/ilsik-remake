@@ -56,14 +56,14 @@ src/editions/remake/     index.ts — 원작판을 펼쳐 order(페이즈제)·f
 - Edition = { rules{damageRange, rollDamage, weaponRange}, order(units, round) → Unit[][], planFor, features{threat, forecast, quickAttack} }
 - 턴 루프 `battle.runRounds`: 라운드마다 턴 시작 이벤트 → order() 단계 차례로. 일행 단계는 플레이어 (단계 유닛이 다 행동하거나 E), 나머지는 AI.
   order 에는 숨김(reserve)·사망 유닛도 넘기고 실행 때 건너뛴다 → 단계 중에 나타난 부대도 그 라운드에 움직인다 (원작 순서표와 같음)
-- 원작판: 한 명씩, 한 명짜리 일행 단계는 자동 선택, "턴 종료" 버튼 = "대기". 위협 범위 버튼 숨김, 피해 예측·적 클릭 이동+공격·공격 가능 적 표시 없음
-- 개선판: 페이즈제 [일행, NPC, 적], 편의 기능 켬. 알림은 단계가 2명 이상이면 페이즈마다, 아니면 라운드 첫 단계에 "턴 N"
+- 원작판: 한 명씩. 차례 유닛 칸 깜빡임 → 눌러 명령창(이동/전투/취소), 버튼 = "휴식" (Esc·우클릭도: 이동 되돌림 → 휴식?). 위협 범위 버튼 숨김, 피해 예측·적 클릭 이동+공격·공격 가능 적 표시 없음 (features.commandFirst)
+- 개선판: 페이즈제 [일행, NPC, 적], 편의 기능 켬, 이동·공격 없이 마치면 자동 휴식 (features.autoRest). 알림은 단계가 2명 이상이면 페이즈마다, 아니면 라운드 첫 단계에 "턴 N"
 - `content` (개선판 대사 덮어쓰기 경로)는 S3 에서 대본 형식과 함께 추가
 - 확인: 두 판 1장 자동 진행 클리어 (원작판 12턴, 개선판 8턴), 원작판 7장 NPC 끼어들기, 재시작, 개선판 피해 예측, `pnpm build`
 - 테스트 팁: 브라우저 패널이 숨겨지면 rAF 가 멈춰 걷기 애니메이션이 멈춘다 → 로드 직후 `requestAnimationFrame = cb => setTimeout(() => cb(performance.now()), 16)`
 
 ## 타이틀 메뉴 — 완료 (2026-10-12)
-- `src/core/title.ts` 타이틀 (로고 = ECPMARK.MAR 0번 위쪽 300줄, 크레딧 = 팬 게임 고지 + 원작 제작진 화면 ECPPLANE.ECP 0번)
+- `src/core/title.ts` 원작 메인 메뉴 재현 (formats.md "메인 메뉴"): 640×480 통째 확대, 로고 번쩍+천둥 → 두루마리 노인 + 돌 창틀. 창 안 = 유랑천하(새로 시작)·지난흔적(이어하기) 원작 버튼 그림 + 장 선택·제작진·판 선택(같은 모양 글자). 제작진 = ECPPLANE 0·1 + 팬 게임 고지 (원작 게임종료 화면 흐름). 로고 연출은 탭마다 한 번 (sessionStorage)
 - `src/core/save.ts` 판마다 localStorage `eclipse.progress.{original|remake}` = {next 이어하기 장, cleared 장 선택 목록, flags}, 마지막 판 `eclipse.edition`
 - 새로 시작 = next 를 1장으로 (클리어 기록은 유지). 이어하기 = next 장. 장 선택 = 클리어한 장 다시 하기 (진행 저장 안 함)
 - 승리 화면: 다음 장 (전투 순서표 `nextStage`, 9장 뒤 진로 선택 3택 = Edition.routeLabels) / 다시 하기 / 타이틀로. 상단 "타이틀" 버튼 (확인 후 새로고침)
