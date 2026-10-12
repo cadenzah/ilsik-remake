@@ -9,7 +9,7 @@ export const ui = {
   btnEnd: $<HTMLButtonElement>('btn-end'), btnTitle: $<HTMLButtonElement>('btn-title'), btnThreat: $<HTMLButtonElement>('btn-threat'),
   card: $('card'), forecast: $('forecast'), menu: $('menu'), toast: $('toast'),
   dialogue: $('dialogue'), dlgPortrait: $<HTMLImageElement>('dlg-portrait'),
-  dlgName: $('dlg-name'), dlgText: $('dlg-text'), result: $('result'),
+  dlgName: $('dlg-name'), dlgText: $('dlg-text'), result: $('result'), goals: $('goals'),
 }
 
 /** 원작 표 기준 장비·마법 이름. 장비 능력치 보정은 spawn 때 반영됨 */
@@ -99,6 +99,14 @@ export function playDialogue(lines: { who?: UnitType; text: string }[]): Promise
     addEventListener('keydown', onKey, true)
     show()
   })
+}
+
+/** 전투 목표 창 (개선판 장 카드 목표 + 보조 목표). 둘 다 없으면 숨긴다 */
+export function showGoals(main: string, goals: { text: string; state: 'open' | 'done' | 'failed' }[]) {
+  ui.goals.hidden = !main && !goals.length
+  const mark = { open: '◇', done: '✓', failed: '✗' }
+  ui.goals.innerHTML = (main ? `<div class="main">${main}</div>` : '')
+    + goals.map(g => `<div class="sub ${g.state}">${mark[g.state]} ${g.text}</div>`).join('')
 }
 
 /** 결과·확인 화면. 버튼을 누르면 화면을 닫고 그 동작을 한다 */

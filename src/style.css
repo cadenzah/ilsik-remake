@@ -51,6 +51,13 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 .loadout span { color: var(--dim); }
 #card .terrain { grid-column: 1 / -1; font-size: 12px; color: var(--dim); border-top: 1px solid var(--line); padding-top: 6px; }
 
+#goals { position: fixed; top: 52px; left: 12px; max-width: min(340px, calc(100vw - 24px)); padding: 8px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.5; pointer-events: none; }
+#goals .main { color: var(--gold); }
+#goals .sub { color: var(--dim); }
+#goals .sub.done { color: var(--hp); }
+#goals .sub.failed { color: var(--enemy); text-decoration: line-through; }
+
 #forecast { position: fixed; padding: 8px 10px; background: var(--panel); border: 1px solid var(--enemy);
   border-radius: 8px; font-size: 13px; pointer-events: none; white-space: nowrap; }
 #forecast .kill { color: var(--enemy); font-weight: 700; }

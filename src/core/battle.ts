@@ -10,8 +10,8 @@ import { recordClear } from './save'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
-import { blocksAt, chapter, initScript, ownsSteps, story } from './script'
-import { hideMenu, playDialogue, showForecast, showMenu, showResult, toast, ui } from './ui'
+import { blocksAt, chapter, goalStates, initScript, ownsSteps, story, type When } from './script'
+import { hideMenu, playDialogue, showForecast, showGoals, showMenu, showResult, toast, ui } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
 const STEP_MS = 110
@@ -103,7 +103,8 @@ async function start() {
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
   S.reserve = all.filter(u => S.troopState[u.troop] === 4)
   S.fired.clear()
-  toldDead.clear()
+  told.clear()
+  woke.length = 0
   S.turn = 1
   S.active = []
   S.mode = { kind: 'busy' }
@@ -111,6 +112,7 @@ async function start() {
   await fadeIn()
   const card = chapter()?.card
   if (card) await toast(`${S.def.n}장 · ${card[0]}${card[1] ? ` — ${card[1]}` : ''}`, 'card', 2200)   // 장 카드 (S2 제안 4)
+  renderGoals()
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
   await runRounds()
 }
@@ -148,7 +150,7 @@ async function attack(a: Unit, d: Unit) {
   a.px = a.x; a.py = a.y
   const dmg = S.ed.rules.rollDamage(S.map, a, d)
   d.hp = Math.max(0, d.hp - dmg)
-  if (S.troopState[d.troop] === 1) S.troopState[d.troop] = 0   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
+  if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
   d.flash = performance.now() + 160
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
   await sleep(350)
@@ -187,8 +189,9 @@ function tire(u: Unit, attacked: boolean) {
 
 // ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
 
-// 대본 dead 장면은 이름마다 한 번 (43장: 사바카 1단·최종 모두 사망 조건)
-const toldDead = new Set<string>()
+// 대본의 전투 중 시점 (dead·troop·hp) 은 한 전투에 한 번씩 ("시점:값"). 43장: 사바카 1단·최종 모두 사망 조건
+const told = new Set<string>()
+const woke: number[] = []   // 움직이기 시작한(상태 0 으로 바뀐) 부대 — 대본 troop N
 const member = ([t, m]: Member) => [...S.units, ...S.reserve].find(u => u.troop === t && u.member === m)
 const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
 // +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
@@ -205,6 +208,7 @@ function test(c: CondIf): boolean {
 
 // 부대 상태를 바꾼다. 숨김(4)에서 풀리면 맵에 나온다. 0~3 의미는 editions/original/ai.ts
 function setTroop(t: number, v: number) {
+  if (v === 0 && S.troopState[t] !== 0) woke.push(t)
   S.troopState[t] = v
   if (v === 4) return
   for (const u of S.reserve.filter(u => u.troop === t)) {
@@ -223,7 +227,7 @@ export async function checkEnd(): Promise<boolean> {
     if (result || S.fired.has(i) || !test(rule.if)) continue
     S.fired.add(i)
     const dname = 'dead' in rule.if ? member(rule.if.dead[0])!.type.name : ''
-    const into = dname && !toldDead.has(dname) ? (toldDead.add(dname), deadScenes.push([dname, []]), deadScenes.at(-1)![1]) : scenes
+    const into = dname && !told.has(`dead:${dname}`) ? (told.add(`dead:${dname}`), deadScenes.push([dname, []]), deadScenes.at(-1)![1]) : scenes
     for (const d of rule.do as CondDo[]) {
       if (typeof d === 'string') {
         result = d
@@ -244,9 +248,12 @@ export async function checkEnd(): Promise<boolean> {
   const prev = S.mode
   if (result) { S.mode = { kind: 'busy' }; await sleep(400) }
   const won = result === 'win' || result === 'ending'
-  if (deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
+  const moments = scriptMoments()
+  renderGoals()
+  if (deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || moments.length || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
     S.mode = { kind: 'busy' }
     for (const [who, keys] of deadScenes) await story('dead', keys, aliveMember, who)
+    for (const [w, a] of moments) await story(w, [], aliveMember, a)
     if (won) await story('win', scenes, aliveMember, undefined, lines)
     else if (scenes.length || lines.length) await playDialogue([...sceneLines(scenes), ...lines])
     if (!result) S.mode = prev
@@ -259,6 +266,28 @@ export async function checkEnd(): Promise<boolean> {
 }
 
 const aliveMember = (t: number, m: number) => (member([t, m])?.hp ?? 0) > 0
+
+const named = (arg: string, u: Unit) => { const m = /^(.+)#(\d+)$/.exec(arg); return m ? u.type.id === Number(m[2]) : u.type.name === arg }
+
+/** 대본에 블록이 있는 전투 중 시점 가운데 방금 일어난 것: troop N (부대 출동), hp 이름 <N% (HP 위험), dead 이름 (원작 장면이 없는 사망) */
+function scriptMoments(): [When, string][] {
+  const ch = chapter(), out: [When, string][] = []
+  const once = (w: When, a: string) => { if (told.has(`${w}:${a}`)) return; told.add(`${w}:${a}`); out.push([w, a]) }
+  for (const t of woke.splice(0)) if (blocksAt(ch, 'troop', String(t)).length) once('troop', String(t))
+  for (const b of ch?.blocks ?? []) {
+    if (!b.arg || told.has(`${b.when}:${b.arg}`)) continue
+    if (b.when === 'hp') {
+      const [who, pct] = b.arg.split(' '), p = Number(pct.slice(1, -1)) / 100
+      if (S.units.some(u => named(who, u) && u.hp > 0 && u.hp < u.maxHp * p)) once('hp', b.arg)
+    } else if (b.when === 'dead' && [...S.units, ...S.reserve].some(u => named(b.arg!, u) && u.hp <= 0)) once('dead', b.arg)
+  }
+  return out
+}
+
+/** 목표 창: 장 카드의 목표 + 보조 목표 상태 (개선판 대본이 있을 때만) */
+function renderGoals() {
+  showGoals(chapter()?.card?.[1] ?? '', goalStates(aliveMember))
+}
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
@@ -311,6 +340,8 @@ async function turnEvents() {
     }
   }
   await story('turn', scenes, aliveMember, String(S.turn))
+  for (const [w, a] of scriptMoments()) await story(w, [], aliveMember, a)
+  renderGoals()
 }
 
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다 */

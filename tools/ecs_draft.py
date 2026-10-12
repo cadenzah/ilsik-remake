@@ -11,10 +11,14 @@ PARTYMEMBER = set(range(2, 29)) - {0, 1}
 
 
 def member_name(n, t, m):
+    """부대.대원 → 유닛 이름"""
     for r in range(3):
         rec = BT['records'].get(f'{n}-{r}')
-        if rec and t >= 1 and t - 1 < len(rec['groups']) and m < len(rec['groups'][t - 1]['units']):
-            return NAME[rec['groups'][t - 1]['units'][m]['type']]
+        if not rec: continue
+        if rec['npc'] and t == 1: return NAME[rec['npc'][m]['type']] if m < len(rec['npc']) else f'{t}.{m}'
+        g = t - (2 if rec['npc'] else 1)   # 부대 번호: 0 일행, (NPC 있으면 1), 그다음 적 무리 (battle.ts placements)
+        if 0 <= g < len(rec['groups']) and m < len(rec['groups'][g]['units']):
+            return NAME[rec['groups'][g]['units'][m]['type']]
     return f'{t}.{m}'
 
 

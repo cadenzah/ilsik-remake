@@ -12,7 +12,7 @@ export type When = 'pre' | 'post' | 'turn' | 'troop' | 'dead' | 'hp' | 'win' | '
 /** 조건 (모두 AND). route 0~2, in = 출전 중, party = 일행에 있음, alive = [부대, 번호] */
 export interface Cond {
   route?: number[]; flag?: string[]; noFlag?: string[]; item?: number[]; noItem?: number[]
-  in?: string[]; party?: string[]; alive?: [number, number][]
+  in?: string[]; party?: string[]; noIn?: string[]; noParty?: string[]; alive?: [number, number][]
 }
 export type Entry =
   | { line: number; who: string[]; opt?: boolean; text?: string; ref?: number }   // who = 화자 후보 ('-' 초상 없음, '출전' 출전 동료). opt = "이름?" (없으면 생략). ref = 원작 줄
@@ -20,7 +20,9 @@ export type Entry =
   | { line: number; do: PostStep[] }
   | { line: number; choose: string[]; branches: Entry[][] }
 export interface Block { when: When; arg?: string; cond: Cond; body: Entry[] }
-export interface Chapter { n: number; card?: [place: string, goal: string]; goals: { text: string; when?: number }[]; blocks: Block[] }
+/** 보조 목표 (제안 2). keep = 조건이 깨지면 실패, ok = 조건이 맞으면 달성, 조건 없음 = 표시만 */
+export interface Goal { text: string; kind?: 'keep' | 'ok'; cond: Cond }
+export interface Chapter { n: number; card?: [place: string, goal: string]; goals: Goal[]; blocks: Block[] }
 
 export class ScriptError extends Error {
   constructor(file: string, line: number, msg: string) { super(`${file}:${line}: ${msg}`) }
@@ -56,7 +58,7 @@ function parseCond(words: string[], name: (s: string) => number, err: (m: string
     if (k === 'route') v.split('|').forEach(r => { if (!(r in ROUTES)) err(`루트는 A·B·C: ${r}`); add('route', ROUTES[r]) })
     else if (k === 'flag') add(not ? 'noFlag' : 'flag', v)
     else if (k === 'item') add(not ? 'noItem' : 'item', Number(v))
-    else if (k === 'in' || k === 'party') { name(v); add(k, v) }
+    else if (k === 'in' || k === 'party') { name(v); add(not ? (k === 'in' ? 'noIn' : 'noParty') : k, v) }
     else if (k === 'alive') { const [t, n] = v.split('.').map(Number); add('alive', [t, n]) }
     else err(`모르는 조건: ${k}`)
   }
@@ -81,8 +83,8 @@ export function parseChapter(file: string, n: number, src: string, name: (s: str
       const [place, goal = ''] = line.slice(5).split('|').map(s => s.trim())
       ch.card = [place, goal]
     } else if (line.startsWith('goal ')) {
-      const m = /^goal (.+?)(?: when (\d+))?$/.exec(line)!
-      ch.goals.push({ text: m[1].trim(), when: m[2] ? Number(m[2]) : undefined })
+      const m = /^goal (.+?)(?:\s+(keep|ok)\s+(\S.*))?$/.exec(line)!
+      ch.goals.push({ text: m[1].trim(), kind: m[2] as Goal['kind'], cond: m[3] ? parseCond(m[3].split(/\s+/), id, err) : {} })
     } else if (line.startsWith('==')) {
       const [w, ...rest] = line.slice(2).trim().split(/\s+/)
       if (w === 'keep') err('keep 은 블록 안에 한 줄로 쓴다')
@@ -144,10 +146,11 @@ const deployed = () => S.units.filter(u => u.troop === 0 && (afterBattle || u.hp
 
 function test(c: Cond, name: (s: string, prefer?: number[]) => number | undefined, alive: Alive) {
   const inParty = (s: string) => { const id = name(s, PARTY); return id !== undefined && PARTY.includes(id) }
+  const isIn = (s: string) => { const id = name(s, deployed()); return id !== undefined && deployed().includes(id) }
   return (!c.route || c.route.includes(S.def.route)) && (c.flag ?? []).every(f => FLAGS.has(f)) && !(c.noFlag ?? []).some(f => FLAGS.has(f))
     && (c.item ?? []).every(hasItem) && !(c.noItem ?? []).some(hasItem)
-    && (c.in ?? []).every(s => { const id = name(s, deployed()); return id !== undefined && deployed().includes(id) })
-    && (c.party ?? []).every(inParty) && (c.alive ?? []).every(([t, m]) => alive(t, m))
+    && (c.in ?? []).every(isIn) && !(c.noIn ?? []).some(isIn)
+    && (c.party ?? []).every(inParty) && !(c.noParty ?? []).some(inParty) && (c.alive ?? []).every(([t, m]) => alive(t, m))
 }
 
 type Line = { who?: UnitType; text: string }
@@ -201,6 +204,16 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
 /** 그 시점의 블록 (조건 검사는 runBlocks 가). 없으면 빈 배열 = 원작 그대로 */
 export const blocksAt = (ch: Chapter | undefined, when: When, arg?: string) =>
   ch?.blocks.filter(b => b.when === when && (arg === undefined || b.arg === arg)) ?? []
+
+export type GoalState = 'open' | 'done' | 'failed'
+/** 보조 목표의 지금 상태 (전투 중 목표 창) */
+export function goalStates(alive: Alive): { text: string; state: GoalState }[] {
+  return (chapter()?.goals ?? []).map(g => {
+    if (!g.kind) return { text: g.text, state: 'open' }
+    const hold = test(g.cond, names, alive)
+    return { text: g.text, state: g.kind === 'ok' ? (hold ? 'done' : 'open') : (hold ? 'open' : 'failed') }
+  })
+}
 
 /** 이 장의 대본이 원작 캠페인 단계를 대신하나 (do 가 하나라도 있으면) */
 export function ownsSteps(ch: Chapter | undefined) {

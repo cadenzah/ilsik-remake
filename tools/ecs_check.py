@@ -33,7 +33,14 @@ for path in sorted(glob.glob(os.path.join(R, 'content', 'remake', 'chapters', '*
     own, used, new = chapter_lines(n), set(), 0
     for i, raw in enumerate(open(path, encoding='utf-8'), 1):
         line = re.sub(r'\s+#.*$|^#.*$', '', raw).strip()
-        if not line or line.startswith(('card ', 'goal ', '==', '? ', '> ', 'do ')) or line == 'keep': continue
+        if line.startswith('=='):   # 블록 머리: dead·hp 의 인물, 조건의 in/party 인물
+            w = line[2:].split()
+            names = [w[1]] if w and w[0] in ('dead', 'hp') and len(w) > 1 else []
+            names += [x.split('=', 1)[1] for x in w if re.match(r'^!?(in|party)=', x)]
+            for nm in names:
+                if not who_ok(nm): print(f'{n:02}.ecs:{i}: 모르는 인물 {nm}'); bad += 1
+            continue
+        if not line or line.startswith(('card ', 'goal ', '? ', '> ', 'do ')) or line == 'keep': continue
         m = re.match(r'^([^:]+):\s*(.*)$', line)
         if not m: print(f'{n:02}.ecs:{i}: 형식'); bad += 1; continue
         for w in m[1].rstrip('?').split('|'):
