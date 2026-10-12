@@ -70,7 +70,7 @@ export interface BattleRecord {
   slots: [number, number][]                 // 주인공 일행 출전 칸 (최대 8)
   npc: BattleUnit[]                          // 함께 싸우는 동료·NPC
   npcState: number                           // NPC 부대 초기 상태 (4 = 숨김)
-  groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active = 부대 상태 (4 = 숨김, 0~3 AI 분기·세부 미확인)
+  groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active = 부대 초기 상태 (0 행동, 1 경계, 2 대기, 3 고정, 4 숨김 — ai.ts)
   treasure: { item: number; at: [number, number] }[] // 숨은 보물 (추정)
   reward: number[]                           // 클리어 보상 도구 (추정)
 }
@@ -83,13 +83,19 @@ export type CondIf =
   | { onlyLeft: Member }             // 남은 적이 그 대원뿐
 export type CondDo = 'win' | 'lose' | 'ending' | { state: [number[], number] } | { scene: string } | { join: number }
 export interface CondRule { if: CondIf; do: CondDo[] }
-export interface Battles { route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]> }
+/** 턴 시작 이벤트 (tools/cond.py TURN, 원작 124e:e0a5). turn·route·flag 가 맞으면 do 실행.
+ *  area = [부대, 칸 목록]: 매 턴 일행 대원이 그 칸에 있으면 그 부대 상태 0 (37장 숨은 부대) */
+export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
+export interface Battles {
+  route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]>; turn: Record<string, TurnEvent[]>
+}
 export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
 
 /** 원작 대화 장면과 전투 전후 흐름 (tools/script.py, EXE 하드코딩에서 추출).
  *  장면 키 "phase:scene" — phase 0 전투 시작, 1 전투 중 트리거, 2 전투 후. scene = 스테이지 번호 또는 스테이지*10+k */
 export type SceneLine = [who: number, line: number, branch: number]  // who -1 = 초상화 없음, branch 0 항상 / 1 선택 '예' / 2 '아니오'
-export type PostStep = { join: number } | { count: number } | { set: [number, number] } | { scene: string }
+// join.flag = 그 캠페인 플래그가 켜져야 합류
+export type PostStep = { join: number; flag?: string } | { count: number } | { set: [number, number] } | { scene: string }
 export interface Scenes {
   scenes: Record<string, SceneLine[]>
   pre: Record<string, string[]>        // 스테이지 → 전투 시작 장면들

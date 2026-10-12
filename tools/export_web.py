@@ -105,7 +105,10 @@ def export_battles(d):
     # cond[stage] = 장별 승패 규칙 (tools/cond.py COND). reach 는 [x, y] 로 바꿔 둔다
     cnd = {s: [{**c, 'if': {'reach': bad.to_xy(c['if']['reach'], S[s - 1][0])}} if 'reach' in c['if'] else c for c in rules]
            for s, rules in cond.COND.items()}
-    json.dump({'route': RT, 'records': recs, 'cond': cnd}, open(os.path.join(d, 'battles.json'), 'w'),
+    # turn[stage] = 턴 시작 이벤트 (tools/cond.py TURN). area 칸은 [x, y] 로
+    trn = {s: [{'area': [e['area'][0], [bad.to_xy(p, S[s - 1][0]) for p in e['area'][1]]]} if 'area' in e else e for e in evs]
+           for s, evs in cond.TURN.items()}
+    json.dump({'route': RT, 'records': recs, 'cond': cnd, 'turn': trn}, open(os.path.join(d, 'battles.json'), 'w'),
               ensure_ascii=False, separators=(',', ':'))
 
 

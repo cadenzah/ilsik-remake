@@ -1,4 +1,4 @@
-import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type CondDo, type CondIf, type CondRule, type Member, type Scenes, type StageMap, type Tables, type UnitType } from './data'
+import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, TH, TW, type BattleRecord, type CondDo, type CondIf, type CondRule, type Member, type TurnEvent, type Scenes, type StageMap, type Tables, type UnitType } from './data'
 import { planFor } from './ai'
 import { attackSpots, dist, equippedStats, inRange, key, pathTo, reachable, rollDamage, terrainName, type Moves, type Pos, type Unit } from './rules'
 import { stage01, type Placement, type StageDef } from './stages/stage01'
@@ -32,6 +32,7 @@ const S = {
   troopInit: [] as number[],   // 부대별 초기 상태 (+0x235)
   troopState: [] as number[],
   cond: [] as CondRule[],
+  turnEv: [] as TurnEvent[],
   fired: new Set<number>(),    // 이미 발동한 규칙 번호
   reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다
   map: null as unknown as StageMap,
@@ -56,9 +57,10 @@ let uidSeq = 0
 function spawn(p: Placement, side: Unit['side']): Unit {
   const t = S.types[p.type]
   const st = equippedStats(t, S.tables.items)
+  if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
   return {
     uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st,
-    range: weaponRange(t), acted: false, awake: side === 'ally' || !!p.awake,
+    range: weaponRange(t), acted: false,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
 }
@@ -72,13 +74,13 @@ function weaponRange(t: UnitType): [number, number] {
 // 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
 function placements(rec: BattleRecord) {
   const allies: Placement[] = S.scenes.party.slice(0, rec.slots.length)
-    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i, awake: true }))
+    .map((type, i) => ({ type, x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
   const troopInit = [0]
   if (rec.npc.length) troopInit.push(rec.npcState)
-  rec.npc.forEach((n, i) => allies.push({ type: n.type, x: n.at[0], y: n.at[1], troop: 1, member: i, awake: true }))
+  rec.npc.forEach((n, i) => allies.push({ type: n.type, x: n.at[0], y: n.at[1], troop: 1, member: i }))
   const base = troopInit.length
   const enemies: Placement[] = rec.groups.flatMap((g, k) =>
-    g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i, awake: g.active === 1 })))
+    g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i })))
   troopInit.push(...rec.groups.map(g => g.active))
   return { allies, enemies, troopInit }
 }
@@ -90,6 +92,7 @@ async function boot() {
   const rec = battles.records[`${S.def.n}-${S.def.route}`] ?? battles.records[[0, 1, 2].map(r => `${S.def.n}-${r}`).find(k => k in battles.records)!]
   Object.assign(S, placements(rec))
   S.cond = battles.cond[S.def.n] ?? []
+  S.turnEv = battles.turn[S.def.n] ?? []
   S.types = tables.types
   S.dialogue = dialogue
   S.map = stage.map
@@ -128,7 +131,7 @@ function sceneLines(keys: string[]) {
 function postLines(stage: number) {
   const steps = S.scenes.post[stage] ?? []
   return [...sceneLines(steps.flatMap(s => 'scene' in s ? [s.scene] : [])),
-    ...steps.flatMap(s => 'join' in s ? [{ text: `${S.types[s.join].name}이(가) 일행에 합류했다.` }] : [])]
+    ...steps.flatMap(s => 'join' in s && (!s.flag || FLAGS.has(s.flag)) ? [{ text: `${S.types[s.join].name}이(가) 일행에 합류했다.` }] : [])]
 }
 
 // ---------- 카메라 ----------
@@ -324,6 +327,7 @@ async function attack(a: Unit, d: Unit) {
   a.px = a.x; a.py = a.y
   const dmg = rollDamage(a, d)
   d.hp = Math.max(0, d.hp - dmg)
+  if (S.troopState[d.troop] === 1) S.troopState[d.troop] = 0   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
   d.flash = performance.now() + 160
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
   await sleep(350)
@@ -358,10 +362,9 @@ function test(c: CondIf): boolean {
   return left.length === 1 && left[0] === member(c.onlyLeft)
 }
 
-// 부대 상태를 바꾼다. 숨김(4)에서 풀리면 맵에 나오고, 이벤트로 바뀐 부대는 곧바로 움직인다 (0~3 세부 미확인)
+// 부대 상태를 바꾼다. 숨김(4)에서 풀리면 맵에 나온다. 0~3 의미는 ai.ts
 function setTroop(t: number, v: number) {
   S.troopState[t] = v
-  for (const u of [...S.units, ...S.reserve]) if (u.troop === t) u.awake = true
   if (v === 4) return
   for (const u of S.reserve.filter(u => u.troop === t)) {
     S.reserve.splice(S.reserve.indexOf(u), 1)
@@ -417,9 +420,37 @@ function updatePhase(text: string) {
   ui.btnEnd.disabled = S.mode.kind === 'busy'
 }
 
+// 캠페인 플래그. 장 연결이 없는 동안은 켜 둔다 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류)
+const FLAGS = new Set(['npc19'])
+
+// 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후)
+async function turnEvents() {
+  const scenes: string[] = []
+  for (const e of S.turnEv) {
+    if ((e.route ?? S.def.route) !== S.def.route || (e.flag && !FLAGS.has(e.flag))) continue
+    if (e.area) {
+      const [t, cells] = e.area
+      // 일행 대원을 순서대로 보다가 사망 대원을 만나면 그만둔다 (원작 그대로)
+      const party = [...S.units, ...S.reserve].filter(u => u.troop === 0).sort((a, b) => a.member - b.member)
+      for (const u of party) {
+        if (u.hp <= 0) break
+        if (cells.some(([x, y]) => x === u.x && y === u.y)) { if (S.troopState[t] !== 0) setTroop(t, 0); break }
+      }
+    } else if (e.turn === S.turn) {
+      for (const d of e.do ?? []) {
+        if (typeof d === 'string') continue
+        if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
+        else if ('scene' in d) scenes.push(d.scene)
+      }
+    }
+  }
+  if (scenes.length) await playDialogue(sceneLines(scenes))
+}
+
 async function beginPlayerTurn() {
   for (const u of S.units) u.acted = false
   S.mode = { kind: 'busy' }
+  await turnEvents()
   updatePhase('아군 차례')
   await toast(`턴 ${S.turn} · 아군`, 'ally', 700)
   S.mode = { kind: 'idle' }
@@ -434,7 +465,7 @@ async function endPlayerTurn() {
   await toast('적 차례', 'enemy', 700)
   for (const e of alive('enemy')) {
     if (e.hp <= 0) continue
-    const plan = planFor(S.map, S.units, e)
+    const plan = planFor(S.map, S.units, e, S.troopState)
     const moves = reachable(S.map, S.units, e)
     const path = pathTo(moves, plan.dest.x, plan.dest.y)
     if (path.length > 1) { centerOnIfOff(e); await walk(e, path) }

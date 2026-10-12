@@ -35,6 +35,29 @@ COND = {
     43: [_dead((2, 0), do=[{'state': [[1], 3]}, {'state': [[3, 4], 0]}, {'scene': '1:43'}]),
          _dead((1, 0), (1, 1), do=['ending'])],
 }
+
+# 턴 시작 이벤트 124e:e0a5(…, stage, turn) [확정]. 캠페인 루프가 턴 수를 올린 직후 호출 (2ff8:1559), 분기표 cs:e3b4 (8개 장).
+# turn = 그 턴 시작에만 / route = 루트 조건 (+0x1d3a) / flag = 캠페인 플래그 (npc19 = 19장 끝에 U[1.0] 생존, +0x1d3c, 2ff8:28a3)
+# area = [부대, 칸 목록 p]: 매 턴 시작, 일행 대원을 순서대로 보며 (사망 대원을 만나면 중단 — 원작 그대로) 위치가 목록에 있으면 그 부대 상태 0
+# 12장 6턴은 장면 (1, 12) 호출뿐인데 장면 함수에 그 블록이 없어 아무 일도 없다
+AREAS = {1: (0x12be, 24), 2: (0x12ee, 30), 3: (0x132a, 39)}   # 37장, DS 오프셋·개수
+
+
+def area(t):
+    a, n = AREAS[t]
+    return list(struct.unpack_from(f'<{n}H', exe.img, exe.DS*16 + a))
+
+
+TURN = {
+    11: [{'turn': 5, 'route': 0, 'do': [{'state': [[1], 0]}]}],
+    15: [{'turn': 6, 'route': 2, 'do': [{'state': [[1], 0]}]}],
+    19: [{'turn': 4, 'route': 0, 'do': [{'state': [[4], 0]}]}],
+    23: [{'turn': 5, 'route': 1, 'do': [{'state': [[1], 0]}]}],
+    36: [{'turn': 5, 'flag': 'npc19', 'do': [{'state': [[1], 0]}, {'scene': '1:36'}]}],  # 앞에 메시지 상자 0aa2:0118 (내용 미확인)
+    37: [{'area': [t, area(t)]} for t in (1, 2, 3)],
+    38: [{'turn': 6, 'do': [{'state': [[2], 0]}]}],
+}
+
 EXPECT = {(3, 1, 0): 100, (5, 1, 0): 22, (7, 1, 0): 3, (7, 1, 1): 17, (12, 1, 0): 10, (26, 1, 0): 92, (27, 2, 0): 91,
           (29, 1, 0): 89, (32, 1, 0): 91, (33, 1, 0): 15, (33, 3, 1): 91, (35, 1, 0): 89, (35, 2, 0): 92, (38, 2, 0): 94,
           (39, 1, 0): 96, (41, 1, 0): 93, (42, 1, 0): 90, (43, 1, 0): 98, (43, 1, 1): 99, (43, 2, 0): 97}
@@ -80,6 +103,13 @@ if __name__ == '__main__':
                 got = T[t][0][m] if t < len(T) and m < len(T[t][0]) else None
                 if got != want: print('mismatch', s, r, f'U[{t}.{m}]', got, '!=', want); bad_ += 1
         print('expect mismatches', bad_)
+        for s, evs in TURN.items():   # 이벤트가 깨우는 부대가 실제로 있고 처음엔 0 이 아닌지
+            for r in {j for row in RT[1:] for j, v in enumerate(row) if v == s}:
+                T = [None] + troops(bad.parse(R[(s-1)*3+r]))
+                for e in evs:
+                    if e.get('route', r) != r: continue
+                    for t in [e['area'][0]] if 'area' in e else [t for d in e['do'] if 'state' in d for t in d['state'][0]]:
+                        print(f'turn {s}-{r} 부대{t}', '없음!' if t >= len(T) else f'초기 {T[t][1]} 종류 {T[t][0][:3]}')
         sys.exit()
     t = table()
     starts = sorted(set(t.values()) | {END})

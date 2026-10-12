@@ -13,7 +13,6 @@ export interface Unit {
   atk: number; def: number; spi: number; agi: number; mov: number
   range: [number, number]
   acted: boolean
-  awake: boolean   // 적: 경계 범위에 아군이 들어오면 true, 이후 계속 추격
   facing: 'down' | 'up' | 'left' | 'right'
   // 렌더용 보간 위치
   px: number; py: number

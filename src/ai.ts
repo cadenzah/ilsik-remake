@@ -1,17 +1,39 @@
-// 적 AI (근사): 아군이 경계 범위(이동력 + WAKE) 안에 들어오기 전엔 대기.
-// 깨어나면 공격 가능한 대상 중 가장 큰 피해(처치 우선)를 주는 쪽을 고르고,
-// 없으면 가장 가까운 아군 쪽으로 최대한 다가간다.
+// 적 AI. 행동 여부는 원작 부대 상태(+0x235) [확정, 20ec:a419]:
+//   0 행동 · 1 경계 대기 (일행이 닿으면 또는 맞으면 0) · 2 대기 (장 이벤트로만 풀림) · 3 행동, 이동력 0 · 4 숨김
+// 행동할 때의 대상 고르기는 근사: 공격 가능한 대상 중 가장 큰 피해(처치 우선), 없으면 가장 가까운 상대 쪽으로.
 import type { StageMap } from './data'
-import { attackSpots, damageRange, dist, reachable, type Pos, type Unit } from './rules'
-
-const WAKE = 3
+import { attackSpots, damageRange, dist, inside, key, moveCost, reachable, type Pos, type Unit } from './rules'
 
 export interface AiPlan { unit: Unit; dest: Pos; target?: Unit }
 
-export function planFor(map: StageMap, units: Unit[], u: Unit): AiPlan {
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
+
+/** 상태 1 깨어남: 이동력+1 걸음 안(지형 비용)에 일행(부대 0) 대원이 있다. 다른 유닛에 막히는지는 근사로 무시 */
+function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
+  const party = new Set(units.filter(o => o.troop === 0 && o.hp > 0).map(o => key(o.x, o.y)))
+  const cost = new Map([[key(u.x, u.y), 0]])
+  const queue: [number, number, number][] = [[0, u.x, u.y]]
+  while (queue.length) {
+    queue.sort((a, b) => a[0] - b[0])
+    const [c, x, y] = queue.shift()!
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy
+      if (!inside(map, nx, ny)) continue
+      const nc = c + moveCost(map, nx, ny)
+      if (nc > u.mov + 1 || nc >= (cost.get(key(nx, ny)) ?? Infinity)) continue
+      if (party.has(key(nx, ny))) return true
+      cost.set(key(nx, ny), nc)
+      queue.push([nc, nx, ny])
+    }
+  }
+  return false
+}
+
+export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan {
+  const stay = { unit: u, dest: { x: u.x, y: u.y } }
+  if (troopState[u.troop] === 1 && partyInReach(map, units, u)) troopState[u.troop] = 0
+  if (troopState[u.troop] === 1 || troopState[u.troop] === 2) return stay
   const foes = units.filter(o => o.hp > 0 && o.side !== u.side)
-  if (!u.awake && foes.some(f => dist(f, u) <= u.mov + u.range[1] + WAKE)) u.awake = true
-  if (!u.awake) return { unit: u, dest: { x: u.x, y: u.y } }
   const moves = reachable(map, units, u)
   let best: AiPlan | null = null
   let bestScore = -Infinity
@@ -30,7 +52,7 @@ export function planFor(map: StageMap, units: Unit[], u: Unit): AiPlan {
   if (best) return best
 
   const nearest = foes.sort((a, b) => dist(a, u) - dist(b, u))[0]
-  if (!nearest) return { unit: u, dest: { x: u.x, y: u.y } }
+  if (!nearest) return stay
   let dest: Pos = { x: u.x, y: u.y }
   for (const k of moves.keys()) {
     const p = { x: k % 1000, y: Math.floor(k / 1000) }

@@ -176,7 +176,7 @@ def triggers():
 def export():
     """웹용 scenes.json 구조."""
     sc = scenes()
-    return {
+    out = {
         'scenes': {f'{ph}:{n}': [list(x) for x in ls] for (ph, n), ls in sorted(sc.items())},
         'pre': {st: [f'{ph}:{n}' for n, ph in v if (ph, n) in sc] for st, v in prebattle().items()},
         'party': INITIAL_PARTY,
@@ -187,6 +187,10 @@ def export():
         'routeSelectAfter': 9,  # 9장 후 '진로선택' 메뉴 (0aa2:0b0d) 결과 = 루트 0~2
         'trigger': sorted({f'1:{n}' for n, _ in triggers() if (1, n) in sc}),
     }
+    # 36장 후 루이스(23) 합류는 19장 끝에 용왕(U[1.0]) 이 살아 있어야 한다 (플래그 +0x1d3c, 2ff8:28a3 → 2ff8:332a)
+    for e in out['post'].get(36, []):
+        if e.get('join') == 23: e['flag'] = 'npc19'
+    return out
 
 
 if __name__ == '__main__':

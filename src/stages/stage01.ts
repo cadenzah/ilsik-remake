@@ -1,6 +1,6 @@
 // 1장 페얼촌. 배치는 ECLIPSE.BAD (battles.json), 일행·대화는 EXE 에서 추출한 scenes.json 을 쓴다.
 
-export interface Placement { type: number; x: number; y: number; troop: number; member: number; awake?: boolean }
+export interface Placement { type: number; x: number; y: number; troop: number; member: number }
 
 export interface StageDef {
   n: number
