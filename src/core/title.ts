@@ -24,6 +24,26 @@ const INTRO_SOUND = 'eclipse.introSound'
 const THUNDER_VOLUME = 0.5
 const soundOn = () => { try { return localStorage.getItem(INTRO_SOUND) === '1' } catch { return false } }
 const setSound = (on: boolean) => { try { localStorage.setItem(INTRO_SOUND, on ? '1' : '0') } catch { /* 무시 */ } }
+const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
+
+/** 브라우저가 소리 자동 재생을 막는 상태인가. 사용자 입력 전 페이지는 대개 막힌다 (AudioContext 가 suspended 로 시작) */
+function autoplayBlocked() {
+  if (navigator.userActivation?.hasBeenActive) return false
+  try { const c = new AudioContext(), blocked = c.state !== 'running'; void c.close(); return blocked } catch { return false }
+}
+
+/** 클릭·키 입력을 기다린다 (소리를 켰는데 자동 재생이 막혔을 때 로고 연출 전에) */
+function waitGesture(stage: HTMLElement) {
+  return new Promise<void>(ok => {
+    const g = document.createElement('div')
+    g.className = 'gate'
+    g.textContent = '클릭하거나 아무 키나 누르세요'
+    stage.append(g)
+    const go = () => { g.remove(); removeEventListener('pointerdown', go); removeEventListener('keydown', go); ok() }
+    addEventListener('pointerdown', go)
+    addEventListener('keydown', go)
+  })
+}
 const sleep = (ms: number) => new Promise(ok => setTimeout(ok, ms))
 const rand = (n: number) => Math.floor(Math.random() * n)
 
@@ -95,7 +115,11 @@ export function showTitle(): Promise<Launch> {
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
         { label: '제 작 진', on: () => credits(0) },
         { label: '인트로 소리', cls: 'opt', toggle: soundOn(), title: '로고 연출의 천둥 소리',
-          on: () => { setSound(!soundOn()); menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus() } },
+          on: () => {
+            setSound(!soundOn())
+            if (soundOn()) thunderAudio().play().catch(() => {})   // 켜면 한 번 들려준다
+            menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus()
+          } },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
@@ -174,6 +198,8 @@ export function showTitle(): Promise<Launch> {
 
 /** 로고 연출. 클릭·키를 누르면 바로 끝낸다 */
 async function intro(stage: HTMLElement, bg: HTMLImageElement) {
+  const thunder = soundOn() ? thunderAudio() : null
+  if (thunder && autoplayBlocked()) await waitGesture(stage)   // 막힌 채 재생하면 소리 없이 지나간다
   let skip = false, skipNow = () => {}
   const skipped = new Promise<void>(ok => { skipNow = ok })
   const onSkip = () => { skip = true; skipNow() }
@@ -184,8 +210,6 @@ async function intro(stage: HTMLElement, bg: HTMLImageElement) {
   const loaded = new Promise<void>(ok => { bg.onload = bg.onerror = () => ok() })
   bg.src = `${A}/ui/mark0.png`
   await Promise.race([loaded, sleep(2000)])
-  const thunder = soundOn() ? new Audio(`${A}/ui/thunder.wav`) : null
-  if (thunder) thunder.volume = THUNDER_VOLUME
   stage.classList.add('cut', 'dark')
   // 원작: 세 번 번쩍 — 켬 10~159ms, 끔 10~309ms, 세 번째 직전에 천둥
   for (let i = 0; i < 3 && !skip; i++) {

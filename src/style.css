@@ -87,6 +87,8 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
   transition: opacity .6s; }
 #titlescreen .stage.dark::after { opacity: 1; }
 #titlescreen .stage.cut::after { transition: none; }
+#titlescreen .gate { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center;
+  background: #000; color: #9c9c90; font-size: 14px; letter-spacing: 2px; cursor: pointer; }
 #titlescreen .bg { position: absolute; inset: 0; width: 640px; height: 480px; }
 /* 돌 창틀 (MAIN.ECP face 9조각 → menu-frame.png 172×199: 위 60, 좌우 26, 아래 26) */
 #titlescreen .win { position: absolute; left: 460px; top: 0; width: 172px; border-style: solid; border-width: 60px 26px 26px;
