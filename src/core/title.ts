@@ -115,11 +115,7 @@ export function showTitle(): Promise<Launch> {
         { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
         { label: '제 작 진', on: () => credits(0) },
         { label: '인트로 소리', cls: 'opt', toggle: soundOn(), title: '로고 연출의 천둥 소리',
-          on: () => {
-            setSound(!soundOn())
-            if (soundOn()) thunderAudio().play().catch(() => {})   // 켜면 한 번 들려준다
-            menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus()
-          } },
+          on: () => { setSound(!soundOn()); menu(); body.querySelector<HTMLButtonElement>('.opt')?.focus() } },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
