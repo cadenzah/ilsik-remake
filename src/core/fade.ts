@@ -10,6 +10,7 @@ const veil = () => {
     e = document.createElement('div')
     e.id = 'fade'
     document.body.append(e)
+    void e.offsetWidth   // 처음 만든 막은 투명 상태를 한 번 계산해야 다음 변화가 전이된다 (안 하면 곧바로 검어짐)
   }
   return e
 }
