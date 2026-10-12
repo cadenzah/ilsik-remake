@@ -203,6 +203,16 @@ def triggers():
     return out
 
 
+# 일행 배열을 훑으며 고치는 블록 (손으로 옮김): leave = 그 종류 대원 빼기, swap = 종류 교체, promote = +0x62 (직업 단계 추정) +1
+POST_EXTRA = {
+    17: [{'leave': 3}],                        # 2ff8:2749 페니 실종 (폭탄 함정)
+    19: [{'leave': 22}],                       # 2ff8:28ec 루이스 염룡곡에 남음 (용왕 U[1.0] 생존 검사 0x289c 는 npc19 플래그)
+    21: [{'swap': [19, 20], 'item': 179}],     # 2ff8:2b66 고대은화 → 수호자 강화
+    37: [{'swap': [25, 26]}],                  # 2ff8:34e2 아티스 → 새 현자 (크란의 마법력)
+    40: [{'promote': 16, 'if62': 7}],          # 2ff8:37c7 레이몬 +0x62 == 7 이면 +1 (마수신과 피의 서약)
+}
+
+
 def _post(e, key):
     """postbattle 사건 → scenes.json post 항목. routes 가 있으면 그 루트(0~2)에서만."""
     d = ({'join': e[1]} if e[0] == 'join' else {'count': e[1]} if e[0] == 'count'
@@ -229,6 +239,8 @@ def export():
         'routeSelectAfter': 9,  # 9장 후 '진로선택' 메뉴 (0aa2:0b0d) 결과 = 루트 0~2
         'trigger': sorted({f'1:{n}' for n, _ in triggers() if (1, n) in sc}),
     }
+    for st, xs in POST_EXTRA.items():
+        out['post'].setdefault(st, [])[:0] = [dict(x) for x in xs]
     return out
 
 
