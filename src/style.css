@@ -143,7 +143,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .wmap.list .mapbox { transform: translate(4px, 52px) scale(.725); }
 #titlescreen .wmap .map, #titlescreen .wmap .paths { position: absolute; inset: 0; width: 640px; height: 480px; }
 #titlescreen .wmap .paths { pointer-events: none; }
-#titlescreen .wmap .paths polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#titlescreen .wmap .paths path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 #titlescreen .wmap .paths .under { stroke: #fff3c8; stroke-width: 7; opacity: .55; }   /* 밝은 바탕 띠: 어두운 지형 위에서도 보이게 */
 #titlescreen .wmap .paths .trail { stroke: #8a1407; stroke-width: 4; stroke-dasharray: .1 8; }   /* 둥근 점 */
 #titlescreen .wmap .dim { position: absolute; inset: 0; background: rgba(20, 10, 0, .62); opacity: 0; transition: opacity .15s; pointer-events: none; }

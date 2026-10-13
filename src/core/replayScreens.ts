@@ -53,11 +53,14 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   const nextSpot = next ? nudge(places[next - 1]) : null
   const pts = trail.map(n => center(spot.get(key(n))!)).filter((q, i, a) => !i || q.join() !== a[i - 1].join())
   if (nextSpot) pts.push(center(nextSpot))
+  // 원작 좌표는 여러 장이 한 자리라 여정이 같은 구간을 오간다 (예: 바하라무성 ↔ 상지스 광장) → 구간마다 한 번만 그린다 (겹치면 점이 어긋나 굵어 보임)
+  const segs = [...new Map(pts.slice(1).map((q, i) => [pts[i], q] as const)
+    .map(([a, b]) => [[a.join(), b.join()].sort().join('|'), `M${a.join(' ')}L${b.join(' ')}`] as const)).values()].join('')
 
   page.innerHTML = `<div class="wmap list">
       <div class="mapbox">
         <img class="map" src="${A}/ui/worldmap.png" alt="아모스 대륙 지도">
-        <svg class="paths" viewBox="0 0 640 480">${['under', 'trail'].map(c => `<polyline class="${c}" points="${pts.map(q => q.join(',')).join(' ')}"/>`).join('')}</svg>
+        <svg class="paths" viewBox="0 0 640 480">${['under', 'trail'].map(c => `<path class="${c}" d="${segs}"/>`).join('')}</svg>
         <div class="dim"></div>
         <div class="labels"></div>
       </div>
@@ -143,13 +146,16 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
     const n = Number(b.dataset.n)
     b.onmouseenter = b.onfocus = () => focus(n)
     b.onmouseleave = b.onblur = () => focus(null)
-    b.onclick = () => { if (groups.has(key(n))) showPopup(groups.get(key(n))!, n) }
+    b.onclick = () => { if (groups.has(key(n))) showPopup(groups.get(key(n))!, n, b.dataset.route === undefined ? undefined : Number(b.dataset.route)) }
   })
   page.querySelectorAll<HTMLButtonElement>('[data-hidden]').forEach(b => b.onclick = () => hidden(Number(b.dataset.hidden)))
 
   // 팝업: 그 장소에서 치른 장 (번호·원작 제목·장소·갈래) → 다시 하기, 찾은 사건
-  const showPopup = (ns: number[], first?: number) => {
-    const list = cleared.filter(c => ns.includes(c.n)).sort((a, b) => (b.n === first ? 1 : 0) - (a.n === first ? 1 : 0) || a.n - b.n || a.route - b.route)
+  const showPopup = (ns: number[], first?: number, route?: number) => {
+    // 세 갈래가 함께 지나는 장은 판마다 기록이 있다 → 장마다 한 줄 (목록의 갈래 줄에서 왔으면 그 갈래, 아니면 가장 최근 판)
+    const pick = (n: number) => cleared.filter(c => c.n === n).reduce((a, c) => (route !== undefined && c.route === route && a.route !== route) || (a.route !== route && c.route !== route) ? c : a)
+    const list = [...new Set(cleared.filter(c => ns.includes(c.n)).map(c => c.n))].map(pick)
+      .sort((a, b) => (b.n === first ? 1 : 0) - (a.n === first ? 1 : 0) || a.n - b.n)
     const found = FOUND.filter(f => ns.includes(f.n) && p?.found?.includes(f.id))
     popup.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
       ${list.map((c, i) => `<div class="prow"><b>${c.n}장</b><span>「${places[c.n - 1].title}」<small>${places[c.n - 1].name}${common(c.n) ? '' : ` · ${ROUTE_TRAIL[c.route]}`}</small></span>
