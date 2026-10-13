@@ -147,7 +147,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .placebtn:hover, #titlescreen .placebtn:focus-visible { filter: drop-shadow(0 0 3px #fff6c0) brightness(1.1); }
 #titlescreen .place.next { animation: placepulse 1.6s ease-in-out infinite; pointer-events: none; }
 @keyframes placepulse { 0%, 100% { filter: drop-shadow(0 0 0 #fff0a0); opacity: .55 } 50% { filter: drop-shadow(0 0 6px #fff0a0); opacity: 1 } }
-#titlescreen .wmap .memory { position: absolute; left: 96px; top: 14px; display: flex; flex-direction: column; gap: 2px; padding: 4px 10px;
+#titlescreen .wmap .memory { position: absolute; left: 14px; bottom: 40px; display: flex; flex-direction: column; gap: 2px; padding: 4px 10px;
   background: rgba(243, 227, 176, .92); border: 1px solid #6b4a1a; border-radius: 3px; color: #3c2a10; font-size: 12px; }
 #titlescreen .wmap .memory button { all: unset; cursor: pointer; color: #7a1c10; }
 #titlescreen .wmap .memory button:hover, #titlescreen .wmap .memory button:focus-visible { text-decoration: underline; }
