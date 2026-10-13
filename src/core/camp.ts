@@ -23,6 +23,7 @@ export interface CampOptions {
   initial: number[]   // 개선판이 처음 채워 둘 출전 목록 (일행 인덱스)
   /** 기록 3칸 (읽기·기록). list = 칸 이름 (빈 칸 null), save = 지금 정비 화면 상태를 그 칸에 */
   slots?: { list: () => (string | null)[]; save: (i: number, items: number[], equip: UnitType['equip'][]) => void }
+  preview?: string    // 개선판: 도구설명 칸에 처음 보일 다음 장 이름·목표 (ux-proposal.md 23)
 }
 
 // 원작 좌표 (화면)
@@ -368,7 +369,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     drawItems()
     draw()
     void fadeIn()
-    if (o.remake) say(PAGE_HELP.intro)
+    if (o.remake) say(o.preview ?? PAGE_HELP.intro)
   })
 }
 
