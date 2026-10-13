@@ -19,7 +19,8 @@ const HIDDEN_PLACE: Record<number, { name: string; title: string; x: number; y: 
 
 export async function chapterMap(page: HTMLElement, p: Progress | null,
   play: (c: Cleared) => void, hidden: (n: number) => void, close: () => void) {
-  const [places, battles] = await Promise.all([loadPlaces(), loadBattles()])
+  const [places, battles, tables] = await Promise.all([loadPlaces(), loadBattles(), loadTables()])
+  const types = tables.types
   const T = battles.route.slice(1)
   const routes = [0, 1, 2].map(k => [...new Set(T.map(row => row[k]))])
   const cleared = p?.cleared ?? []
@@ -51,11 +52,11 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   const spot = new Map<string, Place>()
   for (const ns of [...groups.values()].sort((a, b) => a[0] - b[0])) spot.set(key(ns[0]), nudge(places[latest(ns) - 1]))
   const nextSpot = next ? nudge(places[next - 1]) : null
-  const pts = trail.map(n => center(spot.get(key(n))!)).filter((q, i, a) => !i || q.join() !== a[i - 1].join())
+  // 길 = 장소를 처음 찾아간 순서. 원작은 여러 장이 한 자리라 여정이 같은 곳을 오간다 (바하라무성 ↔ 상지스 광장·고신전) →
+  // 되돌아가는 선까지 그리면 거의 겹친 선이 굵게 보인다 (사용자 지적) → 이미 가 본 곳으로 돌아가는 구간은 그리지 않는다
+  const pts = [...new Map(trail.map(n => [key(n), center(spot.get(key(n))!)] as const)).values()]
   if (nextSpot) pts.push(center(nextSpot))
-  // 원작 좌표는 여러 장이 한 자리라 여정이 같은 구간을 오간다 (예: 바하라무성 ↔ 상지스 광장) → 구간마다 한 번만 그린다 (겹치면 점이 어긋나 굵어 보임)
-  const segs = [...new Map(pts.slice(1).map((q, i) => [pts[i], q] as const)
-    .map(([a, b]) => [[a.join(), b.join()].sort().join('|'), `M${a.join(' ')}L${b.join(' ')}`] as const)).values()].join('')
+  const segs = pts.slice(1).map((q, i) => `M${pts[i].join(' ')}L${q.join(' ')}`).join('')
 
   page.innerHTML = `<div class="wmap list">
       <div class="mapbox">
@@ -152,18 +153,29 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
 
   // 팝업: 그 장소에서 치른 장 (번호·원작 제목·장소·갈래) → 다시 하기, 찾은 사건
   const showPopup = (ns: number[], first?: number, route?: number) => {
-    // 세 갈래가 함께 지나는 장은 판마다 기록이 있다 → 장마다 한 줄 (목록의 갈래 줄에서 왔으면 그 갈래, 아니면 가장 최근 판)
-    const pick = (n: number) => cleared.filter(c => c.n === n).reduce((a, c) => (route !== undefined && c.route === route && a.route !== route) || (a.route !== route && c.route !== route) ? c : a)
-    const list = [...new Set(cleared.filter(c => ns.includes(c.n)).map(c => c.n))].map(pick)
-      .sort((a, b) => (b.n === first ? 1 : 0) - (a.n === first ? 1 : 0) || a.n - b.n)
+    // 장마다 한 줄. 세 갈래가 함께 지나는 장(16·19·26·36~43)은 판마다 기록이 있고 일행이 다르다 →
+    // 깬 갈래마다 다시 하기 버튼, 올리면 그 판에 함께한 동료 (목록의 갈래 줄에서 왔으면 그 갈래 버튼을 앞에·강조)
+    const ns2 = [...new Set(cleared.filter(c => ns.includes(c.n)).map(c => c.n))].sort((a, b) => (b === first ? 1 : 0) - (a === first ? 1 : 0) || a - b)
+    const recs = ns2.map(n => cleared.filter(c => c.n === n).sort((a, b) => (b.route === route ? 1 : 0) - (a.route === route ? 1 : 0) || a.route - b.route))
+    const flat = recs.flat()
+    const crew = (c: Cleared) => (c.at?.party ?? []).map(t => types[t]?.name).filter(Boolean).join(' · ')
     const found = FOUND.filter(f => ns.includes(f.n) && p?.found?.includes(f.id))
     popup.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
-      ${list.map((c, i) => `<div class="prow"><b>${c.n}장</b><span>「${places[c.n - 1].title}」<small>${places[c.n - 1].name}${common(c.n) ? '' : ` · ${ROUTE_TRAIL[c.route]}`}</small></span>
-        <button data-i="${i}">다시 하기</button></div>`).join('')}
+      ${ns2.map((n, k) => `<div class="prow"><b>${n}장</b><span>「${places[n - 1].title}」<small>${places[n - 1].name}${common(n) || recs[k].length > 1 ? '' : ` · ${ROUTE_TRAIL[recs[k][0].route]}`}</small></span>
+        ${recs[k].length === 1 ? `<button data-i="${flat.indexOf(recs[k][0])}" title="${crew(recs[k][0])}">다시 하기</button>`
+          : `<div class="via"><small>어느 길에서 온 판으로?</small>${recs[k].map(c => `<button data-i="${flat.indexOf(c)}" class="${c.route === route ? 'pri' : ''}">${ROUTE_TRAIL[c.route].replace(/ 길$/, '')}</button>`).join('')}</div>`}
+        </div>`).join('')}
+      <p class="crew" hidden></p>
       ${found.map(f => `<p>✓ ${f.label}</p>`).join('')}
       <button class="x">닫기</button>`
     popup.hidden = false
-    popup.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => b.onclick = () => play(list[Number(b.dataset.i)]))
+    const crewLine = popup.querySelector<HTMLElement>('.crew')!
+    popup.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => {
+      const c = flat[Number(b.dataset.i)]
+      b.onclick = () => play(c)
+      b.onmouseenter = b.onfocus = () => { crewLine.hidden = false; crewLine.textContent = `${c.n}장 · ${ROUTE_TRAIL[c.route]} 판의 일행: ${crew(c) || '기록 없음'}` }
+      b.onmouseleave = b.onblur = () => { crewLine.hidden = true }
+    })
     popup.querySelector<HTMLButtonElement>('.x')!.onclick = hidePopup
     popup.querySelector<HTMLButtonElement>('[data-i]')?.focus()
   }

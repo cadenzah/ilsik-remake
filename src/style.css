@@ -182,7 +182,7 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .crow.next { opacity: .75; }
 #titlescreen .crow:hover, #titlescreen .crow:focus-visible { background: rgba(122, 28, 16, .14); }
 /* 장소 팝업 */
-#titlescreen .wmap .popup { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 260px; max-width: 380px; padding: 10px 16px 6px;
+#titlescreen .wmap .popup { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 260px; max-width: 460px; padding: 10px 16px 6px;
   background: #f3e3b0; border: 2px solid #6b4a1a; border-radius: 4px; box-shadow: 0 3px 12px rgba(0, 0, 0, .65); color: #3c2a10; font-size: 13px; z-index: 2; }
 #titlescreen .wmap.list .popup { left: 236px; }
 #titlescreen .wmap .popup[hidden] { display: none; }
@@ -195,6 +195,12 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .wmap .popup button:hover, #titlescreen .wmap .popup button:focus-visible { background: rgba(122, 28, 16, .14); }
 #titlescreen .wmap .popup button.x { display: block; margin: 6px auto 0; color: #8a6a3a; }
 #titlescreen .wmap .popup p { margin: 4px 0 0; color: #2f5a1f; }
+#titlescreen .wmap .popup .via { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 2px 4px; max-width: 230px; }
+#titlescreen .wmap .popup .via small { width: 100%; text-align: right; color: #8a6a3a; font-size: 10px; }
+#titlescreen .wmap .popup .via button { border: 1px solid #b08850; font-size: 11px; padding: 0 5px; }
+#titlescreen .wmap .popup .via button.pri { background: rgba(122, 28, 16, .14); border-color: #7a1c10; }
+#titlescreen .wmap .popup p.crew { color: #5a3a10; font-size: 11px; border-top: 1px dotted #c9a868; padding-top: 4px; }
+#titlescreen .wmap .popup p.crew[hidden] { display: none; }
 #titlescreen .page nav .toggle { position: absolute; left: 12px; }
 #titlescreen .page:has(.wmap) nav { height: 30px; background: linear-gradient(transparent, rgba(12, 10, 6, .92) 40%); z-index: 3; }
 
