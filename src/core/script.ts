@@ -4,7 +4,8 @@
 import { FLAGS, PARTY, applyStep, hasItem, sceneLines, type Alive, type Note } from './campaign'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
-import { playDialogue, showResult } from './ui'
+import { playDialogue } from './dialogue'
+import { showResult } from './ui'
 
 // ---------- 형식 ----------
 

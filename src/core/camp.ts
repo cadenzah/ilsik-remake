@@ -6,6 +6,8 @@
 //   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
+import { hud, mapRect } from './screen'
+import { winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 
@@ -55,6 +57,46 @@ function sprite(t: UnitType, big: boolean) {
   if (t.id < MINI) return `<i class="spr" style="width:${w}px;height:${h}px;background:url(${A}/ui/${big ? 'camp-face' : 'camp-mini'}.png) -${t.id * w}px 0"></i>`
   return `<i class="spr" style="width:${w}px;height:${h}px;background:url(${A}/units/${String(t.id).padStart(3, '0')}.png) 0 0 / auto ${h}px no-repeat"></i>`
 }
+/** 인물기본자료 글자 (WIN 1 위, 화면 좌표 = 창 + (25,12)). cur = 전투 중 현재 생명·피로 */
+export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fatigue: number }) {
+  const st = equippedStats(t, tables.items)
+  const p = profile(t, tables.labels)
+  const row = (y: number, label: string, now: number, max: number) =>
+    `<span class="num cur" style="${px(101, y, 40)}">${now}</span>` +   // '/' 는 WIN 1 그림에 있음
+    `<span class="num" style="${px(155, y)}" aria-label="${label} 최대">${max}</span>`
+  return `<span class="txt b" style="${px(221, 38)}">${esc(t.name)}</span>` +
+    `<span class="txt" style="${px(221, 58)}">${esc(p.race)}</span>` +
+    `<span class="txt" style="${px(221, 78)}">${esc(p.sex)}</span>` +
+    `<span class="txt" style="${px(221, 98)}">${esc(p.job)}</span>` +
+    `<span class="txt" style="${px(221, 119)}">${t.lv}</span>` +
+    row(148, '생명', cur?.hp ?? st.maxHp, st.maxHp) + row(168, '역량', st.atk, st.atk) + row(188, '방어', st.def, st.def) +
+    row(208, '정신', st.spi, st.spi) + row(228, '민첩', st.agi, st.agi) +
+    `<span class="txt" style="${px(270, 147)}">${st.mov}</span>` +
+    `<span class="txt b" style="${px(270, 167)}">${esc(p.move)}</span>` +
+    `<span class="txt" style="${px(270, 187)}">${esc(p.rank)}</span>` +
+    `<span class="txt" style="${px(270, 207)}">${cur?.fatigue ?? t.fatigue}</span>` +
+    `<span class="txt" style="${px(270, 227)}">${t.exp}</span>` +
+    t.equip.map((id, k) => id ? `<button class="eq" data-item="${id}" style="${px(35 + 51 * k, 275, 48, 56)}">${icon(id)}</button>` : '').join('') +
+    t.magic.slice(0, 8).map((id, k) => `<button class="mg" data-magic="${id}" style="${px(213 + 34 * (k % 4), 255 + 41 * Math.floor(k / 4), 32, 40)};background-position:-${id * 32}px 0"
+      aria-label="${esc(tables.magic.get(id)?.name ?? '')}"></button>`).join('')
+}
+
+/** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
+export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }) {
+  document.querySelector('.bigstat')?.remove()
+  const m = mapRect()
+  const el = document.createElement('div')
+  el.className = 'bigstat'
+  Object.assign(el.style, { left: `${Math.round(m.x + (m.w - 330) / 2)}px`, top: `${Math.round(m.y + Math.max(0, (m.h - 330) / 2))}px` })
+  el.innerHTML = `<img class="status-bg" src="${A}/ui/camp-status.png" alt="">
+    <i class="por" style="${px(8, 19, 96, 111)};background-position:-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px"></i>
+    <div class="status" style="left:-25px;top:-12px">${statusMarkup(t, tables, cur)}</div>`
+  const close = (e: Event) => { e.preventDefault(); e.stopPropagation(); el.remove() }
+  el.onclick = close
+  el.oncontextmenu = close
+  hud.append(el)
+}
+
 const icon = (id: number) =>
   `<i class="icon" style="background-position:-${((id - 1) % 13) * 48}px -${Math.floor((id - 1) / 13) * 56}px"></i>`
 
@@ -108,28 +150,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   // ---- 인물기본자료 (원작 7c18 모드 1, WIN 1 위) ----
   const showStatus = (i: number) => {
     shown = i
-    const t = party[i], st = equippedStats(t, o.tables.items)
+    const t = party[i]
     por.style.backgroundPosition = `-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px`
-    const p = profile(t, o.tables.labels)
-    const row = (y: number, label: string, cur: number, max: number) =>
-      `<span class="num cur" style="${px(101, y, 40)}">${cur}</span>` +   // '/' 는 WIN 1 그림에 있음
-      `<span class="num" style="${px(155, y)}" aria-label="${label} 최대">${max}</span>`
-    status.innerHTML =
-      `<span class="txt b" style="${px(221, 38)}">${esc(t.name)}</span>` +
-      `<span class="txt" style="${px(221, 58)}">${esc(p.race)}</span>` +
-      `<span class="txt" style="${px(221, 78)}">${esc(p.sex)}</span>` +
-      `<span class="txt" style="${px(221, 98)}">${esc(p.job)}</span>` +
-      `<span class="txt" style="${px(221, 119)}">${t.lv}</span>` +
-      row(148, '생명', st.maxHp, st.maxHp) + row(168, '역량', st.atk, st.atk) + row(188, '방어', st.def, st.def) +
-      row(208, '정신', st.spi, st.spi) + row(228, '민첩', st.agi, st.agi) +
-      `<span class="txt" style="${px(270, 147)}">${st.mov}</span>` +
-      `<span class="txt b" style="${px(270, 167)}">${esc(p.move)}</span>` +
-      `<span class="txt" style="${px(270, 187)}">${esc(p.rank)}</span>` +
-      `<span class="txt" style="${px(270, 207)}">${t.fatigue}</span>` +
-      `<span class="txt" style="${px(270, 227)}">${t.exp}</span>` +
-      t.equip.map((id, k) => id ? `<button class="eq" data-item="${id}" style="${px(35 + 51 * k, 275, 48, 56)}">${icon(id)}</button>` : '').join('') +
-      t.magic.slice(0, 8).map((id, k) => `<button class="mg" data-magic="${id}" style="${px(213 + 34 * (k % 4), 255 + 41 * Math.floor(k / 4), 32, 40)};background-position:-${id * 32}px 0"
-        aria-label="${esc(o.tables.magic.get(id)?.name ?? '')}"></button>`).join('')
+    status.innerHTML = statusMarkup(t, o.tables)
     // 원작판은 장비 아이콘을 눌러도 반응 없음 (DOSBox 확인). 개선판은 설명
     if (o.remake) status.querySelectorAll<HTMLButtonElement>('.eq').forEach(b => {
       const show = () => describe(o.tables.items.get(Number(b.dataset.item)))
@@ -261,9 +284,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   // ---- 확인창 (원작 0aa2:0c58, 화면 좌표) ----
   const confirm = (title: string, y: number, ok: () => void, x = 500) => {
     dialog = document.createElement('div')
-    dialog.className = 'dlg'
-    dialog.style.cssText = px(x, y, 136, 66)
-    dialog.innerHTML = `<div class="t">${title}</div><button class="ok">결정</button><button class="no">취소</button>`
+    dialog.className = 'dlg owin'
+    dialog.style.cssText = px(x, y, 136, 66) + `;background-image:url(${winUrl('comma', 136, 66)})`
+    dialog.innerHTML = `<div class="t">${title}</div><button class="ok obtn">결정</button><button class="no obtn">취소</button>`
     stage.append(dialog)
     const close = () => { dialog?.remove(); dialog = null }
     dialog.querySelector<HTMLButtonElement>('.ok')!.onclick = () => { close(); ok() }

@@ -27,5 +27,6 @@ export const edition: Edition = {
   extraBattles,
   features: { threat: true, forecast: true, quickAttack: true, commandFirst: false, autoRest: true, originalCamp: false },
   // S2 제안 1: 세 길을 목적으로 (story-proposal.md)
+  routePlaces: original.routeLabels,
   routeLabels: ['레스다의 유언대로 유하 마을의 크란을 찾는다', '끌려간 소녀를 쫓아 북쪽 동굴로', '고신전을 지나 제국으로 곧장'],
 }

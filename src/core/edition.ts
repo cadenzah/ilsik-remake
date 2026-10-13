@@ -37,6 +37,8 @@ export interface Edition {
   script?: ScriptSource
   /** 9장 후 진로 선택지 문구 (루트 A·B·C) */
   routeLabels: [string, string, string]
+  /** 진로선택 버튼 글자 (루트 A·B·C). 없으면 routeLabels. 개선판은 원작 장소 이름 + routeLabels 를 설명 칸에 */
+  routePlaces?: [string, string, string]
   /** 진로 메뉴에 보일 순서 (루트 번호). 없으면 0·1·2 */
   routeOrder?: number[]
   /** 판이 더하는 전투 (장 번호 → 배치). 개선판 숨은 장 */

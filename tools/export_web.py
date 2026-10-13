@@ -170,6 +170,44 @@ def export_status_icons():
     st.save(os.path.join(d, 'status-icons.png'))
 
 
+def export_battle_ui():
+    """전투 화면 UI 조각 묶음 (ux-proposal.md, core/frame.ts·win.ts). battle-ui.png 한 장 + battle-ui.json {이름: [x, y, w, h]}.
+    FRTWND 9조각 = 이름.0 바탕 .1 위 .2 왼위 .3 오른위 .4 왼아래 .5 오른아래 .6 아래 .7 왼쪽 .8 오른쪽:
+    mw = ECPMAI "mapwin" 전투 창틀, comma = 명령·확인창, speak = 대화창, basic = 인물기본자료, level, magic.
+    btn.0~5 = ECPBUT 0005 글자 버튼 (0 왼 1 오른 2 가운데 = 보통, 3·4·5 = 눌림), icon.N.S = ECPBUT 000N 아이콘 (상태 0 1 3 4),
+    sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지)"""
+    import frtwnd
+    pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECLIPSE.WIN'), 2)
+    parts = []
+    for f, want, pre in (('ECPMAI', 'mapwin', 'mw'), ('ECPCOM', 'comma', 'comma'), ('ECPSPE', 'speak', 'speak'),
+                         ('ECPBAS', 'basic', 'basic'), ('ECPLEV', 'level', 'level'), ('ECPMAG', 'magic', 'magic')):
+        for _, n, k, w, h, px in frtwnd.entries(open(os.path.join(ROOT, 'original', f + '.ECP'), 'rb').read()):
+            if n == want:
+                parts.append((f'{pre}.{k >> 8}', frtwnd.image(w, h, px, pal).convert('RGBA')))
+    for _, n, k, w, h, px in frtwnd.entries(open(os.path.join(ROOT, 'original', 'ECPBUT.ECP'), 'rb').read()):
+        im = frtwnd.image(w, h, px, pal).convert('RGBA')
+        parts.append((f'btn.{k >> 8}' if n == '0005' else f'icon.{int(n)}.{k >> 8}', im))
+    for i in (0, 1, 2, 3, 5, 12, 13, 14, 15):
+        parts.append((f'sta.{i}', rgba(os.path.join(IMG, 'ECLIPSE.STA', f'{i:03d}.png'))))
+    for i in (3, 4, 5):
+        parts.append((f'oth.{i}', rgba(os.path.join(IMG, 'ECLIPSE.OTH', f'{i:03d}.png'))))
+    # 선반 배치 (높이 순), 너비 1024
+    parts.sort(key=lambda p: -p[1].height)
+    rects, x, y, row, W = {}, 0, 0, 0, 1024
+    for name, im in parts:
+        if x + im.width > W:
+            x, y, row = 0, y + row + 1, 0
+        rects[name] = [x, y, im.width, im.height]
+        x += im.width + 1
+        row = max(row, im.height)
+    sheet = Image.new('RGBA', (W, y + row))
+    for name, im in parts:
+        sheet.paste(im, tuple(rects[name][:2]))
+    d = mkdir('ui')
+    sheet.save(os.path.join(d, 'battle-ui.png'))
+    json.dump(rects, open(os.path.join(d, 'battle-ui.json'), 'w'), separators=(',', ':'))
+
+
 def export_data():
     d = mkdir('data')
     fnt = open(os.path.join(ROOT, 'original', 'ECLIPSE.FNT'), 'rb').read()
@@ -234,9 +272,11 @@ if __name__ == '__main__':
         export_ui()
     elif sys.argv[1:] == ['icons']:
         export_status_icons()
+    elif sys.argv[1:] == ['battle-ui']:
+        export_battle_ui()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_data(); font.export()
+        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_battle_ui(); export_data(); font.export()
     print('ok')

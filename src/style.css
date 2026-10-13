@@ -28,72 +28,75 @@ button.on { border-color: var(--enemy); color: #ffb3b3; }
 button:disabled { opacity: .45; cursor: default; }
 kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
 
-#topbar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 12px; align-items: center;
-  padding: 8px 14px; background: linear-gradient(var(--panel), rgba(18,21,30,.6)); border-bottom: 1px solid var(--line); }
-#title { font-weight: 700; color: var(--gold); }
-#phase { color: var(--dim); }
-.spacer { flex: 1; }
-
-#card { position: fixed; left: 12px; bottom: 12px; width: 280px; padding: 12px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: 72px 1fr; gap: 10px; }
-#card.at-br { left: auto; right: 12px; }
-#card.at-tr { left: auto; right: 12px; bottom: auto; top: 52px; }
-#card img { width: 72px; height: 83px; border-radius: 6px; border: 2px solid var(--line); object-fit: cover; }
-#card.ally img { border-color: var(--ally); }
-#card.enemy img { border-color: var(--enemy); }
-#card.npc img { border-color: var(--npc); }
-#card .name { font-weight: 700; font-size: 16px; }
-#card .lv { color: var(--dim); font-size: 12px; margin-left: 6px; font-weight: 400; }
-.bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin: 6px 0 2px; }
-.bar > i { display: block; height: 100%; background: var(--hp); }
-.stats { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13px; color: var(--dim); margin-top: 4px; }
-.stats span { white-space: nowrap; }
-.stats b { color: var(--text); }
-.loadout { font-size: 12px; color: var(--text); margin-top: 3px; }
-.loadout span { color: var(--dim); }
-#card .terrain { grid-column: 1 / -1; font-size: 12px; color: var(--dim); border-top: 1px solid var(--line); padding-top: 6px; }
-
-#goals { position: fixed; top: 52px; left: 12px; max-width: min(340px, calc(100vw - 24px)); padding: 8px 12px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.5; pointer-events: none; }
-#goals .main { color: var(--gold); }
-#goals .sub { color: var(--dim); }
-#goals .sub.done { color: var(--hp); }
-#goals .sub.failed { color: var(--enemy); text-decoration: line-through; }
-
-#forecast { position: fixed; padding: 8px 10px; background: var(--panel); border: 1px solid var(--enemy);
-  border-radius: 8px; font-size: 13px; pointer-events: none; white-space: nowrap; }
-#forecast .kill { color: var(--enemy); font-weight: 700; }
-
-#menu { position: fixed; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 8px; }
-#menu button { text-align: left; min-width: 110px; }
-
-#toast { position: fixed; top: 38%; left: 50%; transform: translate(-50%, -50%); padding: 14px 36px;
-  font-size: 26px; font-weight: 700; letter-spacing: 4px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 10px; pointer-events: none; }
-#toast.enemy { color: var(--enemy); } #toast.ally { color: var(--ally); } #toast.npc { color: var(--npc); }
-
-#dialogue { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(860px, calc(100% - 32px));
-  display: flex; gap: 14px; padding: 14px; background: var(--panel); border: 1px solid var(--gold); border-radius: 12px; cursor: pointer; }
-#dlg-portrait { width: 96px; height: 111px; border-radius: 6px; flex: none; }
-#dlg-body { flex: 1; display: flex; flex-direction: column; }
-#dlg-name { color: var(--gold); font-weight: 700; margin-bottom: 6px; }
-#dlg-text { font-size: 17px; line-height: 1.6; flex: 1; }
-#dlg-hint { font-size: 11px; color: var(--dim); text-align: right; }
-
-#result { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; background: rgba(0,0,0,.7); font-size: 18px; }
-#result h1 { margin: 0; font-size: 44px; letter-spacing: 8px; }
 [hidden] { display: none !important; }
 
-@media (max-width: 640px) {
-  #card { width: calc(100% - 24px); }
-  #topbar { flex-wrap: wrap; }
-}
+/* 전투 화면 (ux-proposal.md): #hud = 논리 크기 div 를 s 배 확대 (screen.ts). 창은 원작 그림 (skin.ts) 을 배경으로 */
+#hud { position: fixed; transform-origin: 0 0; pointer-events: none; image-rendering: pixelated; user-select: none;
+  font: 16px/16px var(--font); color: #000; z-index: 5; }
+#hud > * { position: absolute; pointer-events: auto; }
+canvas#view { touch-action: none; }
+/* 원작 창 (comma): 제목 띠 25 · 크림 바탕. 글자 = 검정 + 왼쪽 회색 그림자 (원작 색 7/0) */
+.owin { position: absolute; background-size: 100% 100%; image-rendering: pixelated; color: #000; font: 16px/16px var(--font); }
+.owin .t { position: absolute; left: 8px; right: 8px; top: 5px; height: 18px; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; }
+.owin .b { position: absolute; left: 12px; right: 12px; line-height: 18px; text-shadow: -1px 0 #aaa; overflow: hidden; text-align: center; }
+.owin .blue, .owin .h.blue { color: #2828e0; text-shadow: -1px 0 #8888ff; }
+.owin .red, .owin .h.red { color: #b00000; text-shadow: -1px 0 #ff8080; }
+.owin .green, .owin .h.green { color: #006a1a; text-shadow: -1px 0 #80c080; }
+.owin .dim { color: #555; }
+.owin .done { color: #006a1a; } .owin .failed { color: #b00000; text-decoration: line-through; }
+/* 원작 글자 버튼 (ECPBUT 0005): 왼 8 + 가운데 + 오른 8, 높이 25 */
+.obtn { all: unset; position: absolute; box-sizing: border-box; height: 25px; line-height: 25px; text-align: center; white-space: nowrap;
+  border-style: solid; border-width: 0 8px; border-image: var(--btn) 0 8 fill / 0 8px stretch; color: #000; font: 16px/25px var(--font);
+  cursor: pointer; image-rendering: pixelated; }
+.obtn:active:not(:disabled) { border-image-source: var(--btn-down); }
+.obtn:hover:not(:disabled), .obtn:focus-visible { filter: brightness(1.12); }
+.obtn:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+.obtn:disabled { color: #7a6a58; cursor: default; filter: saturate(.4); }
+.obtn.on { color: #a00000; text-shadow: -1px 0 #ffb080; }
+/* 위·아래 띠 (band.ts) */
+#hud .band { left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.band > * { position: absolute; pointer-events: auto; }
+.band-title { text-align: center; line-height: 29px; color: #3a2008; text-shadow: -1px 0 #c8a878; white-space: nowrap; overflow: hidden; pointer-events: none !important; }
+.band-title.desc { color: #000; font-size: 14px; }
+.band.foe .band-title { background: rgba(200, 40, 20, .18); }
+.plate { height: 25px; line-height: 23px; text-align: center; white-space: nowrap; background: #fcecA4;
+  border: 1px solid #64401c; box-shadow: inset 0 0 0 1px #ecd084; border-radius: 3px; color: #000; padding: 0 6px; }
+.plate b { font-weight: inherit; } .plate .ally { color: #2828e0; } .plate .enemy { color: #b00000; } .plate .npc { color: #006a1a; }
+.plate.terrain { width: auto; }
+/* 작은 인물기본자료 (ECPBAS) */
+.owin.basic .ic { position: absolute; top: 28px; }
+#hud .owin.basic.passive { pointer-events: none; }
+.owin.basic .ic.btn { cursor: pointer; }
+.owin.basic .v { position: absolute; top: 50px; width: 24px; text-align: center; color: #2a3c9c; text-shadow: -1px 0 #9aa8e0; }
+.owin.basic .x { position: absolute; left: 10px; right: 6px; top: 72px; line-height: 18px; white-space: nowrap; overflow: hidden; }
+/* 큰 인물기본자료 (camp.ts statusWindow): 정비 화면 상태창 */
+.bigstat { position: absolute; width: 330px; height: 330px; cursor: pointer; font: 14px/16px var(--font); }
+html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
+.bigstat > *, .bigstat .status > * { position: absolute; }
+.bigstat .status-bg { left: 0; top: 0; }
+.bigstat .por { display: block; background: url(/assets/ui/camp-por.png); }
+.bigstat .txt, .bigstat .num { color: #000; text-shadow: -1px 0 #aaa; white-space: nowrap; }
+.bigstat .num.cur { color: #0000aa; text-shadow: -1px 0 #5555ff; text-align: right; }
+.bigstat .b { font-weight: 700; }
+.bigstat .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
+.bigstat .mg { background-image: url(/assets/ui/magic-icons.png); }
+.bigstat button { all: unset; position: absolute; }
+/* GO!! GO!! (OTH 4) */
+#hud .gogo { pointer-events: none; }
+/* 대화창 (dialogue.ts): speak 창틀 */
+.speak { background-size: 100% 100%; image-rendering: pixelated; cursor: pointer; transition: filter .15s, opacity .15s; }
+.speak > * { position: absolute; }
+.speak .por { width: 96px; height: 111px; }
+.speak .name { color: #2828e0; text-shadow: -1px 0 #8888ff; white-space: nowrap; }
+.speak .text { line-height: 20px; height: 60px; overflow: hidden; color: #000; text-shadow: -1px 0 #aaa; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.speak.narr .text { left: 24px !important; width: calc(100% - 48px) !important; }
+.speak.narr .name { display: none; }
+.speak.dim { filter: brightness(.82) saturate(.7); opacity: .85; }
+.speak.remake .por { filter: drop-shadow(1px 1px 0 rgba(0,0,0,.5)); }
+.speak.remake .text { height: 60px; }
+/* 미니맵 (minimap.ts) */
+.owin.minimap canvas { position: absolute; image-rendering: pixelated; cursor: pointer; touch-action: none; }
 
-#result .buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: min(720px, calc(100% - 32px)); }
-#result .buttons button { padding: 10px 20px; font-size: 16px; }
-#result .note { font-size: 13px; color: var(--dim); }
 /* 출전 선택 */
 
 /* 타이틀 화면 — 원작 640×480 을 통째로 확대 (title.ts) */
@@ -264,13 +267,11 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
   color: #fff; background: #c86414; }
 #camp .count { left: 548px; top: 352px; width: 60px; text-align: right; font-weight: 700; color: #000; }
 /* 확인창 (원작 0aa2:0c58): 주황 띠 제목 + [결정][취소] */
-#camp .dlg { box-sizing: border-box; background: #fff7c3; border: 3px double #6b4416; box-shadow: 2px 2px 0 rgba(0,0,0,.4); }
-#camp .dlg .t { position: absolute; left: 4px; right: 4px; top: 4px; height: 20px; text-align: center; font-weight: 700; line-height: 20px;
-  background: #ffba75; border: 1px solid #6b4416; color: #000; }
-#camp .dlg button { top: 32px; width: 54px; height: 24px; text-align: center; line-height: 22px; font-weight: 700; cursor: pointer;
-  background: linear-gradient(#f0c08a, #c87a3c); border: 1px solid #5a3410; color: #2a1600; text-shadow: -1px 0 #e8b080; }
+#camp .dlg .obtn { top: 32px; width: 54px; height: 25px; border-style: solid; border-width: 0 8px; cursor: pointer;
+  border-image: var(--btn) 0 8 fill / 0 8px stretch; font: 16px/25px var(--font); text-align: center; color: #000; }
+#camp .dlg .obtn:active { border-image-source: var(--btn-down); }
+#camp .dlg .obtn:hover, #camp .dlg .obtn:focus-visible { filter: brightness(1.12); }
 #camp .dlg .ok { left: 9px; } #camp .dlg .no { left: 67px; }
-#camp .dlg button:hover, #camp .dlg button:focus-visible { filter: brightness(1.12); }
 /* 화면 전환 페이드 (fade.ts) */
 /* 장 사이 대륙 지도 (worldmap.ts) — 640×480 을 화면에 맞게, 페이드 막 아래 */
 #worldmap { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; cursor: pointer; }

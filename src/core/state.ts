@@ -1,5 +1,5 @@
 // 전투 상태 — 엔진 모듈들이 함께 읽고 쓴다
-import type { CondRule, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
+import type { CondRule, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
 import type { Edition } from './edition'
 import type { Moves } from './grid'
 import type { Placement, StageDef } from './stage'
@@ -40,6 +40,9 @@ export const S = {
   mode: { kind: 'busy' } as Mode,
   hover: null as Pos | null,
   threat: false,
+  watch: null as Unit | null,  // 개선판: 클릭한 적 하나의 위협 범위
+  aim: null as Pos | null,     // 공격 확인창이 떠 있는 동안 대상 칸 (STA 2 틀)
+  marks: true,                 // 진영 표시 (원작 시스템 → 표기)
   cam: { x: 0, y: 0, scale: 1 },
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }
@@ -49,3 +52,5 @@ export const alive = (side: Side) => S.units.filter(u => u.hp > 0 && u.side === 
 // 플레이어가 조종하는 건 일행(부대 0)뿐. NPC 부대는 같은 편이지만 컴퓨터가 움직인다 (원작 +0x237: 일행 0, NPC 1, 적 2 → 2ff8:0ea0)
 export const isNpc = (u: Unit) => u.side === 'ally' && u.troop !== 0
 export const canCommand = (u: Unit) => S.active.includes(u) && u.hp > 0 && !u.acted
+// 원작 부대·대원 번호로 유닛 (숨은 부대 대원 포함)
+export const member = ([t, m]: Member) => [...S.units, ...S.reserve].find(u => u.troop === t && u.member === m)

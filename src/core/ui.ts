@@ -1,138 +1,149 @@
-// DOM 오버레이: 유닛 카드, 피해 예측, 행동 메뉴, 대화창, 알림
-import { portraitUrl, type Tables, type UnitType } from './data'
-import type { Unit } from './unit'
+// 원작 창 (comma 창틀: 주황 제목 띠 + 크림 바탕, ECPBUT 글자 버튼) — 명령창·확인창·결과·선택 팝업을 모두 이것으로 (ux-proposal.md 2·6·22·24).
+// 창은 #hud (논리 좌표) 안 DOM. 원작처럼 모달: 창이 떠 있으면 맵 클릭은 무시하고, 오른쪽 클릭·Esc 는 맨 위 창의 '뒤로'.
+// 원작 치수 (DOSBox u30): 제목 띠 25, 아래 9, 옆 8, 버튼 25 높이·4 간격, 첫 버튼은 바탕 5 아래, 명령창 버튼 64 폭·창 86
+import { hud, mapRect, clampBox } from './screen'
+import { buttonUrl, winUrl } from './skin'
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
+export type Btn = [string, () => void] | [string, () => void, { disabled?: boolean; title?: string }]
 
-export const ui = {
-  title: $('title'), phase: $('phase'),
-  btnEnd: $<HTMLButtonElement>('btn-end'), btnTitle: $<HTMLButtonElement>('btn-title'), btnThreat: $<HTMLButtonElement>('btn-threat'),
-  card: $('card'), forecast: $('forecast'), menu: $('menu'), toast: $('toast'),
-  dialogue: $('dialogue'), dlgPortrait: $<HTMLImageElement>('dlg-portrait'),
-  dlgName: $('dlg-name'), dlgText: $('dlg-text'), result: $('result'), goals: $('goals'),
+interface Win { el: HTMLElement; onBack?: () => void; modal: boolean; kind: string; keys?: (e: KeyboardEvent) => boolean }
+const stack: Win[] = []
+
+export const BAR = 25, BOTTOM = 9, SIDE = 8, BTN_H = 25, GAP = 4
+const CH = 16   // 글자 폭 (원작 글꼴 한글 16)
+
+/** 버튼 그림을 CSS 변수로 (skin 을 읽은 뒤 한 번) */
+export function initSkinCss() {
+  const r = document.documentElement.style
+  r.setProperty('--btn', `url(${buttonUrl(56)})`)
+  r.setProperty('--btn-down', `url(${buttonUrl(56, true)})`)
 }
 
-/** 원작 표 기준 장비·마법 이름. 장비 능력치 보정은 spawn 때 반영됨 */
-function loadout(u: Unit, t: Tables): string {
-  const eq = u.type.equip.filter(id => id).map(id => t.items.get(id)?.name ?? `#${id}`)
-  const mg = u.type.magic.map(id => t.magic.get(id)?.name ?? `#${id}`)
-  const row = (label: string, xs: string[]) => xs.length ? `<div class="loadout"><span>${label}</span> ${xs.join(' · ')}</div>` : ''
-  return row('장비', eq) + row('마법', mg)
+export const textWidth = (s: string) => [...s].reduce((n, c) => n + (c.charCodeAt(0) > 0x7f ? CH : CH / 2), 0)
+export const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+/** 원작 글자 버튼 */
+export function button([label, fn, opt]: Btn, w?: number): HTMLButtonElement {
+  const b = document.createElement('button')
+  b.className = 'obtn'
+  b.textContent = label
+  b.style.width = `${w ?? Math.max(56, textWidth(label) + 16)}px`
+  if (opt?.title) b.title = opt.title
+  if (opt?.disabled) b.disabled = true
+  b.onclick = e => { e.stopPropagation(); fn() }
+  b.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); back() }
+  return b
 }
 
-export type Rect = { x: number; y: number; w: number; h: number }
-const CARD_SPOTS = ['bl', 'br', 'tr'] as const   // 왼쪽 아래 (기본) → 오른쪽 아래 → 오른쪽 위
-
-/** 유닛·지형 정보 창. avoid = 가리면 안 되는 화면 영역 (가리킨 칸, 선택한 유닛) → 겹치지 않는 구석으로 옮긴다 */
-export function showCard(u: Unit | null, terrain: string | null, t?: Tables, avoid: Rect[] = []) {
-  if (!u && !terrain) { ui.card.hidden = true; return }
-  ui.card.hidden = false
-  const npc = !!u && u.side === 'ally' && u.troop !== 0   // 같은 편 NPC 부대, 컴퓨터 조종
-  ui.card.className = u ? (npc ? 'npc' : u.side) : ''
-  ui.card.innerHTML = u
-    ? `<img src="${portraitUrl(u.type.por)}" alt="">
-       <div>
-         <div class="name">${u.type.name}<span class="lv">Lv ${u.type.lv}${npc ? ' · NPC (자동)' : ''}</span></div>
-         <div class="bar"><i style="width:${(100 * u.hp) / u.maxHp}%"></i></div>
-         <div style="font-size:13px">HP <b>${u.hp}</b> / ${u.maxHp}</div>
-         <div class="stats"><span>역량 <b>${u.atk}</b></span><span>방어 <b>${u.def}</b></span><span>정신 <b>${u.spi}</b></span><span>민첩 <b>${u.agi}</b></span><span>이동 <b>${u.mov}</b></span><span>피로 <b>${u.fatigue}</b></span><span>사거리 <b>${u.range[0] === u.range[1] ? u.range[0] : u.range.join('~')}</b></span></div>
-         ${t ? loadout(u, t) : ''}
-       </div>
-       <div class="terrain">${terrain ?? ''}${u.acted ? ' · 행동 완료' : ''}</div>`
-    : `<div class="terrain" style="border:0;padding:0">${terrain}</div>`
-  placeCard(avoid)
+export interface WinOpts {
+  title?: string
+  buttons?: Btn[]
+  dir?: 'col' | 'row'
+  body?: string          // 버튼 위 본문 (HTML, 원작 글자 색 클래스 .blue .red .dim)
+  bodyH?: number         // 본문 높이 (없으면 줄 수 × 16 + 여백)
+  width?: number         // 창 너비 (없으면 버튼·본문에 맞춤)
+  btnW?: number          // 버튼 너비 (없으면 가장 긴 글자에 맞춤)
+  at?: { x: number; y: number } | 'center'
+  onBack?: () => void    // 오른쪽 클릭·Esc. 없으면 무시 (원작 모달)
+  modal?: boolean        // 기본 true
+  kind?: string          // 같은 kind 창은 하나만 (다시 열면 바꿈)
+  closeOnPick?: boolean  // 버튼을 누르면 창을 닫고 동작 (기본 true)
 }
 
-function placeCard(avoid: Rect[]) {
-  const w = ui.card.offsetWidth, h = ui.card.offsetHeight, m = 12, top = 52
-  const at = (s: typeof CARD_SPOTS[number]): Rect => ({
-    x: s === 'bl' ? m : innerWidth - m - w, y: s === 'tr' ? top : innerHeight - m - h, w, h })
-  const hits = (a: Rect) => avoid.some(b => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h)
-  const spot = CARD_SPOTS.find(s => !hits(at(s))) ?? 'bl'
-  ui.card.classList.add(`at-${spot}`)
-}
-
-/** 피해 예측. range = 판 규칙의 피해 범위 */
-export function showForecast(a: Unit | null, d: Unit | null, range: [number, number] = [0, 0], sx = 0, sy = 0) {
-  if (!a || !d) { ui.forecast.hidden = true; return }
-  const [lo, hi] = range
-  const kill = lo >= d.hp ? '<div class="kill">확정 처치</div>' : hi >= d.hp ? '<div class="kill">처치 가능</div>' : ''
-  const span = (x: number, y: number) => x === y ? `${x}` : `${x}~${y}`   // 원작 공식은 난수가 없어 한 값
-  ui.forecast.innerHTML = `<b>${a.type.name}</b> → <b>${d.type.name}</b><br>피해 ${span(lo, hi)} (남은 HP ${span(Math.max(0, d.hp - hi), Math.max(0, d.hp - lo))})${kill}`
-  ui.forecast.hidden = false
-  ui.forecast.style.left = `${sx + 18}px`
-  ui.forecast.style.top = `${sy + 18}px`
-}
-
-export function showMenu(items: [string, () => void][], sx: number, sy: number, title = '') {
-  ui.menu.innerHTML = title ? `<div class="menu-title">${title}</div>` : ''
-  for (const [label, fn] of items) {
-    const b = document.createElement('button')
-    b.textContent = label
-    b.onclick = (e) => { e.stopPropagation(); fn() }
-    ui.menu.append(b)
-  }
-  ui.menu.hidden = false
-  ui.menu.style.left = `${Math.min(sx, innerWidth - 140)}px`
-  ui.menu.style.top = `${Math.min(sy, innerHeight - 40 * items.length - 20)}px`
-}
-export const hideMenu = () => { ui.menu.hidden = true }
-
-export function toast(text: string, cls: string, ms = 900): Promise<void> {
-  ui.toast.textContent = text
-  ui.toast.className = cls
-  ui.toast.hidden = false
-  return new Promise(ok => setTimeout(() => { ui.toast.hidden = true; ok() }, ms))
-}
-
-/** 대화 재생. 클릭/Space/Enter 로 진행, Esc 로 전부 건너뛰기. */
-export function playDialogue(lines: { who?: UnitType; text: string }[]): Promise<void> {
-  return new Promise(done => {
-    let i = 0
-    const show = () => {
-      if (i >= lines.length) { finish(); return }
-      const l = lines[i]
-      ui.dlgPortrait.hidden = !l.who
-      if (l.who) ui.dlgPortrait.src = portraitUrl(l.who.por)
-      ui.dlgName.textContent = l.who?.name ?? ''
-      ui.dlgText.textContent = l.text
-    }
-    const next = () => { i++; show() }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); next() }
-      else if (e.key === 'Escape') finish()
-    }
-    const finish = () => {
-      ui.dialogue.hidden = true
-      ui.dialogue.removeEventListener('click', next)
-      removeEventListener('keydown', onKey, true)
-      done()
-    }
-    ui.dialogue.hidden = false
-    ui.dialogue.addEventListener('click', next)
-    addEventListener('keydown', onKey, true)
-    show()
+/** comma 창을 연다. 돌려준 요소에 더 붙일 수 있다 */
+export function openWin(o: WinOpts): HTMLElement {
+  if (o.kind) closeWin(o.kind)
+  const btns = o.buttons ?? []
+  const dir = o.dir ?? 'col'
+  const bw = o.btnW ?? Math.max(dir === 'col' ? 64 : 54, ...btns.map(b => textWidth(b[0]) + 16))
+  const rowW = btns.length * bw + (btns.length - 1) * GAP
+  const w = Math.round(o.width ?? Math.max(dir === 'col' ? bw + 22 : rowW + 26, o.title ? textWidth(o.title) + 40 : 0, o.body ? 136 : 0, 86))
+  // 본문 줄 수: <br> 줄마다 창 안쪽 너비로 접힌 줄 수
+  const lines = o.body ? o.body.split('<br>').reduce((n, l) => n + Math.max(1, Math.ceil(textWidth(l.replace(/<[^>]+>/g, '').replace(/&\w+;/g, '_')) / (w - 24))), 0) : 0
+  const bodyH = o.body ? (o.bodyH ?? lines * 18 + 8) : 0
+  const btnBlock = !btns.length ? 0 : dir === 'col' ? btns.length * (BTN_H + GAP) - GAP : BTN_H
+  const h = BAR + 5 + bodyH + (btns.length ? btnBlock + (o.body ? 4 : 2) : 0) + 5 + BOTTOM
+  const el = document.createElement('div')
+  el.className = `owin ${o.kind ?? ''}`
+  el.style.width = `${w}px`
+  el.style.height = `${h}px`
+  el.style.backgroundImage = `url(${winUrl('comma', w, h)})`
+  if (o.title) el.insertAdjacentHTML('beforeend', `<div class="t">${esc(o.title)}</div>`)
+  if (o.body) el.insertAdjacentHTML('beforeend', `<div class="b" style="top:${BAR + 5}px;height:${bodyH}px">${o.body}</div>`)
+  const pick = o.closeOnPick ?? true
+  btns.forEach((b, i) => {
+    const fn = b[1]
+    const e = button([b[0], () => { if (pick) close(); fn() }, b[2] as never], bw)
+    if (dir === 'col') Object.assign(e.style, { left: `${Math.round((w - bw) / 2)}px`, top: `${BAR + 5 + bodyH + i * (BTN_H + GAP)}px` })
+    else Object.assign(e.style, { left: `${Math.round((w - rowW) / 2) + i * (bw + GAP)}px`, top: `${BAR + 5 + bodyH + (o.body ? 4 : 2)}px` })
+    el.append(e)
   })
+  const m = mapRect()
+  const at = o.at === 'center' || !o.at ? { x: m.x + (m.w - w) / 2, y: m.y + (m.h - h) / 2 } : o.at
+  const p = clampBox(at.x, at.y, w, h)
+  el.style.left = `${p.x}px`
+  el.style.top = `${p.y}px`
+  hud.append(el)
+  const win: Win = { el, onBack: o.onBack, modal: o.modal ?? true, kind: o.kind ?? '' }
+  stack.push(win)
+  const close = () => closeEl(el)
+  el.querySelector<HTMLButtonElement>('.obtn:not(:disabled)')?.focus({ preventScroll: true })
+  el.oncontextmenu = e => { e.preventDefault(); back() }
+  return el
 }
 
-/** 전투 목표 창 (개선판 장 카드 목표 + 보조 목표). 둘 다 없으면 숨긴다 */
-export function showGoals(main: string, goals: { text: string; state: 'open' | 'done' | 'failed' }[]) {
-  ui.goals.hidden = !main && !goals.length
-  const mark = { open: '◇', done: '✓', failed: '✗' }
-  ui.goals.innerHTML = (main ? `<div class="main">${main}</div>` : '')
-    + goals.map(g => `<div class="sub ${g.state}">${mark[g.state]} ${g.text}</div>`).join('')
+function closeEl(el: HTMLElement) {
+  const i = stack.findIndex(w => w.el === el)
+  if (i >= 0) stack.splice(i, 1)
+  el.remove()
 }
 
-/** 결과·확인 화면. 버튼을 누르면 화면을 닫고 그 동작을 한다 */
-export function showResult(title: string, body: string, buttons: [string, () => void][], note = '') {
-  ui.result.innerHTML = `<h1>${title}</h1><div>${body}</div><div class="buttons"></div>${note ? `<div class="note">${note}</div>` : ''}`
-  const row = ui.result.querySelector('.buttons')!
-  for (const [label, fn] of buttons) {
-    const b = document.createElement('button')
-    b.textContent = label
-    b.onclick = () => { ui.result.hidden = true; fn() }
-    row.append(b)
-  }
-  ui.result.hidden = false
-  ;(row.firstElementChild as HTMLElement | null)?.focus()
+/** kind 창 (없으면 맨 위 창) 을 닫는다 */
+export function closeWin(kind?: string) {
+  for (const w of [...stack].reverse()) if (kind === undefined || w.kind === kind) { closeEl(w.el); if (kind === undefined) return }
+}
+export const closeAll = () => { while (stack.length) closeEl(stack[stack.length - 1].el) }
+
+/** 모달 창이 떠 있나 (맵 클릭 막기) */
+export const modalOpen = () => stack.some(w => w.modal)
+export const isOpen = (kind: string) => stack.some(w => w.kind === kind)
+
+/** 오른쪽 클릭·Esc: 맨 위 모달 창의 '뒤로'. 창이 처리했으면 true */
+export function back(): boolean {
+  const top = [...stack].reverse().find(w => w.modal)
+  if (!top) return false
+  top.onBack?.()
+  return true
+}
+
+/** Enter: 맨 위 모달 창의 초점 버튼 (없으면 첫 버튼) */
+export function enter(): boolean {
+  const top = [...stack].reverse().find(w => w.modal)
+  if (!top) return false
+  const b = (top.el.contains(document.activeElement) ? document.activeElement : top.el.querySelector('.obtn:not(:disabled)')) as HTMLButtonElement | null
+  b?.click()
+  return true
+}
+
+// ---------- 자주 쓰는 창 ----------
+
+/** 명령창 (원작: 누른 유닛 오른쪽 옆, 제목 '명령') */
+export function showMenu(items: Btn[], x: number, y: number, title = '명령', onBack?: () => void) {
+  openWin({ title, buttons: items, at: { x, y }, kind: 'menu', onBack: onBack ?? (() => closeWin('menu')) })
+}
+export const hideMenu = () => closeWin('menu')
+
+/** 확인창 (원작 「전 투」「휴식」「대기화면」: 136×66, 결정·취소). body = 개선판 예측 줄 */
+export function confirmWin(title: string, at: { x: number; y: number } | 'center', ok: () => void, cancel: () => void = () => {}, body?: string, width?: number) {
+  openWin({ title, at, kind: 'confirm', dir: 'row', btnW: 54, body, width: width ?? (body ? 168 : 136),
+    buttons: [['결정', ok], ['취소', cancel]], onBack: () => { closeWin('confirm'); cancel() } })
+}
+
+/** 결과·선택 팝업 (맵 창 가운데). 버튼을 누르면 닫고 그 동작 */
+export function showResult(title: string, body: string, buttons: Btn[], note = '') {
+  const text = [body, note].filter(Boolean).map(t => esc(t).replace(/\n/g, '<br>')).join('<br>')
+  const longest = Math.max(...buttons.map(b => textWidth(b[0])))
+  const row = buttons.length <= 3 && buttons.length * (longest + 20) < mapRect().w - 60
+  openWin({ title, body: text || undefined, buttons, dir: row ? 'row' : 'col', at: 'center', kind: 'result',
+    width: Math.min(mapRect().w - 16, Math.max(180, ...text.split('<br>').map(l => textWidth(l) + 32))) })
 }

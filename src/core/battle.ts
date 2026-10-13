@@ -2,18 +2,24 @@
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
-import { inRange, pathTo, reachable } from './grid'
+import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
 import { campScreen } from './camp'
 import { fadeIn, fadeOut } from './fade'
-import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
+import { canvas, centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
+import { layout, view } from './screen'
+import { loadSkin, pieceUrl } from './skin'
+import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
+import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
+import { aboveUnit, goGo, hideBasic, showBasic, showConditions } from './info'
+import { playDialogue } from './dialogue'
 import { recordClear, recordHidden, recordRun } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { travelMap } from './worldmap'
 import { stageDef, type Placement, type StageDef } from './stage'
-import { alive, isNpc, S } from './state'
+import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
-import { hideMenu, playDialogue, showForecast, showGoals, showMenu, showResult, toast, ui } from './ui'
+import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, openWin, showMenu, showResult, type Btn } from './ui'
 import { equippedStats, type Pos, type Unit } from './unit'
 
 const STEP_MS = 110
@@ -59,7 +65,8 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.def = def
   const extra = ed.extraBattles?.[def.n]   // 개선판 숨은 장: 원작 맵 재사용 + 새 배치·고정 일행
   if (extra) S.def = def = { ...def, title: `숨은 장 · ${extra.title}` }
-  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes()])
+  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes(), loadSkin()])
+  initSkinCss()
   S.tables = tables
   S.types = tables.types
   initScript(ed.script, tables.types)
@@ -92,8 +99,8 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.atlas = stage.atlas
   const ids = new Set([...S.allies, ...S.enemies].map(p => p.type))
   await Promise.all([...ids].map(async id => S.sprites.set(id, await loadUnitSprite(id))))
-  ui.title.textContent = `${def.title} · ${ed.name}`
   S.floats = []
+  setupScreen(ed, def)
   resize()
   if (!looping) { looping = true; requestAnimationFrame(frame) }
   await start()
@@ -115,13 +122,18 @@ async function start() {
   S.turn = 1
   S.active = []
   S.mode = { kind: 'busy' }
+  S.aim = S.watch = null
+  closeAll()
+  hideBasic()
+  setTurn(1, null)
+  const card = chapter()?.card
+  setTitle(remake() && card && !S.ed.extraBattles?.[S.def.n] ? `${S.def.n}장 · ${card[0]}` : S.def.title)
   centerOn(S.units[0])
   await fadeIn()
-  const card = chapter()?.card
-  if (card) await toast(`${S.def.n}장 · ${card[0]}${card[1] ? ` — ${card[1]}` : ''}`, 'card', 2200)   // 장 카드 (S2 제안 4)
-  renderGoals()
+  if (remake()) await new Promise<void>(ok => showGoalsWin(ok))   // 장 카드 + 목표 (S2 제안 4, ux-proposal 16)
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
   await banter('start')
+  if (!remake()) await goGo()   // 원작: 첫 대화 뒤 「GO!! GO!!」, 첫 클릭에 사라짐
   await runRounds()
 }
 
@@ -182,7 +194,8 @@ function finishUnit(u: Unit, attacked = false) {
   u.acted = true
   S.mode = { kind: 'idle' }
   hideMenu()
-  showForecast(null, null)
+  hideBasic()
+  S.aim = null
   void checkEnd().then(over => {
     if (over) stepDone?.(true)
     else if (S.active.every(a => a.acted || a.hp <= 0)) stepDone?.(false)
@@ -200,7 +213,6 @@ function tire(u: Unit, attacked: boolean) {
 // 대본의 전투 중 시점 (dead·troop·hp) 은 한 전투에 한 번씩 ("시점:값"). 43장: 사바카 1단·최종 모두 사망 조건
 const told = new Set<string>()
 const woke: number[] = []   // 움직이기 시작한(상태 0 으로 바뀐) 부대 — 대본 troop N
-const member = ([t, m]: Member) => [...S.units, ...S.reserve].find(u => u.troop === t && u.member === m)
 const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
 // +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
 const enemiesLeft = () => [...S.units, ...S.reserve].filter(u => u.side === 'enemy' && u.hp > 0)
@@ -250,7 +262,12 @@ export async function checkEnd(): Promise<boolean> {
   if (!result && !enemiesLeft().length) result = 'win'
   if (result === 'lose') {
     S.mode = { kind: 'busy' }
-    showResult('패배', `${fallen.type.name}이(가) 쓰러졌다.`, [['다시 하기', () => void start()], ['타이틀로', toTitle]])
+    closeAll()
+    hideBasic()
+    if (remake()) showResult('패 배', `${fallen.type.name}이(가) 쓰러졌다.`, [['다시 하기', () => void start()], ['정비 화면', toCamp], ['타이틀로', toTitle]])
+    // 원작: 패배 화면·메시지 없이 어두워졌다가 1장 정비 화면 (초기 일행, formats "기본 패배"). 장 선택으로 연 장은 그 장 처음부터
+    else if (S.def.campaign) void boot(S.ed, stageDef(1, 0, true), { flags: [], party: [], items: [] })
+    else void start()
     return true
   }
   const prev = S.mode
@@ -258,7 +275,6 @@ export async function checkEnd(): Promise<boolean> {
   const won = result === 'win' || result === 'ending'
   const moments = scriptMoments()
   const bossTalk = !result && bossHit()
-  renderGoals()
   if (bossTalk || deadScenes.some(([w, k]) => k.length || blocksAt(chapter(), 'dead', w).length) || moments.length || scenes.length || lines.length || (won && blocksAt(chapter(), 'win').length)) {
     S.mode = { kind: 'busy' }
     for (const [who, keys] of deadScenes) await story('dead', keys, aliveMember, who)
@@ -306,9 +322,11 @@ function bossHit() {
   return true
 }
 
-/** 목표 창: 장 카드의 목표 + 보조 목표 상태 (개선판 대본이 있을 때만) */
-function renderGoals() {
-  showGoals(chapter()?.card?.[1] ?? '', goalStates(aliveMember))
+/** 조건 창: 원작 승리·실패 조건 (+ 개선판 장 카드 목표·보조 목표) */
+function showGoalsWin(onClose?: () => void) {
+  const card = chapter()?.card
+  showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined,
+    goals: remake() ? goalStates(aliveMember) : undefined, onClose })
 }
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
@@ -333,22 +351,54 @@ function cleared(ending: boolean) {
     if (def.campaign) recordClear(S.ed.id, def, { n, route }, atStart, snapshot())   // 진로 선택 결과를 남긴다
     void boot(S.ed, stageDef(n, route, true))
   }
-  const buttons: [string, () => void][] = []
   const extraNext = S.ed.extraBattles?.[def.n]?.next
-  if (extraNext) buttons.push(['다음 장', () => void boot(S.ed, stageDef(extraNext, 0))])
-  else if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
-    showResult('진로 선택', '어느 길로 갈까?', (S.ed.routeOrder ?? [0, 1, 2]).map((r): [string, () => void] => [S.ed.routeLabels[r], () => go(next.choose[r], r)]))])
+  const onward = extraNext ? () => void boot(S.ed, stageDef(extraNext, 0))
+    : def.campaign && next ? ('n' in next ? () => go(next.n, next.route) : () => void chooseRoute().then(r => go(next.choose[r], r)))
+    : null
+  if (!remake()) {
+    // 원작: 결과 창 없이 장 후 대화 → (진로선택) → 다음 장 정비 화면. 장 선택으로 연 장·엔딩만 짧게 묻는다
+    if (onward) { onward(); return }
+    showResult(ending ? '엔 딩' : '승 리', ending ? '' : `${def.title}`, [['다시 하기', () => void start()], ['타이틀로', toTitle]])
+    return
+  }
+  const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0).map(u => u.type.name)
+  const goals = goalStates(aliveMember)
+  const lines = [`${S.turn}턴 만에 클리어${ending ? ' — 엔딩' : ''}`, fallen.length ? `쓰러진 동료: ${fallen.join(', ')}` : '쓰러진 동료 없음',
+    ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
+  const buttons: Btn[] = []
+  if (onward) buttons.push(['다음 장', onward])
   buttons.push(['다시 하기', () => void start()], ['타이틀로', toTitle])
-  showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons)
+  showResult(ending ? '엔 딩' : '승 리', lines.join('\n'), buttons)
+}
+
+/** 진로선택 (원작 comma 창, 0aa2:0b0d: 암흑동굴·혼탁한호수·옛 신전 순). 개선판은 버튼마다 그 길의 목적을 설명 칸에 보이고 결정·취소로 확인 */
+function chooseRoute(): Promise<number> {
+  const order = S.ed.routeOrder ?? [0, 1, 2]
+  const places = S.ed.routePlaces ?? S.ed.routeLabels
+  return new Promise(ok => {
+    const open = () => {
+      const hint = '어느 길로 갈까?'
+      const el = openWin({ title: '진로선택', kind: 'route', at: 'center', btnW: 112,
+        body: remake() ? `<span class="hint">${hint}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? Math.min(view.w - 160, 300) : undefined,
+        buttons: order.map((r): Btn => [places[r], () => remake() ? confirmWin('진로선택', 'center', () => ok(r), open, esc(S.ed.routeLabels[r]), 260) : ok(r)]) })
+      if (!remake()) return
+      const box = el.querySelector<HTMLElement>('.hint')!
+      el.querySelectorAll<HTMLButtonElement>('.obtn').forEach((b, i) => {
+        b.onmouseenter = b.onfocus = () => { box.textContent = S.ed.routeLabels[order[i]] }
+        b.onmouseleave = () => { box.textContent = hint }
+      })
+    }
+    open()
+  })
 }
 
 // ---------- 턴 ----------
 
-let phaseText = ''
-function updatePhase(text = phaseText) {
-  phaseText = text
-  ui.phase.textContent = `턴 ${S.turn} · ${text}`
-  ui.btnEnd.disabled = S.mode.kind === 'busy' || !stepDone
+let phase: { side: 'ally' | 'enemy' | 'npc' | null; who: string } = { side: null, who: '' }
+function updatePhase(side = phase.side, who = phase.who) {
+  phase = { side, who }
+  setTurn(S.turn, side, who)
+  setDisabled('end', S.mode.kind === 'busy' || !stepDone)
 }
 
 // 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후)
@@ -374,55 +424,47 @@ async function turnEvents() {
   }
   await story('turn', scenes, aliveMember, String(S.turn))
   for (const [w, a] of scriptMoments()) await story(w, [], aliveMember, a)
-  renderGoals()
 }
 
-/** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다 */
+/** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다.
+ *  원작: 턴·차례 알림 없음 (띠는 장 제목만). 개선판: 띠의 턴 패 + 아군 차례 시작마다 「GO!! GO!!」 */
 async function runRounds() {
   for (;;) {
     for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
     S.mode = { kind: 'busy' }
     await turnEvents()
-    let bannered = false
     for (const step of S.ed.order([...S.units, ...S.reserve], S.turn)) {
       const live = step.filter(u => u.hp > 0 && S.units.includes(u))
       if (!live.length) continue
       const lead = live[0], party = lead.troop === 0
-      const label = party ? '아군' : isNpc(lead) ? 'NPC' : '적'
-      if (step.length > 1) {
-        // 페이즈 단계: 페이즈마다 알림
-        updatePhase(`${label} 차례`)
-        await toast(party ? `턴 ${S.turn} · 아군` : `${label} 차례`, party ? 'ally' : isNpc(lead) ? 'npc' : 'enemy', party ? 700 : 600)
-        bannered = true
-      } else if (!bannered) {
-        updatePhase(`${lead.type.name} 차례`)
-        await toast(`턴 ${S.turn}`, 'ally', 700)
-        bannered = true
-      }
+      const side = party ? 'ally' : isNpc(lead) ? 'npc' : 'enemy'
+      updatePhase(side, step.length > 1 ? '' : lead.type.name)
+      if (party && step.length > 1) await goGo(900)
       if (await (party ? playerStep(live) : aiStep(step))) return
     }
     S.turn++
   }
 }
 
-// 플레이어 단계: 단계의 일행 대원이 모두 행동하거나 턴 종료(원작판은 대기)를 누를 때까지
+// 플레이어 단계: 단계의 일행 대원이 모두 행동하거나 턴 종료(원작판은 휴식)를 누를 때까지
 let stepDone: ((over: boolean) => void) | null = null
 function playerStep(units: Unit[]): Promise<boolean> {
   return new Promise(ok => {
     S.active = units
-    stepDone = over => { stepDone = null; S.active = []; ok(over) }
+    stepDone = over => { stepDone = null; S.active = []; updatePhase(); ok(over) }
     S.mode = { kind: 'idle' }
     if (units.length === 1) {
       centerOnIfOff(units[0])
-      if (!S.ed.features.commandFirst) select(units[0])   // 원작판은 유닛을 눌러 명령부터 고른다
+      if (remake()) select(units[0])   // 원작판은 유닛을 눌러 명령부터 고른다
     }
-    updatePhase(units.length > 1 ? '아군 차례' : `${units[0].type.name} 차례`)
+    updatePhase()
   })
 }
 
 export function endPlayerStep() {
   if (S.mode.kind === 'busy' || !stepDone) return
   cancel()
+  closeAll()
   for (const u of S.active) {
     if (!u.acted && u.hp > 0 && S.ed.features.autoRest && !u.moved) rest(u)
     else if (!u.acted && u.hp > 0) tire(u, false)
@@ -440,7 +482,7 @@ async function aiStep(units: Unit[]): Promise<boolean> {
     if (plan.rest) { rest(u); continue }
     const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
     const acts = path.length > 1 || (plan.target && plan.target.hp > 0)
-    if (acts && units.length === 1) updatePhase(`${u.type.name} 차례`)
+    if (acts && units.length === 1) updatePhase(phase.side, u.type.name)
     if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
     const hits = !!plan.target && plan.target.hp > 0
     if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
@@ -450,75 +492,251 @@ async function aiStep(units: Unit[]): Promise<boolean> {
   return false
 }
 
+// ---------- 화면 (띠·미니맵) ----------
+
+const remake = () => !S.ed.features.commandFirst
+
+/** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
+function setupScreen(ed: Edition, def: StageDef) {
+  layout(ed.id === 'remake')
+  canvas.style.cursor = `url(${pieceUrl('sta.0')}) 2 2, default`   // 원작 커서 = 날개 지팡이 (STA 0)
+  S.marks = true
+  S.threat = false
+  initBand(ed.id === 'remake', [
+    { id: 'goal', label: '목표', desc: '승리·실패 조건과 보조 목표', side: 'left', prio: 2, on: () => showGoalsWin() },
+    { id: 'end', label: '턴 종료', desc: '아군 차례를 마친다 (E)', side: 'right', prio: 0, on: endPlayerStep },
+    { id: 'menu', label: '메뉴', desc: '시스템 메뉴 (설정·정비 화면·타이틀)', side: 'right', prio: 0, on: () => systemMenu() },
+    { id: 'threat', label: '위험', desc: '적이 닿을 수 있는 범위 표시 (T)', side: 'right', prio: 1, on: toggleThreat },
+    { id: 'map', label: '지도', desc: '미니맵 켜고 끄기 (M)', side: 'right', prio: 3, on: toggleMinimap },
+  ], goBack)
+  if (ed.id === 'remake') { initMinimap(); setOn('map', minimapOn()) } else removeMinimap()
+}
+
+export function toggleThreat() {
+  if (!remake()) return
+  S.threat = !S.threat
+  setOn('threat', S.threat)
+}
+export function toggleMinimap() {
+  if (!remake()) return
+  const on = !minimapOn()
+  setMinimap(on)
+  setOn('map', on)
+}
+
+/** 전투를 그만두고 이 장 정비 화면으로 (원작 시스템 → 종료 「대기화면」) */
+function toCamp() {
+  S.mode = { kind: 'busy' }
+  closeAll()
+  hideBasic()
+  void boot(S.ed, S.def, atStart)
+}
+
+/** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
+function systemMenu(at?: { x: number; y: number }) {
+  const onOff = (title: string, set?: (on: boolean) => void) => () =>
+    openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['열기', () => set?.(true)], ['닫기', () => set?.(false)]], onBack: () => closeWin('sub') })
+  const items: Btn[] = remake() ? [
+    ['목표', () => showGoalsWin()],
+    [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
+    [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
+    [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
+    ['턴 종료', endPlayerStep, { disabled: !stepDone || S.mode.kind === 'busy' }],
+    ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
+    ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
+  ] : [
+    ['알림', onOff('알림전환')],   // 무엇을 켜고 끄는지 미확인 (ux.md 6절) — 창만
+    ['표기', () => { S.marks = !S.marks; closeWin('system') }],
+    ['음악', onOff('음악전환')],
+    ['음향', onOff('음향전환')],
+    ['조건', () => showGoalsWin()],
+    ['종료', () => confirmWin('대기화면', 'center', toCamp)],
+  ]
+  openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 96 : 64,
+    closeOnPick: !!remake(), onBack: () => closeWin('system') })
+}
+
 // ---------- 플레이어 명령 ----------
+
+/** 유닛 오른쪽 옆 (원작: 창은 누른 유닛 오른쪽에 뜬다) */
+const beside = (u: Pos) => { const { sx, sy } = toScreen(u.x + 1, u.y); return { x: sx + 4, y: sy } }
 
 export function select(u: Unit) {
   S.mode = { kind: 'selected', unit: u, moves: reachable(S.map, S.units, u) }
 }
 
+/** 행동 전이면 이동 취소 (원위치) */
+function undoMove(u: Unit, from: Pos) {
+  u.x = u.px = from.x
+  u.y = u.py = from.y
+  u.moved = false
+  u.steps = 0
+}
+
 export function cancel() {
   const md = S.mode
   hideMenu()
-  showForecast(null, null)
-  if (md.kind === 'moved' || md.kind === 'targeting') {
-    // 행동 전이면 이동 취소 (원위치)
-    md.unit.x = md.unit.px = md.from.x
-    md.unit.y = md.unit.py = md.from.y
-    md.unit.moved = false
-    md.unit.steps = 0
-    select(md.unit)
-  } else if (md.kind === 'selected') S.mode = { kind: 'idle' }
+  S.aim = null
+  if (md.kind === 'moved' || md.kind === 'targeting') { undoMove(md.unit, md.from); select(md.unit) }
+  else if (md.kind === 'selected') S.mode = { kind: 'idle' }
 }
 
-/** 원작판: 차례인 유닛을 누르면 여는 명령창 (원작 20ec:eb81 → 0 이동 20ec:cb07, 제자리 행동 20ec:d900). 아이콘 5개 중 확인된 것만 */
+/** 맵 칸 클릭 (창이 떠 있지 않을 때) */
+export async function clickTile(t: Pos) {
+  const md = S.mode
+  const there = unitAt(t.x, t.y)
+  if (md.kind === 'busy') return
+  hideBasic()
+  if (!remake()) {
+    // 원작판
+    if (md.kind === 'idle') {
+      if (there && canCommand(there)) commandMenu(there)
+      else if (there) showBasic(there, aboveUnit(toScreen(there.x, there.y).sx, toScreen(there.x, there.y).sy), { onFace: () => bigStatus(there) })   // 다른 유닛 = 작은 인물기본자료
+      return
+    }
+    if (md.kind === 'selected') {   // 범위 밖 칸은 무시
+      if (md.moves.has(key(t.x, t.y)) || there === md.unit) await moveTo(md.unit, t)
+      return
+    }
+    if (md.kind === 'targeting' && there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
+    return
+  }
+  // 개선판
+  if (md.kind === 'idle') {
+    if (there && canCommand(there)) select(there)
+    else if (there?.side === 'enemy') S.watch = S.watch === there ? null : there   // 그 적의 위협 범위
+    return
+  }
+  if (md.kind === 'selected') {
+    const u = md.unit
+    if (there === u) { actionMenu(u, { x: u.x, y: u.y }); return }
+    if (there && canCommand(there)) { select(there); return }
+    if (there?.side === 'enemy' && S.ed.features.quickAttack) {
+      // 이동 + 공격을 한 번에: 대상에 닿는 칸 중 가장 가까운 곳으로 (확인창 결정 뒤)
+      const spots = attackSpots(u, md.moves, there).sort((a, b) => dist(a, u) - dist(b, u))
+      if (spots.length) { askAttack(u, there, spots[0], md.moves); return }
+      S.watch = S.watch === there ? null : there
+      return
+    }
+    if (md.moves.has(key(t.x, t.y))) { await moveTo(u, t); return }
+    S.mode = { kind: 'idle' }
+    return
+  }
+  if (md.kind === 'targeting' && there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
+}
+
+async function moveTo(u: Unit, t: Pos) {
+  const md = S.mode
+  if (md.kind !== 'selected') return
+  const from = { x: u.x, y: u.y }
+  S.mode = { kind: 'busy' }
+  await walk(u, pathTo(md.moves, t.x, t.y))
+  actionMenu(u, from)
+}
+
+/** 마우스 올림. 개선판: 유닛 옆 작은 인물기본자료 (+ 이름·지형) · 아래 띠 지형 패. 원작: 아무것도 */
+export function hoverTile(t: Pos | null) {
+  S.hover = t
+  if (!remake()) return
+  setTerrain(t ? terrainName(S.map, t.x, t.y) : null)
+  const there = t && unitAt(t.x, t.y)
+  if (!there || S.mode.kind === 'busy' || modalOpen()) { hideBasic(); return }
+  const { sx, sy } = toScreen(there.x, there.y)
+  showBasic(there, aboveUnit(sx, sy, 112), { extra: true })
+}
+
+/** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다. spot = 개선판 이동+공격 때 설 칸 */
+function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>) {
+  S.aim = { x: target.x, y: target.y }
+  hideBasic()
+  let body: string | undefined
+  if (S.ed.features.forecast) {
+    const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
+    const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
+    const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
+    body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
+  }
+  const { sx, sy } = toScreen(target.x + 1, target.y)
+  confirmWin('전 투', { x: sx + 4, y: sy }, () => {
+    S.aim = null
+    void (async () => {
+      if (spot && moves) {
+        const from = { x: u.x, y: u.y }
+        S.mode = { kind: 'busy' }
+        await walk(u, pathTo(moves, spot.x, spot.y))
+        S.mode = { kind: 'targeting', unit: u, from }
+      }
+      await doAttack(u, target)
+    })()
+  }, () => { S.aim = null }, body)
+}
+
+/** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): 이동·전투·상황·시스템 (마법은 마법 구현 때) */
 export function commandMenu(u: Unit) {
   const here = { x: u.x, y: u.y }
-  const targets = alive('enemy').filter(e => inRange(u, u, e))
-  const { sx, sy } = toScreen(u.x + 1, u.y)
-  const items: [string, () => void][] = [['이동', () => { hideMenu(); select(u) }]]
-  if (targets.length) items.push(['전투', () => { hideMenu(); S.mode = { kind: 'targeting', unit: u, from: here } }])
-  items.push(['취소', () => { hideMenu(); S.mode = { kind: 'idle' } }])
   S.mode = { kind: 'idle' }
-  showMenu(items, sx + 4, sy, u.type.name)
+  showMenu([
+    ['이동', () => select(u)],
+    ['전투', () => { S.mode = { kind: 'targeting', unit: u, from: here } }],   // 원작: 사거리에 적이 없어도 들어간다
+    ['상황', () => { const p = beside(u); showBasic(u, { x: p.x, y: p.y }, { onFace: () => bigStatus(u) }) }],
+    ['시스템', () => systemMenu(beside(u))],
+  ], beside(u).x, beside(u).y)
 }
 
-/** 원작판 휴식: 움직이기 전에 취소하면 "휴식?" (20ec:c25c, 예 → 회복하고 차례 끝). 움직였으면 먼저 제자리로 */
+/** 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘 → 정비 화면 상태창과 같은 창) — 정비 화면 상태창을 맵 가운데에 */
+function bigStatus(u: Unit) {
+  hideBasic()
+  void import('./camp').then(m => m.statusWindow(u.type, S.tables, { hp: u.hp, fatigue: u.fatigue }))
+}
+
+/** 휴식 확인 「휴식」 (원작 DS:0x1f64, 20ec:c25c: 결정 → 회복하고 차례 끝). 원작판: 창이 없을 때 오른쪽 클릭 */
 export function restPrompt() {
   if (S.mode.kind === 'busy' || !stepDone) return
   const u = S.active.find(a => !a.acted && a.hp > 0)
   if (!u) return
   if (S.mode.kind === 'moved' || S.mode.kind === 'targeting') cancel()
   hideMenu()
-  showForecast(null, null)
   S.mode = { kind: 'idle' }
-  const { sx, sy } = toScreen(u.x + 1, u.y)
-  showMenu([['예', () => { rest(u); finishUnit(u) }], ['아니오', () => hideMenu()]], sx + 4, sy, '휴식?')
+  confirmWin('휴 식', beside(u), () => { rest(u); finishUnit(u) })
 }
 
-/** Esc·우클릭. 원작판은 이동을 되돌리고, 제자리면 휴식을 묻는다 (원작 취소 흐름) */
+/** 오른쪽 클릭·Esc (창이 처리하지 않았을 때). 원작: 공격 범위·이동 범위 → 명령창, 아무것도 없으면 「휴식」. 개선판: 한 단계 취소 */
 export function back() {
-  if (!S.ed.features.commandFirst) { cancel(); return }
   const md = S.mode
-  if (!ui.menu.hidden && md.kind === 'idle') { hideMenu(); return }
-  if (md.kind === 'moved' || md.kind === 'targeting') { cancel(); S.mode = { kind: 'idle' }; return }
+  hideBasic()
+  if (md.kind === 'busy') return
+  if (!remake()) {
+    if (md.kind === 'targeting') { if (md.unit.x !== md.from.x || md.unit.y !== md.from.y) actionMenu(md.unit, md.from); else commandMenu(md.unit); return }
+    if (md.kind === 'selected') { commandMenu(md.unit); return }
+    if (md.kind === 'idle') restPrompt()
+    return
+  }
+  if (md.kind === 'targeting') { actionMenu(md.unit, md.from); return }
   if (md.kind === 'selected') { S.mode = { kind: 'idle' }; return }
-  if (md.kind === 'idle') restPrompt()
+  if (md.kind === 'idle') S.watch = null
 }
 
+/** 이동 뒤 명령. 원작: 전투·결정·취소 (취소 = 제자리로 + 명령창 다시). 개선판: 공격(적이 닿으면)·대기·취소 (취소 = 이동 범위 다시) */
 export function actionMenu(u: Unit, from: Pos) {
   S.mode = { kind: 'moved', unit: u, from }
+  const undo = () => { undoMove(u, from); if (remake()) select(u); else commandMenu(u) }
   const targets = alive('enemy').filter(e => inRange(u, u, e))
-  const { sx, sy } = toScreen(u.x + 1, u.y)
-  const items: [string, () => void][] = []
-  if (targets.length) items.push([S.ed.features.commandFirst ? '전투' : '공격', () => { hideMenu(); S.mode = { kind: 'targeting', unit: u, from } }])
-  items.push(['대기', () => finishUnit(u)], ['취소', () => cancel()])
-  showMenu(items, sx + 4, sy)
+  const items: Btn[] = remake()
+    ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ['대기', () => finishUnit(u)], ['취소', undo]]
+    : [['전투', () => { S.mode = { kind: 'targeting', unit: u, from } }], ['결정', () => finishUnit(u)], ['취소', undo]]
+  const p = beside(u)
+  showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() })
 }
 
 export async function doAttack(u: Unit, target: Unit) {
   S.mode = { kind: 'busy' }
   hideMenu()
-  showForecast(null, null)
+  hideBasic()
   await attack(u, target)
   finishUnit(u, true)
+}
+
+/** 오른쪽 클릭·Esc 입구: 떠 있는 창 → 맵 순서 */
+export function goBack() {
+  if (!winBack()) back()
 }
