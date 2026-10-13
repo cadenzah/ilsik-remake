@@ -43,6 +43,7 @@ export const S = {
   watch: null as Unit | null,  // 개선판: 클릭한 적 하나의 위협 범위
   aim: null as Pos | null,     // 공격 확인창이 떠 있는 동안 대상 칸 (STA 2 틀)
   marks: true,                 // 진영 표시 (원작 시스템 → 표기)
+  notice: false,               // 원작 시스템 → 알림: 공격·마법 확인창 (기본 닫기, 저장 안 됨 — formats.md "시스템 창 설정")
   cam: { x: 0, y: 0, scale: 1 },
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }

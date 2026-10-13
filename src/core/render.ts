@@ -136,7 +136,6 @@ export function frame(now: number) {
     }
 
   const each = (f: (x: number, y: number) => void) => { for (let y = 0; y < mp.h; y++) for (let x = 0; x < mp.w; x++) f(x, y) }
-  const tint = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x * TW, y * TH, TW, TH) }
 
   if (remake && (S.threat || S.watch)) {
     const red = ditherRed()
@@ -159,11 +158,9 @@ export function frame(now: number) {
     }
   }
   if (md.kind === 'targeting') {
-    // 보랏빛으로 어둡게, 사거리 칸만 원래 색
+    // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀
     const u = md.unit
-    ctx.globalCompositeOperation = 'multiply'
-    each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) tint(x, y, '#8a62c8') })
-    ctx.globalCompositeOperation = 'source-over'
+    each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
     if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
   }
 

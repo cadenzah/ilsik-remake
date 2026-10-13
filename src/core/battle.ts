@@ -600,7 +600,7 @@ function toCamp() {
 }
 
 /** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
-function systemMenu(at?: { x: number; y: number }) {
+function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   const onOff = (title: string, set?: (on: boolean) => void) => () =>
     openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['열기', () => set?.(true)], ['닫기', () => set?.(false)]], onBack: () => closeWin('sub') })
   const items: Btn[] = remake() ? [
@@ -613,7 +613,7 @@ function systemMenu(at?: { x: number; y: number }) {
     ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로.<br>지난흔적에서 이어 합니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
   ] : [
-    ['알림', onOff('알림전환')],   // 무엇을 켜고 끄는지 미확인 (ux.md 6절) — 창만
+    ['알림', onOff('알림전환', on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
     ['표기', () => { S.marks = !S.marks; closeWin('system') }],
     ['음악', onOff('음악전환')],
     ['음향', onOff('음향전환')],
@@ -621,7 +621,7 @@ function systemMenu(at?: { x: number; y: number }) {
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],
   ]
   openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 96 : 64,
-    closeOnPick: !!remake(), onBack: () => closeWin('system') })
+    closeOnPick: !!remake(), onBack: () => { closeWin('system'); if (from) commandMenu(from) } })   // 원작: 오른쪽 클릭 = 명령창으로
 }
 
 // ---------- 플레이어 명령 ----------
@@ -737,7 +737,7 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
       await doAttack(u, target)
     })()
   }
-  if (remake() && setting('quickAttack')) { go(); return }   // 개선판 설정: 확인 생략
+  if (remake() ? setting('quickAttack') : !S.notice) { go(); return }   // 원작: 알림을 열었을 때만 확인 (기본 닫기), 개선판: 설정으로 생략
   confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body)
 }
 
@@ -749,7 +749,7 @@ export function commandMenu(u: Unit) {
     ['이동', () => select(u)],
     ['전투', () => { S.mode = { kind: 'targeting', unit: u, from: here } }],   // 원작: 사거리에 적이 없어도 들어간다
     ['상황', () => { const p = beside(u); showBasic(u, { x: p.x, y: p.y }, { onFace: () => bigStatus(u) }) }],
-    ['시스템', () => systemMenu(beside(u))],
+    ['시스템', () => systemMenu(beside(u), u)],
   ], beside(u).x, beside(u).y)
 }
 
