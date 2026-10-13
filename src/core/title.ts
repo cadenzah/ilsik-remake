@@ -6,14 +6,14 @@
 import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
-import { lastEdition, loadProgress, loadSlots, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId } from './save'
+import { lastEdition, loadProgress, loadSlots, loadSuspended, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId, type Suspended } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
 import { setSetting, setting, type Setting } from './settings'
 import { stageDef, type StageDef } from './stage'
 
-export interface Launch { ed: EditionId; def: StageDef; camp?: Camp }  // camp 없음 = 캠페인 밖 기본 상태
+export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
 
 const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'original', name: '원작판', desc: '원작 규칙·조작 그대로' },
@@ -29,6 +29,9 @@ const THUNDER_VOLUME = 0.5
 const SETTINGS: { k: Setting; label: string; title: string }[] = [
   { k: 'bitmapFont', label: '원작 글꼴', title: '원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴)' },
   { k: 'logoSound', label: '로고 효과음', title: '시작 로고 연출의 천둥소리' },
+  { k: 'fastEnemy', label: '적 차례 빠르게', title: '개선판: 적·NPC 가 움직이는 속도를 높인다' },
+  { k: 'shortAnim', label: '전투 연출 짧게', title: '개선판: 공격·쓰러짐 연출을 짧게' },
+  { k: 'quickAttack', label: '공격 확인 생략', title: '개선판: 「전 투」 확인창 없이 대상을 누르면 바로 공격' },
 ]
 const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
 
@@ -80,14 +83,14 @@ export function showTitle(): Promise<Launch> {
   let ed = lastEdition()
 
   return new Promise(done => {
-    const launch = (def: StageDef, camp?: Camp) => {
+    const launch = (def: StageDef, camp?: Camp, resume?: Suspended) => {
       setLastEdition(ed)
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey)
       void fadeOut().then(() => {   // 원작처럼 어두워진 뒤 다음 화면 (boot·정비 화면이 밝힌다)
         root.hidden = true
         root.innerHTML = ''
-        done({ ed, def, camp })
+        done({ ed, def, camp, resume })
       })
     }
 
@@ -118,8 +121,8 @@ export function showTitle(): Promise<Launch> {
       win.classList.remove('wide')
       rows([
         { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
-        { label: '지난흔적', title: p || loadSlots(ed).some(Boolean) ? '이어하기·기록 불러오기' : '저장된 진행 없음',
-          on: p || loadSlots(ed).some(Boolean) ? () => loadMenu() : undefined },
+        { label: '지난흔적', title: p || loadSlots(ed).some(Boolean) || loadSuspended(ed) ? '이어하기·기록 불러오기' : '저장된 진행 없음',
+          on: p || loadSlots(ed).some(Boolean) || loadSuspended(ed) ? () => loadMenu() : undefined },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
           ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
@@ -143,9 +146,11 @@ export function showTitle(): Promise<Launch> {
 
     // 지난흔적: 자동 기록 (장을 마칠 때마다) + 정비 화면 기록 3칸 (원작 「불러오기」)
     const loadMenu = () => {
-      const p = loadProgress(ed)
+      const p = loadProgress(ed), sus = loadSuspended(ed)
       win.classList.add('wide')
       rows([
+        ...sus ? [{ label: `중단한 전투 · ${sus.title} ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
+          on: () => launch(sus.def, sus.at, sus) }] : [],
         { label: p ? `이어하기 · ${chapterName(p.next.n, p.next.route)}` : '이어하기 (없음)', title: '장을 마칠 때마다 자동 기록',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         ...loadSlots(ed).map((s, i) => ({ label: s ? `기록 ${i + 1} · ${s.title}` : `기록 ${i + 1} · 무기록`, title: s ? new Date(s.at).toLocaleString() : '',

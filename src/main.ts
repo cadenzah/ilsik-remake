@@ -30,7 +30,7 @@ async function main() {
   addEventListener('resize', () => S.map && resize())
   // 개발 중 브라우저에서 상태 확인·자동 테스트용
   if (import.meta.env.DEV) Object.assign(window, { __game: { S, camp: snapshot, toScreen, reachable, planFor: ed.planFor, checkEnd, chooseRoute } })
-  await boot(ed, go.def, go.camp ?? null)
+  await boot(ed, go.def, go.camp ?? null, go.resume)
 }
 
 main().catch(err => {

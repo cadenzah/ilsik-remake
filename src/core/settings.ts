@@ -2,8 +2,12 @@
 const KEYS = {
   bitmapFont: 'eclipse.bitmapFont',   // 원작 비트맵 글꼴 (FULLSOFT.FNT) 로 화면 글자를 그린다. 기본 켬
   logoSound: 'eclipse.introSound',    // 로고 연출의 천둥 효과음. 기본 끔 (옛 '인트로 소리' 키 그대로)
+  // 개선판 편의 (ux-proposal.md 12·18). 원작판은 무시
+  fastEnemy: 'eclipse.fastEnemy',     // 적·NPC 차례 빠르게
+  shortAnim: 'eclipse.shortAnim',     // 전투 연출 짧게
+  quickAttack: 'eclipse.quickAttack', // 공격 확인창 없이 바로
 } as const
-const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false }
+const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, fastEnemy: false, shortAnim: false, quickAttack: false }
 
 export type Setting = keyof typeof KEYS
 

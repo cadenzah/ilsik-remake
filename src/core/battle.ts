@@ -12,9 +12,10 @@ import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './b
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, showBasic, showConditions } from './info'
 import { playDialogue } from './dialogue'
-import { loadSlots, recordClear, recordHidden, recordRun, writeSlot } from './save'
+import { loadSlots, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
+import { setting } from './settings'
 import { travelMap } from './worldmap'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
@@ -23,6 +24,9 @@ import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMe
 import { equippedStats, type Pos, type Unit } from './unit'
 
 const STEP_MS = 110
+// 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
+let aiTurn = false
+const pace = () => !remake() ? 1 : (aiTurn && setting('fastEnemy') ? 0.35 : 1) * (setting('shortAnim') ? 0.5 : 1)
 
 // ---------- 초기화 ----------
 
@@ -59,7 +63,7 @@ let askDeploy = true   // ?stage=N 로 바로 연 판은 출전 선택 없이 �
 
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
-export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null) {
+export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null, resume?: Suspended) {
   await fadeOut()   // 결과 화면·타이틀에서 넘어올 때 (이미 어두우면 바로)
   S.ed = ed
   S.def = def
@@ -81,7 +85,11 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
-  if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
+  if (resume) {   // 중단한 전투: 정비 화면·대륙 지도 없이 그 자리부터
+    restore(resume.at)
+    atStart = snapshot()
+    S.deploy = resume.deploy
+  } else if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
     const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first,
       slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
         const base = snapshot(), rec = { ...base.equip }
@@ -99,7 +107,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
     atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
   }
-  if (def.campaign) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
+  if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
   Object.assign(S, placements(rec))
   S.reward = rec.reward
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
@@ -113,10 +121,10 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   setupScreen(ed, def)
   resize()
   if (!looping) { looping = true; requestAnimationFrame(frame) }
-  await start()
+  await start(resume)
 }
 
-async function start() {
+async function start(resume?: Suspended) {
   await fadeOut()   // 다시 하기 (boot 에서 오면 이미 어둡다)
   uidSeq = 0
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
@@ -133,6 +141,7 @@ async function start() {
   S.active = []
   S.mode = { kind: 'busy' }
   S.aim = S.watch = null
+  if (resume) { await resumeAt(resume, all); return }
   closeAll()
   hideBasic()
   setTurn(1, null)
@@ -159,7 +168,7 @@ export async function walk(u: Unit, path: Pos[]) {
     u.x = p.x; u.y = p.y
     await new Promise<void>(ok => {
       const tick = () => {
-        const k = Math.min(1, (performance.now() - t0) / STEP_MS)
+        const k = Math.min(1, (performance.now() - t0) / (STEP_MS * (aiTurn && remake() && setting('fastEnemy') ? 0.35 : 1)))
         u.px = sx + (p.x - sx) * k
         u.py = sy + (p.y - sy) * k
         k < 1 ? requestAnimationFrame(tick) : ok()
@@ -175,16 +184,16 @@ async function attack(a: Unit, d: Unit) {
   // 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
   const dx = Math.sign(d.x - a.x) * 0.25, dy = Math.sign(d.y - a.y) * 0.25
   a.px += dx; a.py += dy
-  await sleep(120)
+  await sleep(120 * pace())
   a.px = a.x; a.py = a.y
   const dmg = S.ed.rules.rollDamage(S.map, a, d)
   d.hp = Math.max(0, d.hp - dmg)
   if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
   d.flash = performance.now() + 160
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
-  await sleep(350)
+  await sleep(350 * pace())
   if (d.hp <= 0) {
-    for (let i = 10; i >= 0; i--) { d.alpha = i / 10; await sleep(30) }
+    for (let i = 10; i >= 0; i--) { d.alpha = i / 10; await sleep(30 * pace()) }
   }
 }
 
@@ -437,16 +446,20 @@ async function turnEvents() {
 
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다.
  *  원작: 턴·차례 알림 없음 (띠는 장 제목만). 개선판: 띠의 턴 패 + 아군 차례 시작마다 「GO!! GO!!」 */
-async function runRounds() {
+async function runRounds(resumed = false) {
   for (;;) {
-    for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
-    S.mode = { kind: 'busy' }
-    await turnEvents()
+    if (!resumed) {
+      for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
+      S.mode = { kind: 'busy' }
+      await turnEvents()
+    }
+    resumed = false
     for (const step of S.ed.order([...S.units, ...S.reserve], S.turn)) {
       const live = step.filter(u => u.hp > 0 && S.units.includes(u))
       if (!live.length) continue
       const lead = live[0], party = lead.troop === 0
       const side = party ? 'ally' : isNpc(lead) ? 'npc' : 'enemy'
+      if (party && live.every(u => u.acted)) continue   // 중단 저장에서 이어 온 턴: 이미 마친 단계
       updatePhase(side, step.length > 1 ? '' : lead.type.name)
       if (party && step.length > 1) await goGo(900)
       if (await (party ? playerStep(live) : aiStep(step))) return
@@ -485,6 +498,10 @@ export function endPlayerStep() {
 
 /** 컴퓨터 조종 유닛을 차례로 움직인다. 전투가 끝나면 true */
 async function aiStep(units: Unit[]): Promise<boolean> {
+  aiTurn = true
+  try { return await aiSteps(units) } finally { aiTurn = false }
+}
+async function aiSteps(units: Unit[]): Promise<boolean> {
   for (const u of units) {
     if (u.hp <= 0 || !S.units.includes(u)) continue
     const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
@@ -539,6 +556,39 @@ export function toggleMinimap() {
   setOn('map', on)
 }
 
+/** 중단 (개선판): 아군 차례 중 지금 상태를 저장하고 타이틀로. 이어하기는 그 턴 아군 차례부터 */
+function suspend() {
+  if (!stepDone || S.mode.kind === 'busy') return
+  cancel()
+  const all = [...S.units, ...S.reserve].sort((a, b) => a.uid - b.uid)
+  writeSuspended(S.ed.id, {
+    def: S.def, title: chapterTitle(), at: atStart, deploy: S.deploy, turn: S.turn,
+    units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u) })),
+    troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
+  })
+  toTitle()
+}
+
+/** 중단 저장에서 이어 하기: 유닛·부대·발동 기록을 되돌리고 그 턴 아군 차례부터 */
+async function resumeAt(r: Suspended, all: Unit[]) {
+  writeSuspended(S.ed.id, null)   // 한 번 불러오면 지운다
+  all.forEach((u, i) => { const v = r.units[i]; if (!v) return; const { onMap: _, ...rest } = v; Object.assign(u, rest, { px: v.x, py: v.y }) })
+  S.units = all.filter((_, i) => r.units[i]?.onMap ?? true)
+  S.reserve = all.filter((_, i) => r.units[i] && !r.units[i].onMap)
+  S.troopState = [...r.troopState]
+  r.fired.forEach(i => S.fired.add(i))
+  r.told.forEach(t => told.add(t))
+  S.joined = [...r.joined]
+  FLAGS.clear(); r.flags.forEach(f => FLAGS.add(f))
+  S.turn = r.turn
+  closeAll()
+  hideBasic()
+  setTitle(chapterTitle())
+  centerOn(S.units.find(u => u.troop === 0 && u.hp > 0 && !u.acted) ?? S.units[0])
+  await fadeIn()
+  await runRounds(true)
+}
+
 /** 전투를 그만두고 이 장 정비 화면으로 (원작 시스템 → 종료 「대기화면」) */
 function toCamp() {
   S.mode = { kind: 'busy' }
@@ -558,6 +608,7 @@ function systemMenu(at?: { x: number; y: number }) {
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
     ['턴 종료', endPlayerStep, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
+    ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로.<br>지난흔적에서 이어 합니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
   ] : [
     ['알림', onOff('알림전환')],   // 무엇을 켜고 끄는지 미확인 (ux.md 6절) — 창만
@@ -672,7 +723,7 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
     body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
   }
   const { sx, sy } = toScreen(target.x + 1, target.y)
-  confirmWin('전 투', { x: sx + 4, y: sy }, () => {
+  const go = () => {
     S.aim = null
     void (async () => {
       if (spot && moves) {
@@ -683,7 +734,9 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
       }
       await doAttack(u, target)
     })()
-  }, () => { S.aim = null }, body)
+  }
+  if (remake() && setting('quickAttack')) { go(); return }   // 개선판 설정: 확인 생략
+  confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body)
 }
 
 /** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): 이동·전투·상황·시스템 (마법은 마법 구현 때) */

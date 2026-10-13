@@ -109,3 +109,19 @@ export function writeSlot(ed: EditionId, i: number, slot: SaveSlot) {
   all[i] = slot
   try { localStorage.setItem(slotKey(ed), JSON.stringify(all)) } catch { /* 저장 불가 */ }
 }
+
+// ---------- 중단 저장 (개선판 전투 중 메뉴 → 중단, ux-proposal.md 21). 이어하기 때 불러오고 지운다 ----------
+
+export interface UnitSave { x: number; y: number; hp: number; fatigue: number; acted: boolean; moved: boolean; steps: number
+  facing: 'down' | 'up' | 'left' | 'right'; alpha: number; onMap: boolean }
+export interface Suspended {
+  def: StageDef; title: string; at: Camp; deploy: number[]
+  turn: number; units: UnitSave[]; troopState: number[]; fired: number[]; told: string[]; joined: number[]; flags: string[]; saved: number
+}
+const susKey = (ed: EditionId) => `eclipse.suspend.${ed}`
+export function loadSuspended(ed: EditionId): Suspended | null {
+  try { const raw = localStorage.getItem(susKey(ed)); return raw ? JSON.parse(raw) as Suspended : null } catch { return null }
+}
+export function writeSuspended(ed: EditionId, s: Suspended | null) {
+  try { s ? localStorage.setItem(susKey(ed), JSON.stringify(s)) : localStorage.removeItem(susKey(ed)) } catch { /* 저장 불가 */ }
+}
