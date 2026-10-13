@@ -3,7 +3,7 @@
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 
-export interface Place { name: string; x: number; y: number; w: number; h: number; sy: number }
+export interface Place { name: string; title: string; x: number; y: number; w: number; h: number; sy: number }
 
 let places: Promise<Place[]> | null = null
 /** 장마다 장소 (칸 n = n+1장). 원작 43장만 */

@@ -6,7 +6,7 @@ import { inRange, pathTo, reachable } from './grid'
 import { campScreen } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
-import { recordClear, recordRun } from './save'
+import { recordClear, recordHidden, recordRun } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { travelMap } from './worldmap'
@@ -322,6 +322,7 @@ function cleared(ending: boolean) {
   if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, atStart, snapshot())
   // 판을 넘는 기록: 분기점·엔딩·찾은 사건 (캠페인 진행일 때), 도감 (늘)
   const now = snapshot(), camp = def.campaign
+  if (S.ed.extraBattles?.[def.n]) recordHidden(S.ed.id, def.n)
   recordRun(S.ed.id, { route: def.route, now,
     branchNext: camp && next && 'choose' in next ? next.choose : undefined,
     ending: camp && ending ? { carry: carryOf(now, id => S.tables.items.get(id)?.cat) } : undefined,

@@ -18,6 +18,7 @@ export interface Progress {
   found?: string[]                       // 찾은 조건 사건 (replay.FOUND id)
   seen?: { units: number[]; items: number[] }   // 도감
   carry?: { equip: Camp['equip']; items: number[] }   // 마지막 엔딩 때 장비 ("다른 길로" 이어받기)
+  hidden?: number[]                      // 깬 숨은 장 (44·45, 45 = 진엔딩)
 }
 
 /** 이어하기 상태 */
@@ -80,4 +81,11 @@ export function startOtherRoad(ed: EditionId, route: number, camp: Camp): { n: n
   Object.assign(p, { next }, camp)
   store(ed, p)
   return next
+}
+
+/** 숨은 장 클리어 (진행 저장과 따로, 장 지도의 기억 속의 장소·진엔딩 표식) */
+export function recordHidden(ed: EditionId, n: number) {
+  const p = loadProgress(ed) ?? { next: { n: 1, route: 0 }, cleared: [], flags: [] }
+  p.hidden = [...new Set([...p.hidden ?? [], n])].sort((a, b) => a - b)
+  store(ed, p)
 }

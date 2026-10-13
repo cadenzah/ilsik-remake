@@ -8,9 +8,15 @@ type Cleared = Progress['cleared'][number]
 
 const nav = (extra = '') => `<nav>${extra}<button data-go="0" class="close">돌아가기</button></nav>`
 
-/** 장 지도 (사용자 요청 2026-10-14: 진행에 따라 채워지는 지도, 스포일러 없음): 원작 대륙 지도 위에 가 본 장소의 원작 이름표만 붙이고,
- *  지나온 길을 점선으로 잇는다. 다음 목적지는 빛나는 이름표. 엔딩·갈림길·장 개수는 드러내지 않는다.
- *  이름표를 누르면 그 장소에서 치른 장과 찾은 사건 (두루마리 창) → 다시 하기 */
+/** 장 지도 (사용자 설계 2026-10-14, replay-design.md "장 지도 3판"):
+ *  - 오른쪽에 늘 클리어한 장 목록 (시작·갈래별·사바카 성·기억 속의 장소). 갈래는 깬 것만 드러난다
+ *  - 지도에는 가 본 장소의 원작 이름표, 지금 갈래의 여정만 점선으로, 마지막 장소에 아리크스, 다음 목적지는 빛나는 이름표
+ *  - 목록의 장에 올리면 그 장소만 밝고 나머지는 어둡게. 이름표·목록을 누르면 그 장소에서 치른 장 팝업 → 다시 하기
+ *  - "지도만 보기" = 목록과 어둠을 걷고 지도 전체. 진엔딩(45 클리어) 뒤엔 숨은 장소 이름표와 떠오른 해 */
+const ROUTE_TRAIL = ['혼탁한 호수 길', '암흑동굴 길', '옛 신전 길']   // 원작 진로 메뉴 문구 (0aa2:0b0d)
+const HIDDEN_PLACE: Record<number, { name: string; title: string; x: number; y: number }> = {
+  44: { name: '아도 왕성', title: '반란의 밤', x: 455, y: 335 }, 45: { name: '국경 마을', title: '레스다의 과거', x: 30, y: 262 } }
+
 export async function chapterMap(page: HTMLElement, p: Progress | null,
   play: (c: Cleared) => void, hidden: (n: number) => void, close: () => void) {
   const [places, battles] = await Promise.all([loadPlaces(), loadBattles()])
@@ -19,72 +25,152 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   const cleared = p?.cleared ?? []
   const visited = (n: number, route?: number) => cleared.some(c => c.n === n && (route === undefined || c.route === route))
   const common = (n: number) => routes.every(r => r.includes(n))
-  const key = (n: number) => { const q = places[n - 1]; return q ? `${q.x},${q.y}` : '' }
-  // 장소 묶음 (원작 좌표가 같은 장들) — 가 본 장만
+  const key = (n: number) => `${places[n - 1].x},${places[n - 1].y}`
+  const cur = p?.next?.route ?? 0   // 지금 갈래 = 이어하기의 루트
+  const order = cleared.map(c => c.n)
+  const latest = (ns: number[]) => ns.reduce((a, b) => order.lastIndexOf(b) > order.lastIndexOf(a) ? b : a)
+
+  // 장소 묶음 (원작 좌표가 같은 장들)
   const groups = new Map<string, number[]>()
   for (const c of cleared) if (places[c.n - 1]) { const g = groups.get(key(c.n)) ?? []; if (!g.includes(c.n)) g.push(c.n); groups.set(key(c.n), g) }
-  // 이름표 = 그 장소에서 가장 최근에 치른 장의 것
-  const latest = (ns: number[]) => ns.reduce((a, b) => cleared.map(c => c.n).lastIndexOf(b) > cleared.map(c => c.n).lastIndexOf(a) ? b : a)
-  const center = (n: number) => { const q = places[n - 1]; return [q.x + q.w / 2, q.y + q.h / 2] }
-  // 지나온 길: 루트 순서표대로, 가 본 장만 (공통 장은 어느 루트든)
-  const paths = routes.map((r, k) => r.filter(n => n <= 43 && (common(n) ? visited(n) : visited(n, k))))
-    .filter(seq => seq.some(n => !common(n)) || seq.length > 1)
-    .map(seq => seq.map(center).filter((pt, i, a) => !i || pt.join() !== a[i - 1].join()))
-  const next = p?.next && !visited(p.next.n) && places[p.next.n - 1] ? places[p.next.n - 1] : null
-  const open = trueEndingOpen(p?.endings)
-  page.innerHTML = `<div class="wmap">
-      <img class="map" src="${A}/ui/worldmap.png" alt="아모스 대륙 지도">
-      <svg class="paths" viewBox="0 0 640 480">${[...new Set(paths.map(pts => pts.map(q => q.join(',')).join(' ')))]
-        .map(pts => `<polyline points="${pts}"/>`).join('')}</svg>
-      ${open ? `<div class="memory"><b>기억 속의 장소</b>${HIDDEN.map(n => `<button data-hidden="${n}">${n === 44 ? '반란의 밤' : '레스다의 과거'}</button>`).join('')}</div>` : ''}
-      <div class="scroll" hidden></div>
-    </div>${nav()}`
-  const wmap = page.querySelector<HTMLElement>('.wmap')!
-  const scroll = page.querySelector<HTMLElement>('.scroll')!
-  // 원작은 이름표를 하나씩만 그려 좌표가 가까우면 겹친다 → 겹치면 위아래로 비켜 놓는다
+  // 지금 갈래의 여정 (루트 순서표, 가 본 장만). 9장 뒤는 이 갈래에서 깬 장만 (지난 판의 공통 장 26·36~43 은 빼고)
+  const trail = routes[cur].filter(n => n <= 43 && (n <= 9 ? visited(n) : visited(n, cur)))
+  const center = (q: { x: number; y: number; w: number; h: number }) => [q.x + q.w / 2, q.y + q.h / 2]
+  const next = p?.next && !visited(p.next.n) && places[p.next.n - 1] ? p.next.n : 0
+  const trueEnd = !!p?.hidden?.includes(45)
+
+  // 이름표 자리: 원작 좌표, 겹치면 위아래로 비킴
   const taken: { x: number; y: number; w: number; h: number }[] = []
-  const nudge = (q: Place) => {
+  const nudge = <Q extends { x: number; y: number; w: number; h: number }>(q: Q): Q => {
     for (const dy of [0, 24, -24, 48, -48, 72]) {
       const r = { x: q.x, y: q.y + dy, w: q.w, h: q.h }
       if (!taken.some(t => r.x < t.x + t.w && t.x < r.x + r.w && r.y < t.y + t.h && t.y < r.y + r.h)) { taken.push(r); return { ...q, y: r.y } }
     }
     return q
   }
-  for (const ns of [...groups.values()].sort((a, b) => a[0] - b[0])) {
-    const b = placeLabel(nudge(places[latest(ns) - 1]), 'place on')
+  const spot = new Map<string, Place>()
+  for (const ns of [...groups.values()].sort((a, b) => a[0] - b[0])) spot.set(key(ns[0]), nudge(places[latest(ns) - 1]))
+  const nextSpot = next ? nudge(places[next - 1]) : null
+  const pts = trail.map(n => center(spot.get(key(n))!)).filter((q, i, a) => !i || q.join() !== a[i - 1].join())
+  if (nextSpot) pts.push(center(nextSpot))
+
+  page.innerHTML = `<div class="wmap list">
+      <div class="mapbox">
+        <img class="map" src="${A}/ui/worldmap.png" alt="아모스 대륙 지도">
+        <svg class="paths" viewBox="0 0 640 480"><polyline points="${pts.map(q => q.join(',')).join(' ')}"/></svg>
+        <div class="dim"></div>
+        <div class="labels"></div>
+      </div>
+      <aside class="clist"></aside>
+      <div class="popup" hidden></div>
+    </div>${nav('<button class="toggle">지도만 보기</button>')}`
+  const wmap = page.querySelector<HTMLElement>('.wmap')!
+  const labels = page.querySelector<HTMLElement>('.labels')!
+  const popup = page.querySelector<HTMLElement>('.popup')!
+
+  // 지도 위 이름표 (가 본 장소) → 누르면 팝업
+  for (const [k, ns] of groups) {
+    const q = spot.get(k)!
     const btn = document.createElement('button')
     btn.className = 'placebtn'
-    btn.append(b)
-    Object.assign(btn.style, { left: b.style.left, top: b.style.top })
-    b.style.left = b.style.top = '0'
-    btn.title = `${places[latest(ns) - 1].name} — 치른 장 보기`
-    btn.onclick = () => showScroll(ns)
-    wmap.append(btn)
+    btn.dataset.key = k
+    Object.assign(btn.style, { left: `${q.x}px`, top: `${q.y}px` })
+    const lab = placeLabel({ ...q, x: 0, y: 0 }, 'place on')
+    btn.append(lab)
+    btn.title = `${q.name} — 이곳에서 치른 장`
+    btn.onclick = () => showPopup(ns)
+    labels.append(btn)
   }
-  if (next) { const e = placeLabel(nudge(next), 'place next'); e.title = `다음 목적지: ${next.name}`; wmap.append(e) }
-  // 두루마리 창: 그 장소에서 치른 장 (다시 하기) + 찾은 사건
-  const showScroll = (ns: number[]) => {
-    const list = cleared.filter(c => ns.includes(c.n)).sort((a, b) => a.n - b.n || a.route - b.route)
+  if (nextSpot) {
+    const e = placeLabel(nextSpot, 'place next')
+    e.title = `다음 목적지: ${nextSpot.name}`
+    labels.append(e)
+  }
+  // 아리크스: 지금 갈래 여정의 마지막 장소 (37장 뒤면 2차 모습)
+  const lastN = trail[trail.length - 1]
+  if (lastN) {
+    const q = spot.get(key(lastN))!, hero = document.createElement('i')
+    hero.className = 'hero'
+    hero.style.backgroundImage = `url(${A}/units/${String((p?.party?.[0] ?? 0) === 1 ? 1 : 0).padStart(3, '0')}.png)`
+    const hx = q.x + q.w / 2 - 28, hy = q.y > 50 ? q.y - 42 : q.y + q.h - 6
+    taken.push({ x: hx + 10, y: hy, w: 36, h: 44 })   // 숨은 장소 이름표가 덮지 않게
+    Object.assign(hero.style, { left: `${hx}px`, top: `${hy}px` })
+    hero.title = `지금 여기: ${lastN}장 ${places[lastN - 1].name}`
+    labels.append(hero)
+  }
+  // 진엔딩 표식: 숨은 장소 이름표 + 떠오른 해
+  if (trueEnd) {
+    for (const n of HIDDEN) {
+      const h = HIDDEN_PLACE[n], q = nudge({ x: h.x, y: h.y, w: 12 * (h.name.length + h.title.length) + 30, h: 20 })
+      labels.insertAdjacentHTML('beforeend', `<span class="hplace" style="left:${q.x}px;top:${q.y}px">${h.name} · ${h.title}</span>`)
+    }
+    labels.insertAdjacentHTML('beforeend', '<span class="sun" title="일식이 걷히다"><i></i><b>일식이 걷히다</b></span>')
+  }
+
+  // 오른쪽 목록: 시작(공통 앞) · 깬 갈래별 · 사바카 성(공통 뒤) · 기억 속의 장소
+  const row = (n: number, route: number | undefined, extra = '') =>
+    `<button class="crow${n === next ? ' next' : ''}" data-n="${n}"${route === undefined ? '' : ` data-route="${route}"`}>
+      <b>${n}</b><span>${places[n - 1]?.name ?? ''}<small>${places[n - 1]?.title ?? ''}</small></span>${extra}</button>`
+  const nextRow = (seq: number[]) => next && seq.includes(next) ? row(next, undefined, '<em>다음</em>') : ''
+  const pre = routes[0].filter(n => n <= 9), post = routes[0].filter(n => n >= 36)
+  const sec = (title: string, body: string) => body ? `<section><h4>${title}</h4>${body}</section>` : ''
+  const branchSecs = [0, 1, 2].map(k => {
+    const ns = routes[k].filter(n => n > 9 && n < 36 && visited(n, k))
+    if (!ns.length) return ''
+    return sec(ROUTE_TRAIL[k] + (k === cur ? ' · 지금' : ''), ns.map(n => row(n, k)).join('') + (k === cur ? nextRow(routes[k].filter(n => n > 9 && n < 36)) : ''))
+  })
+  const memory = trueEndingOpen(p?.endings) ? sec('기억 속의 장소', HIDDEN.map(n =>
+    `<button class="crow hidden" data-hidden="${n}"><b>✦</b><span>${HIDDEN_PLACE[n].title}<small>${HIDDEN_PLACE[n].name}${p?.hidden?.includes(n) ? ' · 클리어' : ''}</small></span></button>`).join('')) : ''
+  page.querySelector<HTMLElement>('.clist')!.innerHTML = `<h3>클리어한 장</h3>`
+    + sec('여정의 시작', pre.filter(n => visited(n)).map(n => row(n, undefined)).join('') + nextRow(pre))
+    + branchSecs.join('')
+    + sec('사바카 성', post.filter(n => visited(n)).map(n => row(n, undefined)).join('') + nextRow(post))
+    + memory
+    + (cleared.length ? '' : '<p>아직 클리어한 장이 없다</p>')
+
+  // 목록에 올리면 그 장소만 밝게
+  const focus = (n: number | null) => {
+    wmap.classList.toggle('focus', !!n)
+    labels.querySelectorAll('.lit').forEach(e => e.classList.remove('lit'))
+    if (!n || !places[n - 1]) return
+    const k = key(n)
+    labels.querySelector(`.placebtn[data-key="${k}"]`)?.classList.add('lit')
+    if (n === next) labels.querySelector('.place.next')?.classList.add('lit')
+  }
+  page.querySelectorAll<HTMLButtonElement>('.crow[data-n]').forEach(b => {
+    const n = Number(b.dataset.n)
+    b.onmouseenter = b.onfocus = () => focus(n)
+    b.onmouseleave = b.onblur = () => focus(null)
+    b.onclick = () => { if (groups.has(key(n))) showPopup(groups.get(key(n))!, n) }
+  })
+  page.querySelectorAll<HTMLButtonElement>('[data-hidden]').forEach(b => b.onclick = () => hidden(Number(b.dataset.hidden)))
+
+  // 팝업: 그 장소에서 치른 장 (번호·원작 제목·장소·갈래) → 다시 하기, 찾은 사건
+  const showPopup = (ns: number[], first?: number) => {
+    const list = cleared.filter(c => ns.includes(c.n)).sort((a, b) => (b.n === first ? 1 : 0) - (a.n === first ? 1 : 0) || a.n - b.n || a.route - b.route)
     const found = FOUND.filter(f => ns.includes(f.n) && p?.found?.includes(f.id))
-    scroll.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
-      ${list.map((c, i) => `<button data-i="${i}">${c.n}장 · ${places[c.n - 1].name}<small>다시 하기</small></button>`).join('')}
+    popup.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
+      ${list.map((c, i) => `<div class="prow"><b>${c.n}장</b><span>「${places[c.n - 1].title}」<small>${places[c.n - 1].name}${common(c.n) ? '' : ` · ${ROUTE_TRAIL[c.route]}`}</small></span>
+        <button data-i="${i}">다시 하기</button></div>`).join('')}
       ${found.map(f => `<p>✓ ${f.label}</p>`).join('')}
       <button class="x">닫기</button>`
-    scroll.hidden = false
-    scroll.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => b.onclick = () => play(list[Number(b.dataset.i)]))
-    scroll.querySelector<HTMLButtonElement>('.x')!.onclick = hideScroll
-    scroll.querySelector<HTMLButtonElement>('button')?.focus()
+    popup.hidden = false
+    popup.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => b.onclick = () => play(list[Number(b.dataset.i)]))
+    popup.querySelector<HTMLButtonElement>('.x')!.onclick = hidePopup
+    popup.querySelector<HTMLButtonElement>('[data-i]')?.focus()
   }
-  const hideScroll = () => { scroll.hidden = true }
-  // Esc: 두루마리가 열려 있으면 그것만 닫는다 (타이틀의 Esc = 지도 닫기보다 먼저)
+  const hidePopup = () => { popup.hidden = true }
+  // Esc: 팝업이 열려 있으면 그것만 닫는다 (타이틀의 Esc = 지도 닫기보다 먼저)
   const onEsc = (e: KeyboardEvent) => {
-    if (!scroll.isConnected) { removeEventListener('keydown', onEsc, true); return }   // 지도를 닫았으면 정리
-    if (e.key === 'Escape' && !scroll.hidden) { e.stopImmediatePropagation(); hideScroll() }
+    if (!popup.isConnected) { removeEventListener('keydown', onEsc, true); return }   // 지도를 닫았으면 정리
+    if (e.key === 'Escape' && !popup.hidden) { e.stopImmediatePropagation(); hidePopup() }
   }
   addEventListener('keydown', onEsc, true)
-  page.querySelectorAll<HTMLButtonElement>('[data-hidden]').forEach(b => b.onclick = () => hidden(Number(b.dataset.hidden)))
+  // 지도만 보기 ↔ 목록 보기
+  const toggle = page.querySelector<HTMLButtonElement>('nav .toggle')!
+  toggle.onclick = () => { const on = wmap.classList.toggle('list'); toggle.textContent = on ? '지도만 보기' : '목록 보기'; focus(null) }
   page.querySelector<HTMLButtonElement>('nav .close')!.onclick = () => { removeEventListener('keydown', onEsc, true); close() }
-  ;(page.querySelector<HTMLButtonElement>('.placebtn') ?? page.querySelector<HTMLButtonElement>('nav .close'))?.focus()
+  ;(page.querySelector<HTMLButtonElement>('.crow') ?? page.querySelector<HTMLButtonElement>('nav .close'))?.focus()
 }
 
 /** 도감: 판을 넘어 만난 인물·적, 손에 넣은 도구 */

@@ -137,30 +137,64 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .page nav button:disabled { opacity: .35; cursor: default; }
 #titlescreen .page nav .close { position: absolute; right: 12px; }
 #titlescreen .page img { width: 640px; height: 480px; }
-/* 장 지도 (개선판, replayScreens.chapterMap) — 원작 대륙 지도 640×480 위 */
-#titlescreen .wmap { position: absolute; inset: 0; }
-#titlescreen .wmap .map { position: absolute; inset: 0; width: 640px; height: 480px; }
-#titlescreen .wmap .paths { position: absolute; inset: 0; width: 640px; height: 480px; pointer-events: none; }
-#titlescreen .wmap .paths polyline { fill: none; stroke: #7a1c10; stroke-width: 2.5; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .85; }
+/* 장 지도 (개선판, replayScreens.chapterMap) — 원작 대륙 지도 640×480. 목록이 보이면 지도를 왼쪽에 줄여 두고 오른쪽에 클리어한 장 목록 */
+#titlescreen .wmap { position: absolute; inset: 0; overflow: hidden; background: #0c0a06; }
+#titlescreen .wmap .mapbox { position: absolute; left: 0; top: 0; width: 640px; height: 480px; transform-origin: 0 0; transition: transform .3s ease; }
+#titlescreen .wmap.list .mapbox { transform: translate(4px, 52px) scale(.725); }
+#titlescreen .wmap .map, #titlescreen .wmap .paths { position: absolute; inset: 0; width: 640px; height: 480px; }
+#titlescreen .wmap .paths { pointer-events: none; }
+#titlescreen .wmap .paths polyline { fill: none; stroke: #7a1c10; stroke-width: 2.5; stroke-dasharray: 2 6; stroke-linecap: round; }
+#titlescreen .wmap .dim { position: absolute; inset: 0; background: rgba(20, 10, 0, .62); opacity: 0; transition: opacity .15s; pointer-events: none; }
+#titlescreen .wmap.focus .dim { opacity: 1; }
+#titlescreen .wmap .labels { position: absolute; inset: 0; }
+#titlescreen .wmap.focus .labels > :not(.lit) { opacity: .18; }
+#titlescreen .wmap.focus .place.next:not(.lit) { animation: none; opacity: .18; }
+#titlescreen .wmap .labels > * { transition: opacity .15s, filter .15s; }
+#titlescreen .wmap .lit { filter: drop-shadow(0 0 6px #fff0a0) brightness(1.15); }
 #titlescreen .placebtn { all: unset; position: absolute; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(60, 30, 0, .6)); }
 #titlescreen .placebtn .place { position: relative; }
-#titlescreen .placebtn:hover, #titlescreen .placebtn:focus-visible { filter: drop-shadow(0 0 3px #fff6c0) brightness(1.1); }
+#titlescreen .placebtn:hover, #titlescreen .placebtn:focus-visible { filter: drop-shadow(0 0 4px #fff6c0) brightness(1.1); }
 #titlescreen .place.next { animation: placepulse 1.6s ease-in-out infinite; pointer-events: none; }
-@keyframes placepulse { 0%, 100% { filter: drop-shadow(0 0 0 #fff0a0); opacity: .55 } 50% { filter: drop-shadow(0 0 6px #fff0a0); opacity: 1 } }
-#titlescreen .wmap .memory { position: absolute; left: 14px; bottom: 40px; display: flex; flex-direction: column; gap: 2px; padding: 4px 10px;
-  background: rgba(243, 227, 176, .92); border: 1px solid #6b4a1a; border-radius: 3px; color: #3c2a10; font-size: 12px; }
-#titlescreen .wmap .memory button { all: unset; cursor: pointer; color: #7a1c10; }
-#titlescreen .wmap .memory button:hover, #titlescreen .wmap .memory button:focus-visible { text-decoration: underline; }
-#titlescreen .wmap .scroll { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); min-width: 240px; max-width: 360px;
-  padding: 10px 16px; background: #f3e3b0; border: 2px solid #6b4a1a; border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, .6);
-  color: #3c2a10; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-#titlescreen .wmap .scroll[hidden] { display: none; }
-#titlescreen .wmap .scroll h3 { margin: 0 0 4px; font-size: 14px; font-weight: 400; color: #5a1a08; text-align: center; }
-#titlescreen .wmap .scroll button { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 2px 4px; }
-#titlescreen .wmap .scroll button small { color: #8a6a3a; }
-#titlescreen .wmap .scroll button:hover, #titlescreen .wmap .scroll button:focus-visible { background: rgba(122, 28, 16, .12); }
-#titlescreen .wmap .scroll button.x { justify-content: center; color: #8a6a3a; margin-top: 4px; }
-#titlescreen .wmap .scroll p { margin: 0; color: #2f5a1f; }
+@keyframes placepulse { 0%, 100% { filter: drop-shadow(0 0 0 #fff0a0); opacity: .6 } 50% { filter: drop-shadow(0 0 6px #fff0a0); opacity: 1 } }
+#titlescreen .wmap .hero { position: absolute; width: 56px; height: 48px; background-repeat: no-repeat; background-position: 0 0; pointer-events: none;
+  image-rendering: pixelated; animation: herobob 1.2s ease-in-out infinite;
+  filter: drop-shadow(1px 0 0 #3a2208) drop-shadow(-1px 0 0 #3a2208) drop-shadow(0 1px 0 #3a2208) drop-shadow(0 -1px 0 #3a2208) drop-shadow(0 3px 2px rgba(0, 0, 0, .6)); }
+@keyframes herobob { 50% { transform: translateY(-2px); } }
+#titlescreen .wmap .hplace { position: absolute; padding: 2px 8px; background: #faeec8; border: 2px solid #96701e; border-radius: 3px; color: #6e3c0a; font-size: 12px; white-space: nowrap; }
+#titlescreen .wmap .sun { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+#titlescreen .wmap .sun i { display: block; width: 36px; height: 36px; margin: 6px auto 8px; border-radius: 50%; background: radial-gradient(#ffe27a, #ffb32c 60%, #c06a10);
+  box-shadow: 0 0 14px 8px rgba(255, 210, 110, .7); }
+#titlescreen .wmap .sun b { font-size: 12px; font-weight: 400; color: #6e3c0a; white-space: nowrap; text-shadow: 0 0 3px #fff3c8; }
+/* 오른쪽 목록 */
+#titlescreen .wmap .clist { position: absolute; right: 6px; top: 8px; bottom: 34px; width: 164px; overflow: auto; padding: 6px 8px;
+  background: #f3e3b0; border: 2px solid #6b4a1a; border-radius: 4px; color: #3c2a10; font-size: 12px; transition: transform .3s ease, opacity .3s; }
+#titlescreen .wmap:not(.list) .clist { transform: translateX(110%); opacity: 0; pointer-events: none; }
+#titlescreen .wmap .clist h3 { margin: 0 0 4px; font-size: 14px; font-weight: 400; color: #5a1a08; text-align: center; }
+#titlescreen .wmap .clist h4 { margin: 8px 0 2px; font-size: 12px; font-weight: 400; color: #8a5a20; border-bottom: 1px solid #c9a868; }
+#titlescreen .wmap .clist p { margin: 8px 0; color: #8a6a3a; text-align: center; }
+#titlescreen .crow { all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 1px 3px; cursor: pointer; border-radius: 2px; }
+#titlescreen .crow b { width: 18px; flex: none; text-align: right; font-weight: 400; color: #8a1c10; }
+#titlescreen .crow span { flex: 1; min-width: 0; }
+#titlescreen .crow small { display: block; color: #8a6a3a; font-size: 10px; }
+#titlescreen .crow em { font-style: normal; color: #8a1c10; font-size: 10px; }
+#titlescreen .crow.next { opacity: .75; }
+#titlescreen .crow:hover, #titlescreen .crow:focus-visible { background: rgba(122, 28, 16, .14); }
+/* 장소 팝업 */
+#titlescreen .wmap .popup { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 260px; max-width: 380px; padding: 10px 16px 6px;
+  background: #f3e3b0; border: 2px solid #6b4a1a; border-radius: 4px; box-shadow: 0 3px 12px rgba(0, 0, 0, .65); color: #3c2a10; font-size: 13px; z-index: 2; }
+#titlescreen .wmap.list .popup { left: 236px; }
+#titlescreen .wmap .popup[hidden] { display: none; }
+#titlescreen .wmap .popup h3 { margin: 0 0 6px; font-size: 14px; font-weight: 400; color: #5a1a08; text-align: center; }
+#titlescreen .wmap .prow { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-top: 1px dotted #c9a868; }
+#titlescreen .wmap .prow b { flex: none; width: 34px; font-weight: 400; color: #8a1c10; }
+#titlescreen .wmap .prow span { flex: 1; }
+#titlescreen .wmap .prow small { display: block; color: #8a6a3a; font-size: 11px; }
+#titlescreen .wmap .popup button { all: unset; cursor: pointer; color: #7a1c10; padding: 1px 4px; border-radius: 2px; }
+#titlescreen .wmap .popup button:hover, #titlescreen .wmap .popup button:focus-visible { background: rgba(122, 28, 16, .14); }
+#titlescreen .wmap .popup button.x { display: block; margin: 6px auto 0; color: #8a6a3a; }
+#titlescreen .wmap .popup p { margin: 4px 0 0; color: #2f5a1f; }
+#titlescreen .page nav .toggle { position: absolute; left: 12px; }
+#titlescreen .page:has(.wmap) nav { height: 30px; background: linear-gradient(transparent, rgba(12, 10, 6, .92) 40%); z-index: 3; }
 
 /* 도감 (개선판) */
 #titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px; color: #c8c8bc; font-size: 12px; overflow: auto; }
