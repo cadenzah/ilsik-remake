@@ -19,8 +19,7 @@ const HIDDEN_PLACE: Record<number, { name: string; title: string; x: number; y: 
 
 export async function chapterMap(page: HTMLElement, p: Progress | null,
   play: (c: Cleared) => void, hidden: (n: number) => void, close: () => void) {
-  const [places, battles, tables] = await Promise.all([loadPlaces(), loadBattles(), loadTables()])
-  const types = tables.types
+  const [places, battles] = await Promise.all([loadPlaces(), loadBattles()])
   const T = battles.route.slice(1)
   const routes = [0, 1, 2].map(k => [...new Set(T.map(row => row[k]))])
   const cleared = p?.cleared ?? []
@@ -154,28 +153,20 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   // 팝업: 그 장소에서 치른 장 (번호·원작 제목·장소·갈래) → 다시 하기, 찾은 사건
   const showPopup = (ns: number[], first?: number, route?: number) => {
     // 장마다 한 줄. 세 갈래가 함께 지나는 장(16·19·26·36~43)은 판마다 기록이 있고 일행이 다르다 →
-    // 깬 갈래마다 다시 하기 버튼, 올리면 그 판에 함께한 동료 (목록의 갈래 줄에서 왔으면 그 갈래 버튼을 앞에·강조)
+    // "다시 하기" 옆에 깬 갈래마다 버튼 (목록의 갈래 줄에서 왔으면 그 갈래 버튼을 앞에·강조)
     const ns2 = [...new Set(cleared.filter(c => ns.includes(c.n)).map(c => c.n))].sort((a, b) => (b === first ? 1 : 0) - (a === first ? 1 : 0) || a - b)
     const recs = ns2.map(n => cleared.filter(c => c.n === n).sort((a, b) => (b.route === route ? 1 : 0) - (a.route === route ? 1 : 0) || a.route - b.route))
     const flat = recs.flat()
-    const crew = (c: Cleared) => (c.at?.party ?? []).map(t => types[t]?.name).filter(Boolean).join(' · ')
     const found = FOUND.filter(f => ns.includes(f.n) && p?.found?.includes(f.id))
     popup.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
       ${ns2.map((n, k) => `<div class="prow"><b>${n}장</b><span>「${places[n - 1].title}」<small>${places[n - 1].name}${common(n) || recs[k].length > 1 ? '' : ` · ${ROUTE_TRAIL[recs[k][0].route]}`}</small></span>
-        ${recs[k].length === 1 ? `<button data-i="${flat.indexOf(recs[k][0])}" title="${crew(recs[k][0])}">다시 하기</button>`
-          : `<div class="via"><small>어느 길에서 온 판으로?</small>${recs[k].map(c => `<button data-i="${flat.indexOf(c)}" class="${c.route === route ? 'pri' : ''}">${ROUTE_TRAIL[c.route].replace(/ 길$/, '')}</button>`).join('')}</div>`}
+        ${recs[k].length === 1 ? `<button data-i="${flat.indexOf(recs[k][0])}">다시 하기</button>`
+          : `<div class="via"><span>다시 하기</span>${recs[k].map(c => `<button data-i="${flat.indexOf(c)}" class="${c.route === route ? 'pri' : ''}">${ROUTE_TRAIL[c.route]}</button>`).join('')}</div>`}
         </div>`).join('')}
-      <p class="crew" hidden></p>
       ${found.map(f => `<p>✓ ${f.label}</p>`).join('')}
       <button class="x">닫기</button>`
     popup.hidden = false
-    const crewLine = popup.querySelector<HTMLElement>('.crew')!
-    popup.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => {
-      const c = flat[Number(b.dataset.i)]
-      b.onclick = () => play(c)
-      b.onmouseenter = b.onfocus = () => { crewLine.hidden = false; crewLine.textContent = `${c.n}장 · ${ROUTE_TRAIL[c.route]} 판의 일행: ${crew(c) || '기록 없음'}` }
-      b.onmouseleave = b.onblur = () => { crewLine.hidden = true }
-    })
+    popup.querySelectorAll<HTMLButtonElement>('[data-i]').forEach(b => b.onclick = () => play(flat[Number(b.dataset.i)]))
     popup.querySelector<HTMLButtonElement>('.x')!.onclick = hidePopup
     popup.querySelector<HTMLButtonElement>('[data-i]')?.focus()
   }
