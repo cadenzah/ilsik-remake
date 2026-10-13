@@ -143,7 +143,9 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .wmap.list .mapbox { transform: translate(4px, 52px) scale(.725); }
 #titlescreen .wmap .map, #titlescreen .wmap .paths { position: absolute; inset: 0; width: 640px; height: 480px; }
 #titlescreen .wmap .paths { pointer-events: none; }
-#titlescreen .wmap .paths polyline { fill: none; stroke: #7a1c10; stroke-width: 2.5; stroke-dasharray: 2 6; stroke-linecap: round; }
+#titlescreen .wmap .paths polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#titlescreen .wmap .paths .under { stroke: #fff3c8; stroke-width: 7; opacity: .55; }   /* 밝은 바탕 띠: 어두운 지형 위에서도 보이게 */
+#titlescreen .wmap .paths .trail { stroke: #8a1407; stroke-width: 4; stroke-dasharray: .1 8; }   /* 둥근 점 */
 #titlescreen .wmap .dim { position: absolute; inset: 0; background: rgba(20, 10, 0, .62); opacity: 0; transition: opacity .15s; pointer-events: none; }
 #titlescreen .wmap.focus .dim { opacity: 1; }
 #titlescreen .wmap .labels { position: absolute; inset: 0; }
@@ -157,9 +159,9 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .place.next { animation: placepulse 1.6s ease-in-out infinite; pointer-events: none; }
 @keyframes placepulse { 0%, 100% { filter: drop-shadow(0 0 0 #fff0a0); opacity: .6 } 50% { filter: drop-shadow(0 0 6px #fff0a0); opacity: 1 } }
 #titlescreen .wmap .hero { position: absolute; width: 56px; height: 48px; background-repeat: no-repeat; background-position: 0 0; pointer-events: none;
-  image-rendering: pixelated; animation: herobob 1.2s ease-in-out infinite;
+  image-rendering: pixelated; animation: herobob 2.6s ease-in-out infinite;
   filter: drop-shadow(1px 0 0 #3a2208) drop-shadow(-1px 0 0 #3a2208) drop-shadow(0 1px 0 #3a2208) drop-shadow(0 -1px 0 #3a2208) drop-shadow(0 3px 2px rgba(0, 0, 0, .6)); }
-@keyframes herobob { 50% { transform: translateY(-2px); } }
+@keyframes herobob { 50% { transform: translateY(-4px); } }
 #titlescreen .wmap .hplace { position: absolute; padding: 2px 8px; background: #faeec8; border: 2px solid #96701e; border-radius: 3px; color: #6e3c0a; font-size: 12px; white-space: nowrap; }
 #titlescreen .wmap .sun { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 #titlescreen .wmap .sun i { display: block; width: 36px; height: 36px; margin: 6px auto 8px; border-radius: 50%; background: radial-gradient(#ffe27a, #ffb32c 60%, #c06a10);

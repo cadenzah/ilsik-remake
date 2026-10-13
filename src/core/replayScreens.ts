@@ -15,7 +15,7 @@ const nav = (extra = '') => `<nav>${extra}<button data-go="0" class="close">돌�
  *  - "지도만 보기" = 목록과 어둠을 걷고 지도 전체. 진엔딩(45 클리어) 뒤엔 숨은 장소 이름표와 떠오른 해 */
 const ROUTE_TRAIL = ['혼탁한 호수 길', '암흑동굴 길', '옛 신전 길']   // 원작 진로 메뉴 문구 (0aa2:0b0d)
 const HIDDEN_PLACE: Record<number, { name: string; title: string; x: number; y: number }> = {
-  44: { name: '아도 왕성', title: '반란의 밤', x: 455, y: 335 }, 45: { name: '국경 마을', title: '레스다의 과거', x: 30, y: 262 } }
+  44: { name: '아도 왕성', title: '반란의 밤', x: 498, y: 240 } /* 사바카의 궁전 오른쪽 위 빈 바다 */, 45: { name: '국경 마을', title: '레스다의 과거', x: 30, y: 262 } }
 
 export async function chapterMap(page: HTMLElement, p: Progress | null,
   play: (c: Cleared) => void, hidden: (n: number) => void, close: () => void) {
@@ -57,7 +57,7 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   page.innerHTML = `<div class="wmap list">
       <div class="mapbox">
         <img class="map" src="${A}/ui/worldmap.png" alt="아모스 대륙 지도">
-        <svg class="paths" viewBox="0 0 640 480"><polyline points="${pts.map(q => q.join(',')).join(' ')}"/></svg>
+        <svg class="paths" viewBox="0 0 640 480">${['under', 'trail'].map(c => `<polyline class="${c}" points="${pts.map(q => q.join(',')).join(' ')}"/>`).join('')}</svg>
         <div class="dim"></div>
         <div class="labels"></div>
       </div>
@@ -103,6 +103,8 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
     for (const n of HIDDEN) {
       const h = HIDDEN_PLACE[n], q = nudge({ x: h.x, y: h.y, w: 12 * (h.name.length + h.title.length) + 30, h: 20 })
       labels.insertAdjacentHTML('beforeend', `<span class="hplace" style="left:${q.x}px;top:${q.y}px">${h.name} · ${h.title}</span>`)
+      const e = labels.lastElementChild as HTMLElement   // 실제 폭으로 지도 안에 들인다
+      e.style.left = `${Math.max(4, Math.min(q.x, 636 - e.offsetWidth))}px`
     }
     labels.insertAdjacentHTML('beforeend', '<span class="sun" title="일식이 걷히다"><i></i><b>일식이 걷히다</b></span>')
   }
