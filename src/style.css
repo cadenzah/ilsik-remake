@@ -137,23 +137,34 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .page nav button:disabled { opacity: .35; cursor: default; }
 #titlescreen .page nav .close { position: absolute; right: 12px; }
 #titlescreen .page img { width: 640px; height: 480px; }
-/* 장 지도·도감 (개선판, replayScreens.ts) — 640×480 안 */
-#titlescreen .cmap, #titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px; color: #c8c8bc; font-size: 12px; overflow: auto; }
-#titlescreen .cmap h2, #titlescreen .codex h2 { margin: 0 0 6px; font-size: 16px; color: var(--gold); font-weight: 400; }
-#titlescreen .cmap .ends { position: absolute; right: 16px; top: 12px; color: #6c6c64; }
-#titlescreen .cmap .ends b { font-weight: 400; margin-left: 4px; } #titlescreen .cmap .ends b.on { color: var(--gold); }
-#titlescreen .cmap .line, #titlescreen .cmap .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
-#titlescreen .cmap .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
-#titlescreen .cmap .col { border: 1px solid #3c3c34; border-radius: 4px; padding: 4px 6px; }
-#titlescreen .cmap h3 { margin: 0; font-size: 12px; font-weight: 400; color: #9c9c90; }
-#titlescreen .chip { all: unset; box-sizing: border-box; width: 56px; height: 34px; border: 1px solid #3c3c34; border-radius: 3px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #5c5c54; font-size: 12px; line-height: 1.2; }
-#titlescreen .chip small { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52px; }
-#titlescreen .chip.on { cursor: pointer; color: #e8e6df; border-color: #6c846c; background: #1c241c; }
-#titlescreen .chip.on:hover, #titlescreen .chip.on:focus-visible { border-color: var(--gold); }
-#titlescreen .chip.hidden { border-style: dashed; }
-#titlescreen .cmap .found { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: #9cc49c; }
-#titlescreen .cmap .found .missed { color: #6c6c64; }
+/* 장 지도 (개선판, replayScreens.chapterMap) — 원작 대륙 지도 640×480 위 */
+#titlescreen .wmap { position: absolute; inset: 0; }
+#titlescreen .wmap .map { position: absolute; inset: 0; width: 640px; height: 480px; }
+#titlescreen .wmap .paths { position: absolute; inset: 0; width: 640px; height: 480px; pointer-events: none; }
+#titlescreen .wmap .paths polyline { fill: none; stroke: #7a1c10; stroke-width: 2.5; stroke-dasharray: 2 5; stroke-linecap: round; opacity: .85; }
+#titlescreen .placebtn { all: unset; position: absolute; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(60, 30, 0, .6)); }
+#titlescreen .placebtn .place { position: relative; }
+#titlescreen .placebtn:hover, #titlescreen .placebtn:focus-visible { filter: drop-shadow(0 0 3px #fff6c0) brightness(1.1); }
+#titlescreen .place.next { animation: placepulse 1.6s ease-in-out infinite; pointer-events: none; }
+@keyframes placepulse { 0%, 100% { filter: drop-shadow(0 0 0 #fff0a0); opacity: .55 } 50% { filter: drop-shadow(0 0 6px #fff0a0); opacity: 1 } }
+#titlescreen .wmap .memory { position: absolute; left: 96px; top: 14px; display: flex; flex-direction: column; gap: 2px; padding: 4px 10px;
+  background: rgba(243, 227, 176, .92); border: 1px solid #6b4a1a; border-radius: 3px; color: #3c2a10; font-size: 12px; }
+#titlescreen .wmap .memory button { all: unset; cursor: pointer; color: #7a1c10; }
+#titlescreen .wmap .memory button:hover, #titlescreen .wmap .memory button:focus-visible { text-decoration: underline; }
+#titlescreen .wmap .scroll { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); min-width: 240px; max-width: 360px;
+  padding: 10px 16px; background: #f3e3b0; border: 2px solid #6b4a1a; border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, .6);
+  color: #3c2a10; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+#titlescreen .wmap .scroll[hidden] { display: none; }
+#titlescreen .wmap .scroll h3 { margin: 0 0 4px; font-size: 14px; font-weight: 400; color: #5a1a08; text-align: center; }
+#titlescreen .wmap .scroll button { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 2px 4px; }
+#titlescreen .wmap .scroll button small { color: #8a6a3a; }
+#titlescreen .wmap .scroll button:hover, #titlescreen .wmap .scroll button:focus-visible { background: rgba(122, 28, 16, .12); }
+#titlescreen .wmap .scroll button.x { justify-content: center; color: #8a6a3a; margin-top: 4px; }
+#titlescreen .wmap .scroll p { margin: 0; color: #2f5a1f; }
+
+/* 도감 (개선판) */
+#titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px; color: #c8c8bc; font-size: 12px; overflow: auto; }
+#titlescreen .codex h2 { margin: 0 0 6px; font-size: 16px; color: var(--gold); font-weight: 400; }
 #titlescreen .codex h3 { margin: 10px 0 4px; font-size: 13px; font-weight: 400; color: #9c9c90; }
 #titlescreen .codex h3 small { color: #6c6c64; }
 #titlescreen .codex .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -219,5 +230,11 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #camp .dlg .ok { left: 9px; } #camp .dlg .no { left: 67px; }
 #camp .dlg button:hover, #camp .dlg button:focus-visible { filter: brightness(1.12); }
 /* 화면 전환 페이드 (fade.ts) */
+/* 장 사이 대륙 지도 (worldmap.ts) — 640×480 을 화면에 맞게, 페이드 막 아래 */
+#worldmap { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; cursor: pointer; }
+#worldmap .stage { position: absolute; left: 50%; top: 50%; width: 640px; height: 480px; transform-origin: 50% 50%; }
+#worldmap .map { position: absolute; inset: 0; width: 640px; height: 480px; }
+#worldmap .place, #titlescreen .place { position: absolute; display: block; image-rendering: pixelated; }
+
 #fade { position: fixed; inset: 0; z-index: 1000; background: #000; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 #fade.on { opacity: 1; pointer-events: auto; }

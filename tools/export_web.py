@@ -83,6 +83,34 @@ def export_ui():
     for old in ('title.png', 'btn-new.png', 'btn-load.png', 'btn-quit.png'):
         if os.path.exists(os.path.join(d, old)): os.remove(os.path.join(d, old))
     export_camp()
+    export_worldmap()
+
+
+# 원작 장소 이름 (ECLIPSE.SCR 0~42 이름표 그림을 옮겨 적음, 칸 n = n+1장)
+PLACES = ['페얼촌', '바하라무성', '지하신전', '아츠리스 동굴', '아츠리스 동굴안', '상지스 광장', '상지스 광장안', '고신전', '바하라무성',
+          '혼탁한 호수', '빙설암', '암흑동굴', '고신전 이층', '제신주랑', '북쪽의 다리', '하스가나 사막', '유하마을 밖', '망혼림', '염룡곡',
+          '신카루스 항구 밖', '카루스만', '신카루스 항구 안', '마카만', '고해', '해적섬', '성전기사당', '봉화대', '배신자의 묘', '배신자의 묘 안',
+          '악령의 언덕', '사형수의 섬', '색령대전', '거인리', '명신의 숲', '명신의 숲 안', '사바카성 밖', '봉인 신전', '사바카성 안', '수련회랑',
+          '수련자의 성', '마석의 탑', '호마신전', '사바카의 궁전']
+
+
+def export_worldmap():
+    """장 사이 대륙 지도 (원작 0aa2:2120, formats.md "대륙 지도"): worldmap.png = ECLIPSE.SCR 43 (640×480, 「亞摩斯大陸」),
+    places.png = 이름표 SCR 0~42 를 세로로 쌓은 시트 (투명 = 255번), data/worldmap.json = 장마다 {name, x, y (지도 위 좌상단, EXE DS:0x5c0·0x616), w, h, sy (시트 y)}"""
+    import exe
+    d = mkdir('ui')
+    Image.open(os.path.join(IMG, 'ECLIPSE.SCR', '043.png')).convert('RGB').save(os.path.join(d, 'worldmap.png'))
+    ims = [rgba(os.path.join(IMG, 'ECLIPSE.SCR', f'{i:03}.png')) for i in range(43)]
+    sheet = Image.new('RGBA', (max(im.width for im in ims), sum(im.height for im in ims)), (0, 0, 0, 0))
+    raw, ds = bytes(exe.img), exe.DS * 16
+    xs, ys = struct.unpack_from('<43H', raw, ds + 0x5c0), struct.unpack_from('<43H', raw, ds + 0x616)
+    places, y = [], 0
+    for i, im in enumerate(ims):
+        sheet.paste(im, (0, y))
+        places.append({'name': PLACES[i], 'x': xs[i], 'y': ys[i], 'w': im.width, 'h': im.height, 'sy': y})
+        y += im.height
+    sheet.save(os.path.join(d, 'places.png'))
+    json.dump({'places': places}, open(os.path.join(mkdir('data'), 'worldmap.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
 
 
 def export_camp():

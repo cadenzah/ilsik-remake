@@ -10,6 +10,7 @@ export const edition: Edition = {
   order,
   planFor,
   features: { threat: false, forecast: false, quickAttack: false, commandFirst: true, autoRest: false, originalCamp: true },
-  // 원작 선택지 문구는 그래픽이라 아직 못 읽었다 (story.md) — 그때까지 중립 표기
-  routeLabels: ['첫째 길', '둘째 길', '셋째 길'],
+  // 원작 진로 메뉴 (0aa2:0b0d, DS:0x9ae~): 메뉴 순서 암흑동굴(B)·혼탁한호수(A)·옛 신전(C)
+  routeLabels: ['혼탁한호수', '암흑동굴', '옛 신전'],
+  routeOrder: [1, 0, 2],
 }

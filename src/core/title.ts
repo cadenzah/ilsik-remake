@@ -20,12 +20,6 @@ const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'remake', name: '개선판', desc: '편의 기능, 다듬은 이야기' },
 ]
 const ROUTE = ['A', 'B', 'C']
-// 개선판 장 카드의 장소 이름 (장 지도용). 개선판 대본은 판 모듈에 있어 필요할 때만 불러온다
-const remakeCards = async () => {
-  const { edition } = await import('../editions/remake')
-  return new Map(Object.entries(edition.script?.files ?? {}).map(([path, src]) =>
-    [Number(/(\d+)\.ecs$/.exec(path)?.[1]), /^card ([^|\n]+)/m.exec(src)?.[1].trim() ?? ''] as [number, string]))
-}
 const chapterName = (n: number, route: number) => stageDef(n, route).title + (n >= 10 ? ` (${ROUTE[route]} 길)` : '')
 
 // 로고 연출은 페이지를 열 때마다. 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
@@ -170,7 +164,7 @@ export function showTitle(): Promise<Launch> {
     const openPage = () => { pageAt = -2; win.hidden = true; page.hidden = false }
     const openMap = async () => {
       openPage()
-      await chapterMap(page, loadProgress(ed), await remakeCards(), c => launch(stageDef(c.n, c.route), c.at),
+      await chapterMap(page, loadProgress(ed), c => launch(stageDef(c.n, c.route), c.at),
         n => launch(stageDef(n, 0), { flags: [], party: [], items: [] }), closeCredits)   // 숨은 장: 일행은 그 장 데이터가 정한다
     }
     const openCodex = async () => { openPage(); await codex(page, loadProgress(ed), closeCredits) }

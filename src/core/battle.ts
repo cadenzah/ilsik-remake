@@ -9,6 +9,7 @@ import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
 import { recordClear, recordRun } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
+import { travelMap } from './worldmap'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
@@ -81,6 +82,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
     atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
   }
+  if (def.campaign) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
   Object.assign(S, placements(rec))
   S.reward = rec.reward
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
@@ -334,7 +336,7 @@ function cleared(ending: boolean) {
   const extraNext = S.ed.extraBattles?.[def.n]?.next
   if (extraNext) buttons.push(['다음 장', () => void boot(S.ed, stageDef(extraNext, 0))])
   else if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
-    showResult('진로 선택', '어느 길로 갈까?', S.ed.routeLabels.map((l, r): [string, () => void] => [l, () => go(next.choose[r], r)]))])
+    showResult('진로 선택', '어느 길로 갈까?', (S.ed.routeOrder ?? [0, 1, 2]).map((r): [string, () => void] => [S.ed.routeLabels[r], () => go(next.choose[r], r)]))])
   buttons.push(['다시 하기', () => void start()], ['타이틀로', toTitle])
   showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons)
 }

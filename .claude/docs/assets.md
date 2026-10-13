@@ -16,7 +16,7 @@
 - `ECLIPSE.EQU` 182 × 48×56 — 장비 아이콘 추정
 - `ECLIPSE.INS` 57 × 48×48 — 도구 아이콘 추정
 - `ECPMAG.MRK` 92 × 32×40 — 마법 아이콘 추정
-- `ECLIPSE.SCR` 87 × 가변×22 — UI 글자/버튼 이미지 추정
+- `ECLIPSE.SCR` 87 — 0~42 장소 이름표, **43 대륙 지도 640×480**, 44~86 장 제목 띠 (확인, formats.md "대륙 지도")
 - `ECLIPSE.STA` 17, `ECLIPSE.OTH` 9, `ECLIPSE.MAR` 11 — UI 부품 추정
 - `ECLIPSE.WIN` 3, `ECLIPSE.BS` 3, `ECLIPSE.780` 14 × 640×480 — 화면 배경 추정
 - `ECPnn.MOV/FIG/MAG` (00~10) — 유닛 종류별 이동/공격/마법 애니메이션 (확인, formats.md)
@@ -31,6 +31,7 @@
 - `portraits/NNN.png` 초상화 96×111
 - `ui/` 메인 메뉴: mark0·mark1 (ECPMARK.MAR 0·1), staff·publish (ECPPLANE.ECP 0·1), menu-frame (MAIN.ECP face 9조각 합본), thunder.wav (ECPMARK.FVT 1). `export_web.py ui` 로 따로 생성
 - `ui/` 정비 화면 (camp.ts): camp-bg (ECPMAI tactics 창틀 + WIN 2), camp-status (WIN 1), camp-face·camp-mini (BS 1·2, 칸 = 유닛 0~28), equip (EQU 182, 칸 = 품목 id−1), camp-por (POR 투명 배경, 12열), magic-icons (MAR 9, 칸 = MAD id), status-icons (OTH 0·1). `export_web.py ui` 에 포함 (magic/status 아이콘은 `icons`)
+- `ui/worldmap.png` 대륙 지도 (SCR 43), `ui/places.png` 장소 이름표 시트, `data/worldmap.json` 장마다 {name, x, y, w, h, sy} — 장 사이 지도(worldmap.ts)·개선판 장 지도
 - `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`
