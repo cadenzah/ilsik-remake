@@ -188,23 +188,34 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
 export async function codex(page: HTMLElement, p: Progress | null, close: () => void) {
   const t = await loadTables()
   const seen = new Set(p?.seen?.units ?? []), items = new Set(p?.seen?.items ?? [])
-  const groups: [string, (id: number) => boolean][] = [['동료', id => id < 29], ['적', id => id >= 29 && id < 100], ['그 밖의 인물', id => id >= 100]]
-  const unitCell = (id: number) => {
-    const u = t.types[id]
-    return `<div class="cell"><img src="${portraitUrl(u.por)}" alt=""><div><b>${u.name}</b>
-      <small>Lv ${u.lv} · ${t.labels.job[u.job] ?? ''} · HP ${u.hp}</small></div></div>`
+  // 같은 이름 = 한 인물 (성장·전직·적으로 나온 모습은 유닛 번호·초상이 따로 — 아리크스 0·1, 채스 6·92, 소피아 27·28·94 등).
+  // 묶음은 그 이름의 가장 작은 번호로 (채스·소피아는 적으로도 나오지만 동료)
+  const forms = new Map<string, number[]>()
+  for (const u of t.types) forms.set(u.name, [...forms.get(u.name) ?? [], u.id])
+  const groupOf = (name: string) => { const id = forms.get(name)![0]; return id < 29 ? 0 : id < 100 ? 1 : 2 }
+  const groups = ['동료', '적', '그 밖의 인물']
+  const personCell = (name: string) => {
+    const all = forms.get(name)!.filter(id => seen.has(id)).map(id => t.types[id]).sort((a, b) => a.lv - b.lv || a.id - b.id)
+    const top = all.reduce((a, b) => b.lv > a.lv ? b : a)   // 초상·HP 는 가장 자란 모습
+    const lv = all[0].lv === top.lv ? `${top.lv}` : `${all[0].lv}~${top.lv}`
+    const jobs = [...new Set(all.map(u => t.labels.job[u.job] ?? ''))].filter(Boolean).join('→')
+    // 수치가 같은 모습(촌민 108·110, 사바카 98·99)은 하나로
+    const lines = [...new Set(all.map(u => `Lv ${u.lv} ${t.labels.job[u.job] ?? ''} HP ${u.hp}`))]
+    const us = lines.length > 1 ? all : [top]
+    const tip = us.length > 1 ? ` title="${lines.join('\n')}"` : ''
+    return `<div class="cell"${tip}><img src="${portraitUrl(top.por)}" alt=""><div><b>${name}</b>
+      <small>Lv ${lv} · ${jobs}${us.length > 1 ? '' : ` · HP ${top.hp}`}</small></div></div>`
   }
-  // 같은 이름·초상화(일반 병사 등)는 한 번만
-  const uniq = (ids: number[]) => ids.filter((id, i) => ids.findIndex(j => t.types[j].name === t.types[id].name && t.types[j].por === t.types[id].por) === i)
-  const ids = [...seen].sort((a, b) => a - b)
+  const names = [...forms.keys()]
+  const met = names.filter(n => forms.get(n)!.some(id => seen.has(id)))
   const itemCats: [string, number][] = [['무기', 0], ['방어구', 1], ['도구', 2]]
   const allItems = [...t.items.values()]
   page.innerHTML = `<div class="codex">
       <h2>도감</h2>
-      ${groups.map(([title, f]) => {
-        const list = uniq(ids.filter(f))
-        const total = uniq(t.types.map(u => u.id).filter(f)).length
-        return `<h3>${title} <small>${list.length} / ${total}</small></h3><div class="cells">${list.map(unitCell).join('') || '<p>아직 없음</p>'}</div>`
+      ${groups.map((title, g) => {
+        const list = met.filter(n => groupOf(n) === g)
+        const total = names.filter(n => groupOf(n) === g).length
+        return `<h3>${title} <small>${list.length} / ${total}</small></h3><div class="cells">${list.map(personCell).join('') || '<p>아직 없음</p>'}</div>`
       }).join('')}
       ${itemCats.map(([title, cat]) => {
         const list = allItems.filter(i => i.cat === cat && items.has(i.id))
