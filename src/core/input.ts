@@ -1,7 +1,8 @@
 // 마우스·키보드 입력
 import { actionMenu, back, commandMenu, doAttack, endPlayerStep, restPrompt, select, toTitle, walk } from './battle'
 import { attackSpots, dist, inRange, key, pathTo, terrainName } from './grid'
-import { canvas, clampCam, toTile } from './render'
+import { canvas, clampCam, toScreen, toTile } from './render'
+import { TW, TH } from './data'
 import { canCommand, S, unitAt } from './state'
 import { showCard, showForecast, showResult, ui } from './ui'
 import type { Pos } from './unit'
@@ -48,7 +49,10 @@ function onHover(t: Pos | null, sx: number, sy: number) {
   S.hover = t
   if (!t) { showCard(null, null); showForecast(null, null); return }
   const there = unitAt(t.x, t.y)
-  showCard(there ?? null, terrainName(S.map, t.x, t.y), S.tables)
+  // 정보 창이 가리킨 칸·선택한 유닛을 가리지 않게
+  const md0 = S.mode, cell = (p: Pos) => { const { sx, sy } = toScreen(p.x, p.y); return { x: sx, y: sy, w: TW * S.cam.scale, h: TH * S.cam.scale } }
+  const avoid = [cell(t), ...(md0.kind === 'selected' || md0.kind === 'targeting' ? [cell(md0.unit)] : [])]
+  showCard(there ?? null, terrainName(S.map, t.x, t.y), S.tables, avoid)
   const md = S.mode
   const aim = S.ed.features.forecast && there?.side === 'enemy' && (
     (md.kind === 'selected' && attackSpots(md.unit, md.moves, there).length > 0) ||

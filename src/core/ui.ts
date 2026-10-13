@@ -20,7 +20,11 @@ function loadout(u: Unit, t: Tables): string {
   return row('장비', eq) + row('마법', mg)
 }
 
-export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
+export type Rect = { x: number; y: number; w: number; h: number }
+const CARD_SPOTS = ['bl', 'br', 'tr'] as const   // 왼쪽 아래 (기본) → 오른쪽 아래 → 오른쪽 위
+
+/** 유닛·지형 정보 창. avoid = 가리면 안 되는 화면 영역 (가리킨 칸, 선택한 유닛) → 겹치지 않는 구석으로 옮긴다 */
+export function showCard(u: Unit | null, terrain: string | null, t?: Tables, avoid: Rect[] = []) {
   if (!u && !terrain) { ui.card.hidden = true; return }
   ui.card.hidden = false
   const npc = !!u && u.side === 'ally' && u.troop !== 0   // 같은 편 NPC 부대, 컴퓨터 조종
@@ -36,6 +40,16 @@ export function showCard(u: Unit | null, terrain: string | null, t?: Tables) {
        </div>
        <div class="terrain">${terrain ?? ''}${u.acted ? ' · 행동 완료' : ''}</div>`
     : `<div class="terrain" style="border:0;padding:0">${terrain}</div>`
+  placeCard(avoid)
+}
+
+function placeCard(avoid: Rect[]) {
+  const w = ui.card.offsetWidth, h = ui.card.offsetHeight, m = 12, top = 52
+  const at = (s: typeof CARD_SPOTS[number]): Rect => ({
+    x: s === 'bl' ? m : innerWidth - m - w, y: s === 'tr' ? top : innerHeight - m - h, w, h })
+  const hits = (a: Rect) => avoid.some(b => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h)
+  const spot = CARD_SPOTS.find(s => !hits(at(s))) ?? 'bl'
+  ui.card.classList.add(`at-${spot}`)
 }
 
 /** 피해 예측. range = 판 규칙의 피해 범위 */
