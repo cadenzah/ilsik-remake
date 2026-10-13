@@ -30,6 +30,7 @@ const TOOL = { x: 530, w: 18, trash: [128, 37], put: [192, 25], take: [238, 25] 
 const MINI = 29   // BS 얼굴 수 (유닛 0~28). 그 밖의 유닛은 이동 그림 첫 장으로
 
 const PAGE_HELP = {
+  intro: '대기인물 클릭: 출전\n출전인물 클릭: 빼기\n행동·Enter: 출발',
   read: '장을 마칠 때마다 자동 기록. 이어하기는 타이틀의 지난흔적.',
   music: '음악은 아직 없습니다.',
   swap: '출전 편성: 대기인물을 눌러 출전에 넣는다.',
@@ -319,7 +320,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     drawItems()
     draw()
     void fadeIn()
-    if (o.remake) say('대기인물 클릭 = 출전, 출전인물 클릭 = 빼기. 행동(Enter) = 출발 확인')
+    if (o.remake) say(PAGE_HELP.intro)
   })
 }
 

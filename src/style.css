@@ -244,7 +244,8 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #camp .b { font-weight: 700; }
 #camp .txt.pos { color: #0000aa; text-shadow: -1px 0 #5555ff; }
 #camp .txt.neg { color: #aa0000; text-shadow: -1px 0 #ff5555; }
-#camp .desc .say { position: static; width: 152px; margin: 4px 6px; font-size: 12px; line-height: 16px; color: #000; text-shadow: -1px 0 #aaa; }
+#camp .desc .say { position: static; width: 152px; margin: 4px 6px; font-size: 12px; line-height: 16px; color: #000; text-shadow: -1px 0 #aaa; 
+  white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }   /* 칸 = 3줄 */
 #camp .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
 #camp .spr { display: block; }
 #camp .por { display: block; background: url(/assets/ui/camp-por.png); }
