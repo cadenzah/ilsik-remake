@@ -171,7 +171,7 @@ export function showTitle(): Promise<Launch> {
     const openMap = async () => {
       openPage()
       await chapterMap(page, loadProgress(ed), await remakeCards(), c => launch(stageDef(c.n, c.route), c.at),
-        n => launch(stageDef(n, 0, true), progressCamp(loadProgress(ed)!)), closeCredits)
+        n => launch(stageDef(n, 0), { flags: [], party: [], items: [] }), closeCredits)   // 숨은 장: 일행은 그 장 데이터가 정한다
     }
     const openCodex = async () => { openPage(); await codex(page, loadProgress(ed), closeCredits) }
 

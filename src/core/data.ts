@@ -92,6 +92,12 @@ export type CondDo = 'win' | 'lose' | 'ending' | { state: [number[], number] } |
 export interface CondRule { if: CondIf; do: CondDo[] }
 /** 턴 시작 이벤트 (tools/cond.py TURN, 원작 124e:e0a5). turn·route·flag 가 맞으면 do 실행.
  *  area = [부대, 칸 목록]: 매 턴 일행 대원이 그 칸에 있으면 그 부대 상태 0 (37장 숨은 부대) */
+/** 개선판이 더하는 전투 (진엔딩 숨은 장, content/remake/battles/NN.json). 원작 맵을 다시 쓰고 배치·조건은 새로.
+ *  party = 고정 일행 (장 사이 상태와 따로), next = 이긴 뒤 이어지는 장, 마지막 장은 cond 에 "ending" */
+export interface ExtraBattle {
+  title: string; map: number; party: number[]; items?: number[]
+  record: BattleRecord; cond: CondRule[]; turn?: TurnEvent[]; next?: number
+}
 export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
 export interface Battles {
   route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]>; turn: Record<string, TurnEvent[]>

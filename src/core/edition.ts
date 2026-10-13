@@ -1,6 +1,6 @@
 // 판(에디션) 인터페이스. 엔진(core)은 공통이고, 규칙·행동 순서·AI·편의 기능은 판마다 다르다 (.claude/docs/editions.md)
 import type { ScriptSource } from './script'
-import type { Item, StageMap, UnitType } from './data'
+import type { ExtraBattle, Item, StageMap, UnitType } from './data'
 import type { Pos, Unit } from './unit'
 
 export interface Rules {
@@ -37,4 +37,6 @@ export interface Edition {
   script?: ScriptSource
   /** 9장 후 진로 선택지 문구 (루트 A·B·C) */
   routeLabels: [string, string, string]
+  /** 판이 더하는 전투 (장 번호 → 배치). 개선판 숨은 장 */
+  extraBattles?: Record<number, ExtraBattle>
 }

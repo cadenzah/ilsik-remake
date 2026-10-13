@@ -1,0 +1,21 @@
+{
+  "title": "반란의 밤",
+  "map": 36,
+  "party": [18, 13, 24],
+  "record": {
+    "slots": [[9, 6], [8, 6], [10, 6]],
+    "npc": [],
+    "npcState": 0,
+    "groups": [
+      { "active": 3, "units": [{ "type": 96, "at": [9, 2] }, { "type": 50, "at": [8, 3] }, { "type": 50, "at": [10, 3] }] },
+      { "active": 0, "units": [{ "type": 50, "at": [4, 11] }, { "type": 50, "at": [14, 11] }, { "type": 54, "at": [9, 11] }, { "type": 50, "at": [5, 12] }, { "type": 54, "at": [13, 12] }] },
+      { "active": 1, "units": [{ "type": 52, "at": [6, 17] }, { "type": 52, "at": [13, 17] }, { "type": 29, "at": [8, 21] }, { "type": 29, "at": [10, 21] }] },
+      { "active": 4, "units": [{ "type": 52, "at": [3, 4] }, { "type": 52, "at": [15, 4] }, { "type": 50, "at": [9, 3] }] }
+    ],
+    "treasure": [],
+    "reward": []
+  },
+  "cond": [{ "if": { "reach": [9, 29] }, "do": ["win"] }],
+  "turn": [{ "turn": 3, "do": [{ "state": [[4], 0] }] }],
+  "next": 45
+}

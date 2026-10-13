@@ -56,17 +56,20 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   await fadeOut()   // 결과 화면·타이틀에서 넘어올 때 (이미 어두우면 바로)
   S.ed = ed
   S.def = def
-  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(def.n), loadBattles(), loadScenes()])
+  const extra = ed.extraBattles?.[def.n]   // 개선판 숨은 장: 원작 맵 재사용 + 새 배치·고정 일행
+  if (extra) S.def = def = { ...def, title: `숨은 장 · ${extra.title}` }
+  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes()])
   S.tables = tables
   S.types = tables.types
   initScript(ed.script, tables.types)
   S.scenes = scenes
   S.routeTable = battles.route
-  if (camp !== undefined) restore(camp)
+  if (extra) restore({ flags: [], party: extra.party, items: extra.items ?? [] })
+  else if (camp !== undefined) restore(camp)
   if (camp === null) askDeploy = false
   if (!PARTY.length) PARTY.push(...scenes.party)
   atStart = snapshot()
-  const rec = battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
+  const rec = extra?.record ?? battles.records[`${def.n}-${def.route}`] ?? battles.records[[0, 1, 2].map(r => `${def.n}-${r}`).find(k => k in battles.records)!]
   // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
@@ -80,8 +83,8 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   }
   Object.assign(S, placements(rec))
   S.reward = rec.reward
-  S.cond = battles.cond[def.n] ?? []
-  S.turnEv = battles.turn[def.n] ?? []
+  S.cond = extra?.cond ?? battles.cond[def.n] ?? []
+  S.turnEv = extra?.turn ?? battles.turn[def.n] ?? []
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas
@@ -266,7 +269,7 @@ export async function checkEnd(): Promise<boolean> {
   if (!result) return false
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, done.notes)
-  if (result === 'ending') await epilogue(aliveMember)
+  if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) await epilogue(aliveMember)   // 숨은 장의 엔딩(진엔딩)은 그 장 대본이 맡는다
   else await banter('win')   // 전투 후 장면 뒤 (보스의 마지막 말 다음). 마지막 전투는 에필로그만
   cleared(result === 'ending')
   return true
@@ -328,7 +331,9 @@ function cleared(ending: boolean) {
     void boot(S.ed, stageDef(n, route, true))
   }
   const buttons: [string, () => void][] = []
-  if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
+  const extraNext = S.ed.extraBattles?.[def.n]?.next
+  if (extraNext) buttons.push(['다음 장', () => void boot(S.ed, stageDef(extraNext, 0))])
+  else if (def.campaign && next) buttons.push(['다음 장', 'n' in next ? () => go(next.n, next.route) : () =>
     showResult('진로 선택', '어느 길로 갈까?', S.ed.routeLabels.map((l, r): [string, () => void] => [l, () => go(next.choose[r], r)]))])
   buttons.push(['다시 하기', () => void start()], ['타이틀로', toTitle])
   showResult(ending ? '엔딩' : '승리', `${S.turn}턴 만에 ${def.title} 클리어${ending ? ' — 엔딩' : ''}`, buttons)

@@ -1,0 +1,20 @@
+{
+  "title": "레스다의 과거",
+  "map": 1,
+  "party": [18, 14],
+  "record": {
+    "slots": [[22, 1], [23, 1]],
+    "npc": [{ "type": 29, "at": [13, 9] }, { "type": 29, "at": [15, 10] }],
+    "npcState": 3,
+    "groups": [
+      { "active": 0, "units": [{ "type": 64, "at": [24, 11] }, { "type": 64, "at": [24, 12] }, { "type": 64, "at": [24, 13] }, { "type": 31, "at": [20, 15] }] },
+      { "active": 1, "units": [{ "type": 31, "at": [7, 5] }, { "type": 31, "at": [4, 6] }, { "type": 54, "at": [8, 14] }] },
+      { "active": 1, "units": [{ "type": 50, "at": [7, 13] }] },
+      { "active": 4, "units": [{ "type": 54, "at": [0, 7] }, { "type": 64, "at": [0, 10] }] }
+    ],
+    "treasure": [],
+    "reward": []
+  },
+  "cond": [{ "if": { "dead": [[4, 0]] }, "do": ["ending"] }],
+  "turn": [{ "turn": 4, "do": [{ "state": [[5], 0] }] }]
+}
