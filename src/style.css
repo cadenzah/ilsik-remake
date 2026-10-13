@@ -271,7 +271,8 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
   border-image: var(--btn) 0 8 fill / 0 8px stretch; font: 16px/25px var(--font); text-align: center; color: #000; }
 #camp .dlg .obtn:active { border-image-source: var(--btn-down); }
 #camp .dlg .obtn:hover, #camp .dlg .obtn:focus-visible { filter: brightness(1.12); }
-#camp .dlg .ok { left: 9px; } #camp .dlg .no { left: 67px; }
+#camp .dlg .ok { left: 9px; } #camp .dlg:not(.slots) .no { left: 67px; }
+#camp .dlg.slots .obtn { width: 100px; } #camp .dlg .obtn:disabled { color: #7a6a58; cursor: default; filter: saturate(.4); }
 /* 화면 전환 페이드 (fade.ts) */
 /* 장 사이 대륙 지도 (worldmap.ts) — 640×480 을 화면에 맞게, 페이드 막 아래 */
 #worldmap { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; cursor: pointer; }

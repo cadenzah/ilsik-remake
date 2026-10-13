@@ -12,7 +12,7 @@ import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './b
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, showBasic, showConditions } from './info'
 import { playDialogue } from './dialogue'
-import { recordClear, recordHidden, recordRun } from './save'
+import { loadSlots, recordClear, recordHidden, recordRun, writeSlot } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { travelMap } from './worldmap'
@@ -82,8 +82,18 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
   if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
-    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first })
+    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first,
+      slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
+        const base = snapshot(), rec = { ...base.equip }
+        equip.forEach((e, k) => { rec[PARTY[k]] = e })
+        writeSlot(ed.id, i, { n: def.n, route: def.route, title: chapterTitle(), at: Date.now(), camp: { ...base, items, equip: rec } })
+      } } })
     if (r.go === 'title') { toTitle(); return }
+    if (r.go === 'load') {   // 기록한 칸의 정비 화면부터
+      const s = loadSlots(ed.id)[r.slot]
+      if (s) { void boot(ed, stageDef(s.n, s.route, true), s.camp); return }
+    }
+    if (r.go !== 'battle') return
     S.deploy = r.deploy
     ITEMS.splice(0, ITEMS.length, ...r.items)
     r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
@@ -126,8 +136,7 @@ async function start() {
   closeAll()
   hideBasic()
   setTurn(1, null)
-  const card = chapter()?.card
-  setTitle(remake() && card && !S.ed.extraBattles?.[S.def.n] ? `${S.def.n}장 · ${card[0]}` : S.def.title)
+  setTitle(chapterTitle())
   centerOn(S.units[0])
   await fadeIn()
   if (remake()) await new Promise<void>(ok => showGoalsWin(ok))   // 장 카드 + 목표 (S2 제안 4, ux-proposal 16)
@@ -372,7 +381,7 @@ function cleared(ending: boolean) {
 }
 
 /** 진로선택 (원작 comma 창, 0aa2:0b0d: 암흑동굴·혼탁한호수·옛 신전 순). 개선판은 버튼마다 그 길의 목적을 설명 칸에 보이고 결정·취소로 확인 */
-function chooseRoute(): Promise<number> {
+export function chooseRoute(): Promise<number> {
   const order = S.ed.routeOrder ?? [0, 1, 2]
   const places = S.ed.routePlaces ?? S.ed.routeLabels
   return new Promise(ok => {
@@ -493,6 +502,12 @@ async function aiStep(units: Unit[]): Promise<boolean> {
 }
 
 // ---------- 화면 (띠·미니맵) ----------
+
+/** 장 이름: 개선판은 장 카드 장소 ("3장 · 지하 신전") */
+function chapterTitle() {
+  const card = chapter()?.card
+  return S.ed.id === 'remake' && card && !S.ed.extraBattles?.[S.def.n] ? `${S.def.n}장 · ${card[0]}` : S.def.title
+}
 
 const remake = () => !S.ed.features.commandFirst
 

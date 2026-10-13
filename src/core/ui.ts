@@ -57,7 +57,8 @@ export function openWin(o: WinOpts): HTMLElement {
   const dir = o.dir ?? 'col'
   const bw = o.btnW ?? Math.max(dir === 'col' ? 64 : 54, ...btns.map(b => textWidth(b[0]) + 16))
   const rowW = btns.length * bw + (btns.length - 1) * GAP
-  const w = Math.round(o.width ?? Math.max(dir === 'col' ? bw + 22 : rowW + 26, o.title ? textWidth(o.title) + 40 : 0, o.body ? 136 : 0, 86))
+  const minW = btns.length ? (dir === 'col' ? bw + 22 : rowW + 26) : 0
+  const w = Math.round(Math.max(minW, o.width ?? Math.max(o.title ? textWidth(o.title) + 40 : 0, o.body ? 136 : 0, 86)))
   // 본문 줄 수: <br> 줄마다 창 안쪽 너비로 접힌 줄 수
   const lines = o.body ? o.body.split('<br>').reduce((n, l) => n + Math.max(1, Math.ceil(textWidth(l.replace(/<[^>]+>/g, '').replace(/&\w+;/g, '_')) / (w - 24))), 0) : 0
   const bodyH = o.body ? (o.bodyH ?? lines * 18 + 8) : 0

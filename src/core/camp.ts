@@ -12,7 +12,7 @@ import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
-export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] } | { go: 'title' }
+export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] } | { go: 'title' } | { go: 'load'; slot: number }
 
 export interface CampOptions {
   party: UnitType[]   // 일행 (0번 = 선두, 뺄 수 없음)
@@ -21,6 +21,8 @@ export interface CampOptions {
   max: number         // 출전 상한 (원작 8 하드코딩, 웹은 출전 칸 수로도 자름)
   remake: boolean
   initial: number[]   // 개선판이 처음 채워 둘 출전 목록 (일행 인덱스)
+  /** 기록 3칸 (읽기·기록). list = 칸 이름 (빈 칸 null), save = 지금 정비 화면 상태를 그 칸에 */
+  slots?: { list: () => (string | null)[]; save: (i: number, items: number[], equip: UnitType['equip'][]) => void }
 }
 
 // 원작 좌표 (화면)
@@ -33,7 +35,8 @@ const MINI = 29   // BS 얼굴 수 (유닛 0~28). 그 밖의 유닛은 이동 �
 
 const PAGE_HELP = {
   intro: '대기인물 클릭: 출전\n출전인물 클릭: 빼기\n행동·Enter: 출발',
-  read: '장을 마칠 때마다 자동 기록. 이어하기는 타이틀의 지난흔적.',
+  read: '기록한 정비 화면을 불러온다.',
+  write: '지금 정비 화면을 기록한다 (3칸).',
   music: '음악은 아직 없습니다.',
   swap: '출전 편성: 대기인물을 눌러 출전에 넣는다.',
   swapRemake: '앞에서부터 다시 채운다.',
@@ -294,6 +297,23 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelector<HTMLButtonElement>('.ok')!.focus()
   }
 
+  /** 원작 「불러오기」·「자료저장」 창 (DOSBox c13·c14): 칸 이름 버튼 3개 (빈 칸 = 무기록) + 종료. needFull = 빈 칸은 못 고름 */
+  const slotWin = (title: string, pick: (i: number) => void, needFull = false) => {
+    const names = o.slots?.list() ?? []
+    const w = 124, bw = 100, h = 25 + 5 + 4 * 29 - 4 + 5 + 9
+    dialog = document.createElement('div')
+    dialog.className = 'dlg owin slots'
+    dialog.style.cssText = px(258, 150, w, h) + `;background-image:url(${winUrl('comma', w, h)})`
+    dialog.innerHTML = `<div class="t">${title}</div>` + [0, 1, 2].map(i =>
+      `<button class="obtn sl" data-i="${i}" style="${px((w - bw) / 2, 30 + i * 29, bw)}"${needFull && !names[i] ? ' disabled' : ''}>${esc(names[i] ?? '무기록')}</button>`).join('')
+      + `<button class="obtn no" style="${px((w - bw) / 2, 30 + 3 * 29, bw)}">종료</button>`
+    stage.append(dialog)
+    const close = () => { dialog?.remove(); dialog = null }
+    dialog.querySelectorAll<HTMLButtonElement>('.sl').forEach(b => { b.onclick = () => { close(); pick(Number(b.dataset.i)) } })
+    dialog.querySelector<HTMLButtonElement>('.no')!.onclick = close
+    dialog.querySelector<HTMLButtonElement>('.obtn:not(:disabled)')?.focus()
+  }
+
   return new Promise(done => {
     const finish = (r: CampResult) => {
       removeEventListener('resize', fit)
@@ -313,7 +333,12 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       draw()
     }
     const buttons: Record<string, () => void> = {
-      read: () => say(PAGE_HELP.read), write: () => say(PAGE_HELP.read), music: () => say(PAGE_HELP.music),
+      read: () => slotWin('불러오기', i => confirm('불러오기', 155, () => finish({ go: 'load', slot: i })), true),
+      write: () => slotWin('자료저장', i => confirm('자료저장', 155, () => {
+        o.slots?.save(i, [...items], party.map(t => t.equip))
+        say('기록했습니다.')
+      })),
+      music: () => say(PAGE_HELP.music),
       quit: () => confirm('주화면', 155, () => finish({ go: 'title' })),
       swap: () => {
         if (o.remake) sel = [...o.initial]
@@ -328,7 +353,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       const k = b.dataset.b!
       b.onclick = () => { if (!dialog) buttons[k]() }
       if (o.remake) {
-        const help = k === 'swap' ? PAGE_HELP.swapRemake : k === 'write' ? PAGE_HELP.read : PAGE_HELP[k as keyof typeof PAGE_HELP]
+        const help = k === 'swap' ? PAGE_HELP.swapRemake : PAGE_HELP[k as keyof typeof PAGE_HELP]
         if (help) b.onmouseenter = () => { if (!dialog) say(help) }
       }
     })

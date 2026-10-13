@@ -6,7 +6,7 @@
 import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
-import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId } from './save'
+import { lastEdition, loadProgress, loadSlots, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
@@ -118,8 +118,8 @@ export function showTitle(): Promise<Launch> {
       win.classList.remove('wide')
       rows([
         { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
-        { label: '지난흔적', title: p ? `이어하기 — ${chapterName(p.next.n, p.next.route)}부터` : '이어하기 — 저장된 진행 없음',
-          on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
+        { label: '지난흔적', title: p || loadSlots(ed).some(Boolean) ? '이어하기·기록 불러오기' : '저장된 진행 없음',
+          on: p || loadSlots(ed).some(Boolean) ? () => loadMenu() : undefined },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
           ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
@@ -139,6 +139,18 @@ export function showTitle(): Promise<Launch> {
         on: () => { setSetting(o.k, !setting(o.k)); applyFont(); settings(SETTINGS.indexOf(o)) } })),
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('.opt')[focus]?.focus()
+    }
+
+    // 지난흔적: 자동 기록 (장을 마칠 때마다) + 정비 화면 기록 3칸 (원작 「불러오기」)
+    const loadMenu = () => {
+      const p = loadProgress(ed)
+      win.classList.add('wide')
+      rows([
+        { label: p ? `이어하기 · ${chapterName(p.next.n, p.next.route)}` : '이어하기 (없음)', title: '장을 마칠 때마다 자동 기록',
+          on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
+        ...loadSlots(ed).map((s, i) => ({ label: s ? `기록 ${i + 1} · ${s.title}` : `기록 ${i + 1} · 무기록`, title: s ? new Date(s.at).toLocaleString() : '',
+          on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
+        { label: '돌아가기', cls: 'back', on: menu }])
     }
 
     // 클리어한 장 다시 하기 (진행 저장에는 영향 없음)

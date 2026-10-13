@@ -89,3 +89,23 @@ export function recordHidden(ed: EditionId, n: number) {
   p.hidden = [...new Set([...p.hidden ?? [], n])].sort((a, b) => a - b)
   store(ed, p)
 }
+
+// ---------- 기록 3칸 (원작 정비 화면 읽기·기록, 타이틀 지난흔적 — ux-proposal.md 21) ----------
+
+/** 정비 화면에서 남긴 기록: 그 장 정비 화면부터 다시 */
+export interface SaveSlot { n: number; route: number; title: string; camp: Camp; at: number }
+export const SLOTS = 3
+const slotKey = (ed: EditionId) => `eclipse.slots.${ed}`
+
+export function loadSlots(ed: EditionId): (SaveSlot | null)[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(slotKey(ed)) ?? '[]') as (SaveSlot | null)[]
+    return Array.from({ length: SLOTS }, (_, i) => raw[i] ?? null)
+  } catch { return Array(SLOTS).fill(null) }
+}
+
+export function writeSlot(ed: EditionId, i: number, slot: SaveSlot) {
+  const all = loadSlots(ed)
+  all[i] = slot
+  try { localStorage.setItem(slotKey(ed), JSON.stringify(all)) } catch { /* 저장 불가 */ }
+}
