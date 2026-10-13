@@ -11,6 +11,13 @@ export interface Progress {
   party?: number[]                       // 없으면 (옛 저장) 초기 일행
   items?: number[]
   equip?: Camp['equip']
+  // 다시 하기·진엔딩 (replay.ts, 개선판에서 씀)
+  branch?: Camp                          // 진로 선택 직전 장(9장)을 클리어한 상태
+  branchNext?: [number, number, number]  // 그 뒤 루트별 첫 장
+  endings?: number[]                     // 엔딩을 본 루트
+  found?: string[]                       // 찾은 조건 사건 (replay.FOUND id)
+  seen?: { units: number[]; items: number[] }   // 도감
+  carry?: { equip: Camp['equip']; items: number[] }   // 마지막 엔딩 때 장비 ("다른 길로" 이어받기)
 }
 
 /** 이어하기 상태 */
@@ -51,4 +58,26 @@ export function lastEdition(): EditionId {
 }
 export function setLastEdition(ed: EditionId) {
   try { localStorage.setItem(LAST_ED, ed) } catch { /* 무시 */ }
+}
+
+/** 판을 넘어 쌓이는 기록 (클리어마다). branchNext 가 있으면 지금 상태를 분기점으로, ending 이면 그 루트 엔딩과 이어받을 장비 */
+export function recordRun(ed: EditionId, r: { route: number; now: Camp; branchNext?: [number, number, number]; ending?: { carry: Progress['carry'] }
+  found: string[]; seenUnits: number[]; seenItems: number[] }) {
+  const p = loadProgress(ed) ?? { next: { n: 1, route: 0 }, cleared: [], flags: [] }
+  const union = (a: number[] = [], b: number[]) => [...new Set([...a, ...b])].sort((x, y) => x - y)
+  if (r.branchNext) { p.branch = r.now; p.branchNext = r.branchNext }
+  if (r.ending) { p.endings = union(p.endings, [r.route]); p.carry = r.ending.carry }
+  p.found = [...new Set([...p.found ?? [], ...r.found])]
+  p.seen = { units: union(p.seen?.units, r.seenUnits), items: union(p.seen?.items, r.seenItems.filter(Boolean)) }
+  store(ed, p)
+}
+
+/** "다른 길로": 분기점에서 그 루트 첫 장을 이어하기로 두고 시작 상태를 돌려준다 */
+export function startOtherRoad(ed: EditionId, route: number, camp: Camp): { n: number; route: number } | null {
+  const p = loadProgress(ed)
+  if (!p?.branchNext) return null
+  const next = { n: p.branchNext[route], route }
+  Object.assign(p, { next }, camp)
+  store(ed, p)
+  return next
 }

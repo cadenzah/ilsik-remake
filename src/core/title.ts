@@ -6,7 +6,9 @@
 import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
-import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, type EditionId } from './save'
+import { lastEdition, loadProgress, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId } from './save'
+import { ROUTE_NAMES, withCarry } from './replay'
+import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
 import { setSetting, setting, type Setting } from './settings'
 import { stageDef, type StageDef } from './stage'
@@ -18,6 +20,12 @@ const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'remake', name: '개선판', desc: '편의 기능, 다듬은 이야기' },
 ]
 const ROUTE = ['A', 'B', 'C']
+// 개선판 장 카드의 장소 이름 (장 지도용). 개선판 대본은 판 모듈에 있어 필요할 때만 불러온다
+const remakeCards = async () => {
+  const { edition } = await import('../editions/remake')
+  return new Map(Object.entries(edition.script?.files ?? {}).map(([path, src]) =>
+    [Number(/(\d+)\.ecs$/.exec(path)?.[1]), /^card ([^|\n]+)/m.exec(src)?.[1].trim() ?? ''] as [number, string]))
+}
 const chapterName = (n: number, route: number) => stageDef(n, route).title + (n >= 10 ? ` (${ROUTE[route]} 길)` : '')
 
 // 로고 연출은 페이지를 열 때마다. 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
@@ -118,7 +126,11 @@ export function showTitle(): Promise<Launch> {
         { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
         { label: '지난흔적', title: p ? `이어하기 — ${chapterName(p.next.n, p.next.route)}부터` : '이어하기 — 저장된 진행 없음',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
-        { label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' },
+        ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
+          { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
+          ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
+          { label: '도    감', on: p?.seen ? () => void openCodex() : undefined, title: p?.seen ? '만난 인물·손에 넣은 도구' : '기록 없음' },
+        ] : [{ label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' }],
         { label: '제 작 진', on: () => credits(0) },
         { label: '설 정', title: '글꼴·효과음', on: () => settings() },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
@@ -143,6 +155,25 @@ export function showTitle(): Promise<Launch> {
       rows([...list.map(c => ({ label: chapterName(c.n, c.route), on: () => launch(stageDef(c.n, c.route), c.at) })),
         { label: '돌아가기', cls: 'back', on: menu }])
     }
+
+    // 다른 길로: 분기점 상태 + 마지막 엔딩의 장비로 고른 루트의 첫 장부터 (이어하기도 그 판으로)
+    const otherRoad = () => {
+      const p = loadProgress(ed)!
+      win.classList.add('wide')
+      rows([...[0, 1, 2].map(r => ({ label: `${ROUTE[r]} · ${ROUTE_NAMES[r]}${p.endings?.includes(r) ? ' ✓' : ''}`,
+        title: p.endings?.includes(r) ? '엔딩을 본 길' : '아직 엔딩을 보지 못한 길',
+        on: () => { const camp = withCarry(p.branch!, p.carry); const next = startOtherRoad(ed, r, camp); if (next) launch(stageDef(next.n, r, true), camp) } })),
+        { label: '돌아가기', cls: 'back', on: menu }])
+    }
+
+    // 장 지도·도감 (개선판). page 를 쓰고 Esc·돌아가기로 메뉴로
+    const openPage = () => { pageAt = -2; win.hidden = true; page.hidden = false }
+    const openMap = async () => {
+      openPage()
+      await chapterMap(page, loadProgress(ed), await remakeCards(), c => launch(stageDef(c.n, c.route), c.at),
+        n => launch(stageDef(n, 0, true), progressCamp(loadProgress(ed)!)), closeCredits)
+    }
+    const openCodex = async () => { openPage(); await codex(page, loadProgress(ed), closeCredits) }
 
     // 원작 게임종료와 같은 제작진(ECPPLANE 0)·발행(ECPPLANE 1) 화면 + 팬 게임 고지. 이전·다음으로 넘긴다
     const PAGES = [`<img src="${A}/ui/staff.png" alt="원작 제작진">`, `<img src="${A}/ui/publish.png" alt="원작 발행 정보">`,
@@ -174,6 +205,7 @@ export function showTitle(): Promise<Launch> {
 
     // 메뉴: 위·아래 화살표로 항목 이동, Esc 로 돌아가기. 제작진: 좌·우 화살표로 이전·다음, Esc 로 돌아가기
     const onKey = (e: KeyboardEvent) => {
+      if (pageAt === -2) { if (e.key === 'Escape') closeCredits(); return }   // 장 지도·도감
       if (pageAt >= 0) {
         if (e.key === 'ArrowLeft' && pageAt > 0) credits(pageAt - 1)
         else if (e.key === 'ArrowRight' && pageAt < PAGES.length - 1) credits(pageAt + 1)

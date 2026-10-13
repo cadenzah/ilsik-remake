@@ -6,7 +6,8 @@ import { inRange, pathTo, reachable } from './grid'
 import { campScreen } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
-import { recordClear } from './save'
+import { recordClear, recordRun } from './save'
+import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, isNpc, S } from './state'
@@ -314,6 +315,14 @@ export const toTitle = () => {
 function cleared(ending: boolean) {
   const def = S.def, next = ending ? null : nextStage(def.n, def.route)
   if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, atStart, snapshot())
+  // 판을 넘는 기록: 분기점·엔딩·찾은 사건 (캠페인 진행일 때), 도감 (늘)
+  const now = snapshot(), camp = def.campaign
+  recordRun(S.ed.id, { route: def.route, now,
+    branchNext: camp && next && 'choose' in next ? next.choose : undefined,
+    ending: camp && ending ? { carry: carryOf(now, id => S.tables.items.get(id)?.cat) } : undefined,
+    found: camp ? FOUND.filter(f => now.party.includes(f.unit)).map(f => f.id) : [],
+    seenUnits: S.units.map(u => u.type.id),
+    seenItems: [...now.items, ...S.units.filter(u => u.troop === 0).flatMap(u => u.type.equip)] })
   const go = (n: number, route: number) => {
     if (def.campaign) recordClear(S.ed.id, def, { n, route }, atStart, snapshot())   // 진로 선택 결과를 남긴다
     void boot(S.ed, stageDef(n, route, true))

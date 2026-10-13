@@ -135,6 +135,33 @@ kbd { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-
 #titlescreen .page nav button:disabled { opacity: .35; cursor: default; }
 #titlescreen .page nav .close { position: absolute; right: 12px; }
 #titlescreen .page img { width: 640px; height: 480px; }
+/* 장 지도·도감 (개선판, replayScreens.ts) — 640×480 안 */
+#titlescreen .cmap, #titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px; color: #c8c8bc; font-size: 12px; overflow: auto; }
+#titlescreen .cmap h2, #titlescreen .codex h2 { margin: 0 0 6px; font-size: 16px; color: var(--gold); font-weight: 400; }
+#titlescreen .cmap .ends { position: absolute; right: 16px; top: 12px; color: #6c6c64; }
+#titlescreen .cmap .ends b { font-weight: 400; margin-left: 4px; } #titlescreen .cmap .ends b.on { color: var(--gold); }
+#titlescreen .cmap .line, #titlescreen .cmap .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+#titlescreen .cmap .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0; }
+#titlescreen .cmap .col { border: 1px solid #3c3c34; border-radius: 4px; padding: 4px 6px; }
+#titlescreen .cmap h3 { margin: 0; font-size: 12px; font-weight: 400; color: #9c9c90; }
+#titlescreen .chip { all: unset; box-sizing: border-box; width: 56px; height: 34px; border: 1px solid #3c3c34; border-radius: 3px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; color: #5c5c54; font-size: 12px; line-height: 1.2; }
+#titlescreen .chip small { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52px; }
+#titlescreen .chip.on { cursor: pointer; color: #e8e6df; border-color: #6c846c; background: #1c241c; }
+#titlescreen .chip.on:hover, #titlescreen .chip.on:focus-visible { border-color: var(--gold); }
+#titlescreen .chip.hidden { border-style: dashed; }
+#titlescreen .cmap .found { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: #9cc49c; }
+#titlescreen .cmap .found .missed { color: #6c6c64; }
+#titlescreen .codex h3 { margin: 10px 0 4px; font-size: 13px; font-weight: 400; color: #9c9c90; }
+#titlescreen .codex h3 small { color: #6c6c64; }
+#titlescreen .codex .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+#titlescreen .codex .cell { display: flex; gap: 6px; align-items: center; border: 1px solid #3c3c34; border-radius: 3px; padding: 3px; }
+#titlescreen .codex .cell img { width: 32px; height: 37px; object-fit: cover; }
+#titlescreen .codex .cell b { display: block; font-weight: 400; color: #e8e6df; }
+#titlescreen .codex .cell small { color: #8c8c80; font-size: 10px; }
+#titlescreen .codex .items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+#titlescreen .codex p { margin: 0; color: #6c6c64; }
+
 #titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: #fcfcfc; text-align: center; font: 16px/1.7 var(--font); }
 #titlescreen .notice h2 { font-size: 20px; margin: 0 0 18px; letter-spacing: 4px; }
