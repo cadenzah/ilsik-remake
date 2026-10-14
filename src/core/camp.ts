@@ -190,7 +190,16 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       `<span class="txt" style="${px(72, 22)}">${MAGIC_EFFECTS[m.effect] ?? ''}</span>` +
       `<span class="txt" style="${px(72, 41)}">피로 +${m.fatigue}</span>`
   }
-  const say = (text: string) => { desc.innerHTML = `<p class="say">${esc(text)}</p>` }
+  // 칸은 3줄. 넘치면 자간·글자 크기를 조금씩 줄여 맞춘다 (다음 장 이름·목표처럼 길이가 장마다 다른 글)
+  const say = (text: string) => {
+    desc.innerHTML = `<p class="say">${esc(text)}</p>`
+    const p = desc.firstElementChild as HTMLElement, size = parseFloat(getComputedStyle(p).fontSize)
+    for (const [ls, k] of [[-1, 1], [-1, 0.875], [-1, 0.75]]) {
+      if (p.scrollHeight <= p.clientHeight + 1) break
+      p.style.letterSpacing = `${ls}px`
+      p.style.fontSize = `${size * k}px`
+    }
+  }
 
   // ---- 도구 목록 12칸 ----
   const drawItems = () => {

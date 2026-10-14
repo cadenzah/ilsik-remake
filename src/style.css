@@ -127,6 +127,10 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
 #titlescreen .row.ed { margin-top: 6px; }
 #titlescreen .wide .row { width: 180px; font-size: 14px; }
 #titlescreen .row.back { margin-top: 6px; }
+/* 두 줄 항목 (지난흔적: 항목 + 장 이름) */
+#titlescreen .row.two { height: 40px; line-height: 20px; padding-top: 1px; }
+#titlescreen .row.two small { display: block; font-size: 12px; line-height: 16px; letter-spacing: 0; font-weight: 400;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #titlescreen .wide .row.opt { font-size: 14px; height: 24px; line-height: 24px; color: inherit; }   /* 설정 창 */
 #titlescreen .wide .row.opt:first-child { margin-top: 12px; }
 /* 제작진 화면 (원작 게임종료 때의 ECPPLANE 화면과 같은 검은 바탕 흰 글자) */
@@ -223,6 +227,9 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
   color: #fcfcfc; text-align: center; font: 16px/1.7 var(--font); }
 #titlescreen .notice h2 { font-size: 20px; margin: 0 0 18px; letter-spacing: 4px; }
 #titlescreen .notice p { margin: 0 0 14px; }
+#titlescreen .notice a { color: #f0d070; text-decoration: underline; text-underline-offset: 3px; }
+#titlescreen .notice a:hover, #titlescreen .notice a:focus-visible { color: #fcfcfc; }
+#titlescreen .notice .dim { color: #9c9c90; font-size: 13px; line-height: 1.6; }
 #menu .menu-title { color: var(--gold); font-weight: 700; padding: 2px 6px 4px; }
 /* 켬/끔 스위치 (인트로 소리) */
 #titlescreen .row[role=switch] { display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -248,7 +255,7 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
 #camp .txt.pos { color: #0000aa; text-shadow: -1px 0 #5555ff; }
 #camp .txt.neg { color: #aa0000; text-shadow: -1px 0 #ff5555; }
 #camp .desc .say { position: static; width: 152px; margin: 4px 6px; font-size: 12px; line-height: 16px; color: #000; text-shadow: -1px 0 #aaa; 
-  white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }   /* 칸 = 3줄 */
+  white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }   /* 칸 = 3줄 */
 #camp .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
 #camp .spr { display: block; }
 #camp .por { display: block; background: url(/assets/ui/camp-por.png); }

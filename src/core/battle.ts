@@ -150,11 +150,11 @@ async function start(resume?: Suspended) {
   setTitle(chapterTitle())
   centerOn(S.units[0])
   await fadeIn()
-  if (remake()) await new Promise<void>(ok => showGoalsWin(ok))   // 장 카드 + 목표 (S2 제안 4, ux-proposal 16)
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
   await banter('start')
   if (!remake()) await goGo()   // 원작: 첫 대화 뒤 「GO!! GO!!」, 첫 클릭에 사라짐
-  await runRounds()
+  // 개선판: 장 카드 + 목표 (S2 제안 4, ux-proposal 16) 는 장 앞 대화·1턴 장면을 다 본 뒤, 첫 아군 차례 직전에
+  await runRounds(false, remake() ? () => new Promise<void>(ok => showGoalsWin(ok)) : undefined)
 }
 
 // ---------- 동작 (애니메이션 포함) ----------
@@ -447,13 +447,16 @@ async function turnEvents() {
 }
 
 /** 라운드 반복. 판의 order() 가 준 행동 단계를 차례로 실행한다 (원작판 = 한 명씩, 개선판 = 페이즈제). 전투가 끝나면 돌아온다.
+ *  intro = 첫 턴 장면 뒤, 첫 행동 단계 전에 한 번 (개선판 조건 창)
  *  원작: 턴·차례 알림 없음 (띠는 장 제목만). 개선판: 띠의 턴 패 + 아군 차례 시작마다 「GO!! GO!!」 */
-async function runRounds(resumed = false) {
+async function runRounds(resumed = false, intro?: () => Promise<void>) {
   for (;;) {
     if (!resumed) {
       for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
       S.mode = { kind: 'busy' }
       await turnEvents()
+      await intro?.()
+      intro = undefined
     }
     resumed = false
     for (const step of S.ed.order([...S.units, ...S.reserve], S.turn)) {

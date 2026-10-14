@@ -60,6 +60,11 @@ const NOTICE = `
   <p>이 게임은 원작 개발사·유통사와 관계없는<br>비공식·비상업 팬 리메이크입니다.</p>
   <p>원작의 그래픽·사운드·텍스트 등 모든 콘텐츠의<br>권리는 원 권리자에게 있습니다.</p>
   <p>권리자께서 문제를 제기하시면<br>즉시 배포를 중단하겠습니다.</p>`
+const REPO = 'https://github.com/cadenzah/ilsik-remake'
+const FEEDBACK = `
+  <p>버그를 찾으셨거나 바라는 기능이 있으면<br>아래 저장소의 이슈(Issues)로 남겨 주세요.</p>
+  <p><a href="${REPO}/issues" target="_blank" rel="noopener">github.com/cadenzah/ilsik-remake</a></p>
+  <p class="dim">어느 판(원작판·개선판)·몇 장에서 무엇을 했을 때인지,<br>가능하면 화면 갈무리를 함께 적어 주시면 큰 도움이 됩니다.</p>`
 
 export function showTitle(): Promise<Launch> {
   const root = document.getElementById('titlescreen')!
@@ -96,13 +101,20 @@ export function showTitle(): Promise<Launch> {
 
     // 창 안 항목 (글자 버튼)
     // toggle 이 있으면 켬/끔 스위치 모양 (role=switch)
-    type Row = { label: string; on?: () => void; cls?: string; title?: string; toggle?: boolean }
+    // sub 가 있으면 두 줄 (위 = 항목, 아래 = 작은 글자 장 이름 등. 넘치면 … 으로 자른다)
+    type Row = { label: string; sub?: string; on?: () => void; cls?: string; title?: string; toggle?: boolean }
     const rows = (items: Row[]) => {
       body.innerHTML = ''
       for (const r of items) {
         const b = document.createElement('button')
         b.className = `row ${r.cls ?? ''}`
         b.textContent = r.label
+        if (r.sub !== undefined) {
+          b.classList.add('two')
+          const small = document.createElement('small')
+          small.textContent = r.sub
+          b.append(small)
+        }
         if (r.toggle !== undefined) {
           b.setAttribute('role', 'switch')
           b.setAttribute('aria-checked', String(r.toggle))
@@ -149,11 +161,11 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed), sus = loadSuspended(ed)
       win.classList.add('wide')
       rows([
-        ...sus ? [{ label: `중단한 전투 · ${sus.title} ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
+        ...sus ? [{ label: '중단한 전투', sub: `${sus.title} · ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
           on: () => launch(sus.def, sus.at, sus) }] : [],
-        { label: p ? `이어하기 · ${chapterName(p.next.n, p.next.route)}` : '이어하기 (없음)', title: '장을 마칠 때마다 자동 기록',
+        { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) : '없음', title: '장을 마칠 때마다 자동 기록',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
-        ...loadSlots(ed).map((s, i) => ({ label: s ? `기록 ${i + 1} · ${s.title}` : `기록 ${i + 1} · 무기록`, title: s ? new Date(s.at).toLocaleString() : '',
+        ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
           on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
         { label: '돌아가기', cls: 'back', on: menu }])
     }
@@ -186,9 +198,9 @@ export function showTitle(): Promise<Launch> {
     }
     const openCodex = async () => { openPage(); await codex(page, loadProgress(ed), closeCredits) }
 
-    // 원작 게임종료와 같은 제작진(ECPPLANE 0)·발행(ECPPLANE 1) 화면 + 팬 게임 고지. 이전·다음으로 넘긴다
+    // 원작 게임종료와 같은 제작진(ECPPLANE 0)·발행(ECPPLANE 1) 화면 + 팬 게임 고지 + 제보·제안 안내. 이전·다음으로 넘긴다
     const PAGES = [`<img src="${A}/ui/staff.png" alt="원작 제작진">`, `<img src="${A}/ui/publish.png" alt="원작 발행 정보">`,
-      `<div class="notice"><h2>팬 게임 고지</h2>${NOTICE}</div>`]
+      `<div class="notice"><h2>팬 게임 고지</h2>${NOTICE}</div>`, `<div class="notice"><h2>버그 제보 · 기능 제안</h2>${FEEDBACK}</div>`]
     let pageAt = -1
     const credits = (i: number) => {
       pageAt = i
