@@ -25,6 +25,12 @@ pnpm install
 pnpm start              # ISO 추출 → 자원 생성 → 개발 서버
 ```
 
+같은 네트워크의 다른 기기(휴대폰 등)에서 접속하려면 `--host` 를 붙입니다. 터미널에 찍히는 `Network:` 주소로 접속합니다. 그 밖의 인자(`--port` 등)도 Vite 에 그대로 넘어갑니다.
+
+```bash
+pnpm start --host
+```
+
 ## 배포 (Cloudflare Pages)
 
 원작 자원이 저장소에 없으므로 Git 연동 자동 빌드로는 게임이 뜨지 않습니다. 로컬에서 빌드해 직접 올립니다.

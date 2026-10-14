@@ -8,7 +8,7 @@
     "setup:force": "node scripts/setup.mjs --force",
     "assets": ".venv/bin/python tools/export_web.py data",
     "dev": "vite",
-    "start": "node scripts/setup.mjs && vite --open",
+    "start": "node scripts/start.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "deploy": "node scripts/deploy.mjs",
