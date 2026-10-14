@@ -6,7 +6,8 @@
 import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeOut } from './fade'
-import { lastEdition, loadProgress, loadSlots, loadSuspended, progressCamp, resetProgress, setLastEdition, startOtherRoad, type EditionId, type Suspended } from './save'
+import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
+  setLastEdition, startOtherRoad, undoImport, type EditionId, type Progress, type SaveBundle, type SaveSlot, type Suspended } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
@@ -133,8 +134,7 @@ export function showTitle(): Promise<Launch> {
       win.classList.remove('wide')
       rows([
         { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
-        { label: '지난흔적', title: p || loadSlots(ed).some(Boolean) || loadSuspended(ed) ? '이어하기·기록 불러오기' : '저장된 진행 없음',
-          on: p || loadSlots(ed).some(Boolean) || loadSuspended(ed) ? () => loadMenu() : undefined },
+        { label: '지난흔적', title: '이어하기·기록 불러오기·기록 옮기기', on: () => loadMenu() },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
           ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
@@ -167,7 +167,76 @@ export function showTitle(): Promise<Launch> {
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
           on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
+        { label: '기록 옮기기', sub: '다른 브라우저·기기로', title: '코드·파일로 진행을 보내고 받는다', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
+    }
+
+    // 기록 옮기기 (save.ts): 보내기 = 코드 복사·파일 저장, 받기 = 코드 붙여넣기·파일 열기 → 내용 확인 → 덮어쓰기 (한 번 되돌리기)
+    const summary = (b: SaveBundle) => EDITIONS.map(e => {
+      const d = b.data, p = d[`eclipse.progress.${e.id}`] as Progress | undefined, s = d[`eclipse.suspend.${e.id}`] as Suspended | undefined
+      const n = (d[`eclipse.slots.${e.id}`] as (SaveSlot | null)[] | undefined)?.filter(Boolean).length ?? 0
+      const parts = [p ? `이어하기 ${chapterName(p.next.n, p.next.route)}` : '', n ? `기록 ${n}칸` : '', s ? '중단한 전투' : ''].filter(Boolean)
+      return `<li><b>${e.name}</b> ${parts.join(' · ') || '<span class="dim">없음</span>'}</li>`
+    }).join('')
+    const openTransfer = async (note = '') => {
+      openPage()
+      const mine = currentBundle(), has = Object.keys(mine.data).length > 0
+      const code = has ? await bundleCode(mine) : ''
+      page.innerHTML = `<div class="transfer">
+          <h2>기록 옮기기</h2>
+          <p class="lead">두 판의 이어하기·기록 3칸·중단한 전투·장 지도·도감을 다른 브라우저나 기기로 옮깁니다. 설정은 옮기지 않습니다.</p>
+          <section><h3>보내기</h3><ul>${summary(mine)}</ul>
+            <textarea class="out" readonly spellcheck="false" placeholder="옮길 기록이 없습니다"></textarea>
+            <div class="btns"><button data-act="copy" ${has ? '' : 'disabled'}>코드 복사</button><button data-act="save" ${has ? '' : 'disabled'}>파일로 저장</button></div>
+            <p class="msg out-msg"></p></section>
+          <section><h3>받기</h3>
+            <textarea class="in" spellcheck="false" placeholder="다른 기기에서 복사한 코드를 여기에 붙여 넣거나 기록 파일을 여세요"></textarea>
+            <div class="btns"><button data-act="open">파일 열기</button><button data-act="read">가져오기</button></div>
+            <p class="msg in-msg"></p></section>
+        </div>
+        <nav>${hasImportBackup() ? '<button data-act="undo" title="마지막으로 가져오기 바로 전 기록으로">가져오기 전으로</button>' : ''}
+          <button data-act="close" class="close">돌아가기</button></nav>`
+      const $ = <T extends HTMLElement>(q: string) => page.querySelector<T>(q)!
+      const out = $<HTMLTextAreaElement>('.out'), inp = $<HTMLTextAreaElement>('.in'), outMsg = $('.out-msg'), inMsg = $('.in-msg'), read = $<HTMLButtonElement>('[data-act="read"]')
+      out.value = code
+      inMsg.innerHTML = note
+      let pending: SaveBundle | null = null
+      const reset = () => { pending = null; read.textContent = '가져오기'; read.classList.remove('warn') }
+      const check = async () => {
+        try {
+          pending = await parseTransfer(inp.value)
+          inMsg.innerHTML = `<ul>${summary(pending)}</ul>${new Date(pending.at).toLocaleString()} 기록. 이 기기의 기록을 이것으로 바꿉니다.`
+          read.textContent = '덮어쓰기'
+          read.classList.add('warn')
+        } catch (err) { reset(); inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
+      }
+      inp.oninput = () => { reset(); inMsg.textContent = '' }
+      const file = document.createElement('input')
+      file.type = 'file'
+      file.accept = '.json,.txt,application/json,text/plain'
+      file.onchange = async () => { const f = file.files?.[0]; if (!f) return; inp.value = await f.text(); await check() }
+      const acts: Record<string, () => void | Promise<void>> = {
+        copy: async () => {
+          try { await navigator.clipboard.writeText(code) } catch { out.select(); document.execCommand('copy') }
+          outMsg.textContent = '복사했습니다. 다른 기기의 「받기」 칸에 붙여 넣으세요.'
+        },
+        save: () => {
+          const a = document.createElement('a'), d = new Date(), pad = (n: number) => String(n).padStart(2, '0')
+          a.href = URL.createObjectURL(new Blob([JSON.stringify(mine, null, 1)], { type: 'application/json' }))
+          a.download = `eclipse-save-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`
+          a.click()
+          setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+          outMsg.textContent = '파일로 저장했습니다.'
+        },
+        open: () => file.click(),
+        read: async () => {
+          if (!pending) { await check(); return }
+          try { applyBundle(pending); await openTransfer('가져왔습니다. 지난흔적에서 이어 하세요.') } catch (err) { inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
+        },
+        undo: async () => { undoImport(); await openTransfer('가져오기 전 기록으로 되돌렸습니다.') },
+        close: () => { closeCredits(); loadMenu() },
+      }
+      page.querySelectorAll<HTMLButtonElement>('button[data-act]').forEach(b => b.onclick = () => void acts[b.dataset.act!]())
     }
 
     // 클리어한 장 다시 하기 (진행 저장에는 영향 없음)

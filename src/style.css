@@ -230,6 +230,28 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
 #titlescreen .notice a { color: #f0d070; text-decoration: underline; text-underline-offset: 3px; }
 #titlescreen .notice a:hover, #titlescreen .notice a:focus-visible { color: #fcfcfc; }
 #titlescreen .notice .dim { color: #9c9c90; font-size: 13px; line-height: 1.6; }
+/* 기록 옮기기 (title.ts openTransfer) */
+#titlescreen .transfer { position: absolute; inset: 0 0 34px; padding: 18px 22px 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr;
+  gap: 0 16px; color: #e8e6df; font: 13px/1.5 var(--font); }
+#titlescreen .transfer h2 { grid-column: 1 / -1; margin: 0 0 4px; font-size: 20px; letter-spacing: 4px; text-align: center; color: #fcfcfc; }
+#titlescreen .transfer .lead { grid-column: 1 / -1; margin: 0 0 10px; color: #9c9c90; text-align: center; }
+#titlescreen .transfer section { display: flex; flex-direction: column; min-height: 0; padding: 10px 12px; border: 1px solid #3c3c34; border-radius: 4px; background: #0c0c0a; }
+#titlescreen .transfer h3 { margin: 0 0 6px; font-size: 15px; font-weight: 400; color: #f0d070; letter-spacing: 2px; }
+#titlescreen .transfer ul { margin: 0 0 6px; padding: 0; list-style: none; }
+#titlescreen .transfer li b { font-weight: 400; color: #f0d070; margin-right: 4px; }
+#titlescreen .transfer .dim { color: #6c6c64; }
+#titlescreen .transfer textarea { flex: 1; min-height: 80px; resize: none; padding: 6px; border: 1px solid #3c3c34; border-radius: 3px; background: #1a1a16;
+  color: #c8c8bc; font: 11px/1.35 ui-monospace, Menlo, monospace; word-break: break-all; user-select: text; }
+#titlescreen .transfer textarea:focus { outline: 1px solid #f0d070; }
+#titlescreen .transfer .btns { display: flex; gap: 8px; margin-top: 8px; }
+#titlescreen .transfer .btns button { all: unset; flex: 1; text-align: center; cursor: pointer; padding: 4px 0; border: 1px solid #5c5c50; border-radius: 3px;
+  color: #e8e6df; background: #24241e; }
+#titlescreen .transfer .btns button:hover:not(:disabled), #titlescreen .transfer .btns button:focus-visible { background: #34342a; color: #fcfcfc; }
+#titlescreen .transfer .btns button:disabled { opacity: .4; cursor: default; }
+#titlescreen .transfer .btns button.warn { border-color: #c06a10; color: #ffd27a; }
+#titlescreen .transfer .msg { margin: 6px 0 0; min-height: 20px; color: #b8d8a0; }
+#titlescreen .transfer .msg .err { color: #ff8a7a; }
+#titlescreen .transfer .msg ul { margin: 0; }
 #menu .menu-title { color: var(--gold); font-weight: 700; padding: 2px 6px 4px; }
 /* 켬/끔 스위치 (인트로 소리) */
 #titlescreen .row[role=switch] { display: flex; align-items: center; justify-content: center; gap: 6px; }

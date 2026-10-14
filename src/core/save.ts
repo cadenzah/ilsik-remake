@@ -125,3 +125,89 @@ export function loadSuspended(ed: EditionId): Suspended | null {
 export function writeSuspended(ed: EditionId, s: Suspended | null) {
   try { s ? localStorage.setItem(susKey(ed), JSON.stringify(s)) : localStorage.removeItem(susKey(ed)) } catch { /* 저장 불가 */ }
 }
+
+// ---------- 기록 옮기기 (다른 브라우저·기기로, 서버 없이 코드·파일로) ----------
+// 옮기는 것 = 두 판의 진행 (이어하기·장 지도·도감)·기록 3칸·중단한 전투. 설정(글꼴·화면 등)은 기기마다라 옮기지 않는다.
+// 코드 = "ECL1." + base64url(deflate-raw(JSON)). 압축을 못 쓰는 브라우저는 "ECL0." + base64url(JSON). 파일 = 같은 묶음의 JSON
+
+export interface SaveBundle { app: 'eclipse-web'; v: 1; at: number; data: Record<string, unknown> }
+const MOVABLE = /^eclipse\.(progress|slots|suspend)\.(original|remake)$/
+const BACKUP = 'eclipse.backup'   // 가져오기 바로 전 상태 (한 번 되돌리기)
+
+function collect(): Record<string, unknown> {
+  const data: Record<string, unknown> = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)!
+      if (MOVABLE.test(k)) data[k] = JSON.parse(localStorage.getItem(k)!)
+    }
+  } catch { /* 읽기 불가 */ }
+  return data
+}
+
+/** 지금 브라우저의 옮길 기록 */
+export const currentBundle = (): SaveBundle => ({ app: 'eclipse-web', v: 1, at: Date.now(), data: collect() })
+
+const b64 = (bytes: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+const pipe = async (bytes: Uint8Array, t: CompressionStream | DecompressionStream) =>
+  new Uint8Array(await new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(t)).arrayBuffer())
+
+export async function bundleCode(b: SaveBundle): Promise<string> {
+  const raw = new TextEncoder().encode(JSON.stringify(b))
+  if (typeof CompressionStream === 'undefined') return `ECL0.${b64(raw)}`
+  return `ECL1.${b64(await pipe(raw, new CompressionStream('deflate-raw')))}`
+}
+
+/** 붙여 넣은 코드나 파일 글을 묶음으로. 잘못됐으면 까닭을 담은 Error */
+export async function parseTransfer(text: string): Promise<SaveBundle> {
+  const t = text.trim()
+  let json: string
+  if (t.startsWith('{')) json = t
+  else {
+    const m = /^ECL([01])\.([A-Za-z0-9_-]+)$/.exec(t.replace(/\s+/g, ''))
+    if (!m) throw new Error('기록 코드가 아닙니다. "ECL1." 로 시작하는 글 전체를 붙여 넣어 주세요.')
+    try {
+      const bytes = unb64(m[2])
+      json = new TextDecoder().decode(m[1] === '1' ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes)
+    } catch { throw new Error('코드가 잘렸거나 바뀌었습니다. 처음부터 끝까지 다시 복사해 주세요.') }
+  }
+  let b: SaveBundle
+  try { b = JSON.parse(json) as SaveBundle } catch { throw new Error('기록 파일을 읽지 못했습니다.') }
+  if (b?.app !== 'eclipse-web' || b.v !== 1 || typeof b.data !== 'object' || !b.data) throw new Error('이 게임의 기록이 아닙니다.')
+  const keys = Object.keys(b.data)
+  if (keys.some(k => !MOVABLE.test(k))) throw new Error('알 수 없는 항목이 들어 있습니다.')
+  if (!keys.length) throw new Error('옮길 기록이 비어 있습니다.')
+  return b
+}
+
+/** 가져오기: 지금 기록을 되돌리기용으로 남기고 묶음으로 바꾼다 (묶음에 없는 항목은 지운다) */
+export function applyBundle(b: SaveBundle) {
+  try {
+    localStorage.setItem(BACKUP, JSON.stringify(currentBundle()))
+    replaceAll(b.data)
+  } catch { throw new Error('이 브라우저에 저장할 수 없습니다 (사생활 보호 모드 등).') }
+}
+
+function replaceAll(data: Record<string, unknown>) {
+  const old: string[] = []
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i)!; if (MOVABLE.test(k)) old.push(k) }
+  old.forEach(k => localStorage.removeItem(k))
+  for (const [k, v] of Object.entries(data)) localStorage.setItem(k, JSON.stringify(v))
+}
+
+export function hasImportBackup() { try { return localStorage.getItem(BACKUP) !== null } catch { return false } }
+
+/** 가져오기 되돌리기 (한 번) */
+export function undoImport() {
+  try {
+    const raw = localStorage.getItem(BACKUP)
+    if (!raw) return
+    replaceAll((JSON.parse(raw) as SaveBundle).data)
+    localStorage.removeItem(BACKUP)
+  } catch { /* 무시 */ }
+}
