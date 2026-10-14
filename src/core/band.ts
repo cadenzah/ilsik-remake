@@ -2,7 +2,8 @@
 // 원작판: 제목 칸에 장 제목만. 개선판: 제목 칸 왼쪽에 턴 패, 양옆 장식 위에 원작 글자 버튼,
 //   버튼에 마우스를 올리면 제목 칸 글자가 그 버튼 설명으로 (정비 화면 도구설명 칸 방식). 자리가 모자라면 순위 낮은 버튼부터 숨기고 메뉴에서 쓴다.
 //   아래 띠 왼쪽 = 가리킨 칸 지형 패, 오른쪽 = [뒤로] (터치 기기)
-import { cartouche, FRAME, hud, onLayout, view } from './screen'
+// 현대식 화면 (view.modern): 창틀 대신 위 바 한 줄 = [턴 패][제목 (버튼 설명)] … [버튼들], 지형 패·[뒤로] 는 맵 아래 모서리에 떠 있게
+import { cartouche, FRAME, hud, onLayout, TOP_BAR, view } from './screen'
 import { button, esc, textWidth } from './ui'
 
 export interface BandButton {
@@ -15,7 +16,7 @@ export interface BandButton {
 }
 
 let root: HTMLElement | null = null
-let titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null, backBtn: HTMLButtonElement | null = null
+let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null, backBtn: HTMLButtonElement | null = null
 let title = '', buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
 const hiddenIds = new Set<string>()
 const BTN_Y = 14, GAP = 4, EDGE = 14
@@ -26,6 +27,9 @@ export function initBand(remake: boolean, btns: BandButton[] = [], onBack?: () =
   root = document.createElement('div')
   root.className = 'band'
   hud.append(root)
+  bar = document.createElement('div')
+  bar.className = 'band-bar'   // 현대식 위 바 바탕 (원작 화면에선 CSS 로 숨김)
+  root.append(bar)
   titleEl = document.createElement('div')
   titleEl.className = 'band-title'
   root.append(titleEl)
@@ -88,6 +92,7 @@ export const bandHidden = (id: string) => hiddenIds.has(id)
 
 function place() {
   if (!root) return
+  if (view.modern) { placeModern(); return }
   const c = cartouche()
   Object.assign(titleEl.style, { left: `${c.x}px`, top: `${c.y}px`, width: `${c.w}px`, height: `${c.h}px` })
   hiddenIds.clear()
@@ -123,6 +128,37 @@ function place() {
   const by = view.h - FRAME.b + 7
   if (terrain) Object.assign(terrain.style, { left: `${EDGE + 54}px`, top: `${by}px` })
   if (backBtn) Object.assign(backBtn.style, { left: `${view.w - EDGE - 54 - parseFloat(backBtn.style.width)}px`, top: `${by}px` })
+}
+
+/** 현대식 위 바: 왼쪽부터 턴 패·제목, 오른쪽 끝부터 버튼 (자리가 모자라면 순위 낮은 것부터 메뉴로) */
+function placeModern() {
+  const by = (TOP_BAR - 25) / 2, PAD = 8
+  Object.assign(bar.style, { left: '0px', top: '0px', width: `${view.w}px`, height: `${TOP_BAR}px` })
+  hiddenIds.clear()
+  const plateW = plate ? Math.max(56, textWidth(plate.textContent ?? '') + 18) : 0
+  if (plate) Object.assign(plate.style, { left: `${PAD}px`, top: `${by}px`, width: `${plateW}px` })
+  const titleX = PAD + (plate ? plateW + 10 : 0)
+  // 버튼: 오른쪽 무리 (적은 순서대로 오른쪽 끝) 앞에 왼쪽 무리
+  const order = [...buttons.filter(b => b.side === 'left'), ...buttons.filter(b => b.side === 'right')]
+  const shown = [...order], width = (b: BandButton) => parseFloat(els.get(b.id)!.style.width)
+  const total = () => shown.reduce((n, b) => n + width(b) + GAP, 0)
+  while (shown.length && total() > view.w - PAD - titleX - 120) {
+    const worst = shown.reduce((a, b) => (b.prio > a.prio ? b : a))
+    if (worst.prio === 0) break
+    shown.splice(shown.indexOf(worst), 1)
+    hiddenIds.add(worst.id)
+  }
+  let x = view.w - PAD
+  for (const b of [...shown].reverse()) {
+    x -= width(b)
+    Object.assign(els.get(b.id)!.style, { left: `${x}px`, top: `${by}px` })
+    x -= GAP
+  }
+  Object.assign(titleEl.style, { left: `${titleX}px`, top: '0px', width: `${Math.max(0, x - titleX - 8)}px`, height: `${TOP_BAR}px` })
+  for (const [id, e] of els) e.hidden = hiddenIds.has(id)
+  const fy = view.h - 25 - PAD
+  if (terrain) Object.assign(terrain.style, { left: `${PAD}px`, top: `${fy}px` })
+  if (backBtn) Object.assign(backBtn.style, { left: `${view.w - PAD - parseFloat(backBtn.style.width)}px`, top: `${fy}px` })
 }
 
 onLayout(place)

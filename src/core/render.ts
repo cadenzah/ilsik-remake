@@ -137,17 +137,23 @@ export function frame(now: number) {
 
   const each = (f: (x: number, y: number) => void) => { for (let y = 0; y < mp.h; y++) for (let x = 0; x < mp.w; x++) f(x, y) }
 
+  // 현대식 화면: 범위를 칸 칠하기로 (이동 파랑·공격 빨강), 원작 화면: 범위 밖 STA 5 체크무늬
+  const modern = view.modern
+  const fill = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x * TW + 1, y * TH + 1, TW - 2, TH - 2) }
+
   if (remake && (S.threat || S.watch)) {
     const red = ditherRed()
-    for (const k of threatTiles(S.threat ? null : S.watch)) ctx.drawImage(red, (k % 1000) * TW, Math.floor(k / 1000) * TH)
+    for (const k of threatTiles(S.threat ? null : S.watch))
+      modern ? fill(k % 1000, Math.floor(k / 1000), 'rgba(255,50,50,0.30)') : ctx.drawImage(red, (k % 1000) * TW, Math.floor(k / 1000) * TH)
   }
 
   const md = S.mode
   if (md.kind === 'selected') {
-    // 범위 밖을 어둡게 (STA 5)
-    each((x, y) => { if (!md.moves.has(key(x, y))) piece(ctx, 'sta.5', x * TW, y * TH) })
+    if (modern) for (const k of md.moves.keys()) fill(k % 1000, Math.floor(k / 1000), 'rgba(80,140,255,0.38)')
+    else each((x, y) => { if (!md.moves.has(key(x, y))) piece(ctx, 'sta.5', x * TW, y * TH) })   // 범위 밖을 어둡게 (STA 5)
     if (S.ed.features.quickAttack)
-      for (const e of alive('enemy')) if (attackSpots(md.unit, md.moves, e).length) piece(ctx, 'sta.2', e.x * TW, e.y * TH)
+      for (const e of alive('enemy')) if (attackSpots(md.unit, md.moves, e).length)
+        modern ? fill(e.x, e.y, 'rgba(255,70,70,0.45)') : piece(ctx, 'sta.2', e.x * TW, e.y * TH)
     if (remake && S.hover && md.moves.has(key(S.hover.x, S.hover.y))) {
       const path = pathTo(md.moves, S.hover.x, S.hover.y)
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'
@@ -160,8 +166,11 @@ export function frame(now: number) {
   if (md.kind === 'targeting') {
     // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀
     const u = md.unit
-    each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
-    if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
+    if (modern) each((x, y) => { const d = dist(u, { x, y }); if (d >= u.range[0] && d <= u.range[1]) fill(x, y, 'rgba(255,70,70,0.30)') })
+    else {
+      each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
+      if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
+    }
   }
 
   // 유닛 (y 순으로 그려 겹침 자연스럽게)
@@ -170,6 +179,12 @@ export function frame(now: number) {
   for (const u of sorted) {
     const x = u.px * TW, y = u.py * TH
     ctx.globalAlpha = u.alpha
+    if (modern && S.marks) {   // 현대식: 발밑 진영 받침 (원작 화면은 머리 위 STA 13~15)
+      ctx.fillStyle = isNpc(u) ? 'rgba(90,210,140,0.55)' : u.side === 'ally' ? 'rgba(79,140,255,0.55)' : 'rgba(255,90,90,0.55)'
+      ctx.beginPath()
+      ctx.ellipse(x + TW / 2, y + TH - 6, 20, 6, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
     const seq = FRAMES[u.facing]
     const moving = u.px !== u.x || u.py !== u.y
     const f = u.acted && u.side === 'ally' ? seq[0] : seq[Math.floor(now / (moving ? 120 : 380)) % seq.length]
@@ -186,7 +201,7 @@ export function frame(now: number) {
       ctx.globalCompositeOperation = 'source-over'
     }
     ctx.globalAlpha = u.alpha
-    if (S.marks) piece(ctx, MARK[isNpc(u) ? 'npc' : u.side], x + 5, y + 2)
+    if (S.marks && !modern) piece(ctx, MARK[isNpc(u) ? 'npc' : u.side], x + 5, y + 2)
     if (remake) {   // 개선판: 생명 막대
       ctx.fillStyle = '#000a'
       ctx.fillRect(x + 8, y + TH - 4, TW - 16, 4)
@@ -195,8 +210,13 @@ export function frame(now: number) {
     }
     ctx.globalAlpha = 1
   }
-  if (turnUnit) piece(ctx, 'sta.1', turnUnit.px * TW, turnUnit.py * TH)
-  if (S.aim) piece(ctx, 'sta.2', S.aim.x * TW, S.aim.y * TH)
+  if (modern) {   // 고른 유닛 = 금빛 테두리, 공격 대상 = 빨간 테두리
+    if (turnUnit) { ctx.strokeStyle = `rgba(227,192,107,${0.6 + 0.4 * Math.sin(now / 180)})`; ctx.lineWidth = 3; ctx.strokeRect(turnUnit.px * TW + 2, turnUnit.py * TH + 2, TW - 4, TH - 4) }
+    if (S.aim) { ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 3; ctx.strokeRect(S.aim.x * TW + 2, S.aim.y * TH + 2, TW - 4, TH - 4) }
+  } else {
+    if (turnUnit) piece(ctx, 'sta.1', turnUnit.px * TW, turnUnit.py * TH)
+    if (S.aim) piece(ctx, 'sta.2', S.aim.x * TW, S.aim.y * TH)
+  }
 
   // 가리킨 칸 (개선판만 — 원작은 마우스를 올려도 표시 없음)
   if (remake && S.hover && md.kind !== 'busy') {
@@ -221,7 +241,7 @@ export function frame(now: number) {
   ctx.globalAlpha = 1
   ctx.restore()
 
-  ctx.drawImage(frameImage(), 0, 0)
+  if (!view.modern) ctx.drawImage(frameImage(), 0, 0)
   for (const f of afterFrame) f(now)
   requestAnimationFrame(frame)
 }

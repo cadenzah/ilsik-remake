@@ -4,8 +4,11 @@
 // 캔버스(#view)는 창 전체 장치 픽셀, #hud 는 논리 크기 div 를 s 배로 확대해 창·버튼을 논리 좌표에 둔다.
 import { nine } from './skin'
 
-export const FRAME = { l: 68, t: 57, r: 68, b: 39 }   // 창틀 두께 (모서리 조각 크기)
-export const view = { s: 1, ox: 0, oy: 0, w: 640, h: 480, wide: false }
+// 현대식 화면 (개선판 설정 modernUi): 창틀 없이 맵 창 = 화면 전체 − 위 바 (TOP_BAR). 창·대화창은 CSS (html.ui-modern) 로 어두운 반투명 패널
+const ORIGINAL_FRAME = { l: 68, t: 57, r: 68, b: 39 }   // 창틀 두께 (모서리 조각 크기)
+export const TOP_BAR = 32
+export const FRAME = { ...ORIGINAL_FRAME }
+export const view = { s: 1, ox: 0, oy: 0, w: 640, h: 480, wide: false, modern: false }
 
 export const hud = document.getElementById('hud') as HTMLElement
 
@@ -13,7 +16,7 @@ export const hud = document.getElementById('hud') as HTMLElement
 export const mapRect = () => ({ x: FRAME.l, y: FRAME.t, w: view.w - FRAME.l - FRAME.r, h: view.h - FRAME.t - FRAME.b })
 
 /** 위 띠 가운데 크림색 제목 칸 (mw.1 안 x 119~384, y 12~40). 띠는 양쪽 구간을 반씩 늘리므로 왼쪽에 ceil(늘린 길이/2) 만큼 밀린다 */
-export const cartouche = () => ({ x: FRAME.l + 119 + Math.ceil((view.w - 640) / 2), y: 12, w: 266, h: 29 })
+export const cartouche = () => ({ x: FRAME.l + 119 + Math.ceil((view.w - 640) / 2), y: 12, w: 266, h: 29 })   // 현대식은 band.ts 가 따로 잡는다
 
 const listeners: (() => void)[] = []
 export const onLayout = (f: () => void) => { listeners.push(f) }
@@ -30,11 +33,15 @@ export function frameImage(): HTMLCanvasElement {
   return frameCanvas
 }
 
-/** 창 크기에 맞춰 논리 화면을 다시 잡는다 */
-export function layout(wide = view.wide) {
+/** 창 크기에 맞춰 논리 화면을 다시 잡는다. modern = 현대식 화면 (wide 일 때만) */
+export function layout(wide = view.wide, modern = view.modern) {
   view.wide = wide
+  view.modern = wide && modern
+  Object.assign(FRAME, view.modern ? { l: 0, t: TOP_BAR, r: 0, b: 0 } : ORIGINAL_FRAME)
+  document.documentElement.classList.toggle('ui-modern', view.modern)
   const iw = innerWidth, ih = innerHeight
-  const s = Math.min(iw / 640, ih / 480)
+  // 현대식은 큰 창에서 덜 확대해 (논리 960×600 쯤에서 1배를 넘기 시작) 맵을 더 넓게 본다. 작은 창은 원작 틀과 같은 배율
+  const s = Math.min(iw / 640, ih / 480, view.modern ? Math.max(1, Math.min(iw / 960, ih / 600)) : Infinity)
   view.s = s
   view.w = wide ? Math.max(640, Math.floor(iw / s)) : 640
   view.h = wide ? Math.max(480, Math.floor(ih / s)) : 480

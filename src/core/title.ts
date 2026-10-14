@@ -33,6 +33,7 @@ const SETTINGS: { k: Setting; label: string; title: string }[] = [
   { k: 'fastEnemy', label: '적 차례 빠르게', title: '개선판: 적·NPC 가 움직이는 속도를 높인다' },
   { k: 'shortAnim', label: '전투 연출 짧게', title: '개선판: 공격·쓰러짐 연출을 짧게' },
   { k: 'quickAttack', label: '공격 확인 생략', title: '개선판: 「전 투」 확인창 없이 대상을 누르면 바로 공격' },
+  { k: 'modernUi', label: '현대식 전투 화면', title: '개선판: 원작 창틀 없이 맵을 화면 가득, 어두운 반투명 창·색 칸 범위 (끄면 원작 창틀을 복각한 화면)' },
 ]
 const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
 

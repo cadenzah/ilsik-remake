@@ -6,8 +6,9 @@ const KEYS = {
   fastEnemy: 'eclipse.fastEnemy',     // 적·NPC 차례 빠르게
   shortAnim: 'eclipse.shortAnim',     // 전투 연출 짧게
   quickAttack: 'eclipse.quickAttack', // 공격 확인창 없이 바로
+  modernUi: 'eclipse.modernUi',       // 현대식 전투 화면 (창틀 없이 맵 가득·어두운 반투명 창). 끄면 원작 창틀
 } as const
-const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, fastEnemy: false, shortAnim: false, quickAttack: false }
+const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, fastEnemy: false, shortAnim: false, quickAttack: false, modernUi: false }
 
 export type Setting = keyof typeof KEYS
 

@@ -5,8 +5,8 @@ import type { Edition } from './edition'
 import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
 import { campScreen } from './camp'
 import { fadeIn, fadeOut } from './fade'
-import { canvas, centerOn, centerOnIfOff, frame, resize, toScreen } from './render'
-import { layout, view } from './screen'
+import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
+import { layout, mapRect, view } from './screen'
 import { loadSkin, pieceUrl } from './skin'
 import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
@@ -15,7 +15,7 @@ import { playDialogue } from './dialogue'
 import { loadSlots, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
-import { setting } from './settings'
+import { setSetting, setting } from './settings'
 import { travelMap } from './worldmap'
 import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
@@ -535,8 +535,7 @@ const remake = () => !S.ed.features.commandFirst
 
 /** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
 function setupScreen(ed: Edition, def: StageDef) {
-  layout(ed.id === 'remake')
-  canvas.style.cursor = `url(${pieceUrl('sta.0')}) 2 2, default`   // 원작 커서 = 날개 지팡이 (STA 0)
+  applyScreenStyle(ed.id === 'remake')
   S.marks = true
   S.threat = false
   initBand(ed.id === 'remake', [
@@ -547,6 +546,24 @@ function setupScreen(ed: Edition, def: StageDef) {
     { id: 'map', label: '지도', desc: '미니맵 켜고 끄기 (M)', side: 'right', prio: 3, on: toggleMinimap },
   ], goBack)
   if (ed.id === 'remake') { initMinimap(); setOn('map', minimapOn()) } else removeMinimap()
+}
+
+/** 화면 틀: 원작판 = 640×480 원작 창틀, 개선판 = 넓게 + 설정에 따라 원작 창틀 / 현대식 (ux-proposal.md 32) */
+function applyScreenStyle(wide = S.ed.id === 'remake') {
+  layout(wide, wide && setting('modernUi'))
+  canvas.style.cursor = view.modern ? 'default' : `url(${pieceUrl('sta.0')}) 2 2, default`   // 원작 커서 = 날개 지팡이 (STA 0)
+}
+
+/** 전투 중 화면 틀 바꾸기 (개선판 메뉴) */
+function toggleScreenStyle() {
+  const m = mapRect(), cx = S.cam.x + m.w / 2 / S.cam.scale, cy = S.cam.y + m.h / 2 / S.cam.scale   // 보던 가운데를 그대로
+  setSetting('modernUi', !setting('modernUi'))
+  applyScreenStyle()
+  resize()
+  const n = mapRect()
+  S.cam.x = cx - n.w / 2 / S.cam.scale
+  S.cam.y = cy - n.h / 2 / S.cam.scale
+  clampCam()
 }
 
 export function toggleThreat() {
@@ -611,6 +628,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
+    [view.modern ? '원작 화면' : '현대식 화면', toggleScreenStyle, { title: view.modern ? '원작 창틀을 복각한 화면으로' : '창틀 없이 맵을 화면 가득' }],
     ['턴 종료', endPlayerStep, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
     ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로.<br>지난흔적에서 이어 합니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],

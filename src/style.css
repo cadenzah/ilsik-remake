@@ -97,6 +97,38 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
 /* 미니맵 (minimap.ts) */
 .owin.minimap canvas { position: absolute; image-rendering: pixelated; cursor: pointer; touch-action: none; }
 
+/* 현대식 전투 화면 (개선판 설정 modernUi, screen.ts layout → html.ui-modern): 원작 그림 창 대신 어두운 반투명 패널·금빛 제목.
+   창 크기·자리 계산은 원작 창과 같고 겉모양만 바꾼다 (인라인 배경 그림을 !important 로 덮음) */
+.band-bar { display: none; }
+html.ui-modern .band-bar { display: block; background: linear-gradient(rgba(18, 21, 30, .96), rgba(18, 21, 30, .86)); border-bottom: 1px solid #3a4157; }
+html.ui-modern .band-title { text-align: left; line-height: 32px; color: #e3c06b; text-shadow: none; font-weight: 700; }
+html.ui-modern .band-title.desc { color: #e8e6df; font-weight: 400; font-size: 14px; }
+html.ui-modern .band.foe .band-title { background: none; color: #ff8a8a; }
+html.ui-modern .band.foe .band-bar { border-bottom-color: #a03030; }
+html.ui-modern .plate { background: rgba(38, 44, 61, .92); border: 1px solid #3a4157; box-shadow: none; border-radius: 6px; color: #e8e6df; }
+html.ui-modern .plate .ally { color: #8fb4ff; } html.ui-modern .plate .enemy { color: #ff8a8a; } html.ui-modern .plate .npc { color: #7ee0a6; }
+html.ui-modern .owin { background: linear-gradient(rgba(227, 192, 107, .10) 0 25px, transparent 25px), rgba(18, 21, 30, .92) !important;
+  border: 1px solid #3a4157; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, .45); color: #e8e6df; image-rendering: auto; }
+html.ui-modern .owin .t { color: #e3c06b; }
+html.ui-modern .owin .b { color: #e8e6df; text-shadow: none; }
+html.ui-modern .owin .blue, html.ui-modern .owin .h.blue { color: #8fb4ff; text-shadow: none; }
+html.ui-modern .owin .red, html.ui-modern .owin .h.red { color: #ff8a8a; text-shadow: none; }
+html.ui-modern .owin .green, html.ui-modern .owin .h.green { color: #7ee0a6; text-shadow: none; }
+html.ui-modern .owin .dim { color: #9aa0b2; }
+html.ui-modern .owin .done { color: #7ee0a6; } html.ui-modern .owin .failed { color: #ff8a8a; }
+html.ui-modern .owin.basic .v { color: #8fb4ff; text-shadow: none; }
+html.ui-modern .obtn { border: 1px solid #3a4157; border-image: none; border-radius: 6px; background: #262c3d; color: #e8e6df; height: 25px; line-height: 23px; }
+html.ui-modern .obtn:active:not(:disabled) { background: #1c2130; }
+html.ui-modern .obtn:hover:not(:disabled), html.ui-modern .obtn:focus-visible { filter: none; background: #313952; border-color: #e3c06b; }
+html.ui-modern .obtn:focus-visible { outline: none; }
+html.ui-modern .obtn:disabled { color: #6a7082; filter: none; }
+html.ui-modern .obtn.on { color: #ffb3b3; border-color: #ff5a5a; text-shadow: none; }
+html.ui-modern .speak { background: rgba(18, 21, 30, .94) !important; border: 1px solid #e3c06b; border-radius: 12px; box-shadow: 0 4px 18px rgba(0, 0, 0, .5); }
+html.ui-modern .speak .name { color: #e3c06b; text-shadow: none; }
+html.ui-modern .speak .text { color: #e8e6df; text-shadow: none; }
+html.ui-modern .speak .por { border-radius: 6px; }
+html.ui-modern .speak.dim { filter: brightness(.7); opacity: .8; }
+
 /* 출전 선택 */
 
 /* 타이틀 화면 — 원작 640×480 을 통째로 확대 (title.ts) */
