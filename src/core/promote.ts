@@ -2,9 +2,11 @@
 // (112×85, 애슬이 「My Queen」 SM여왕으로 바뀜) 을 0xa0 ms 간격으로 돌리고 끝 프레임에서 0x5dc ms 멈춘다. 자원 ui/promote.png (export_web.py promote)
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
+import { play } from './sfx'
 
 const W = 112, H = 85, COLS = 10, FRAMES = 38
 const FRAME_MS = 0xa0, HOLD_MS = 0x5dc
+const SOUND_AT = 16   // 효과음 ECPANI.FVT 12 를 이 프레임 앞에서 (2ff8:0860 불러 두고 08a6 di == 0x10 에서 0f17)
 
 /** 화면이 어두운 상태에서 불러 장면을 밝혔다가 다시 어둡게 한다. 클릭·키로 넘긴다. caption = 끝 프레임에서 보일 아래 글 (개선판, 그만큼 더 멈춘다) */
 export async function promoteScene(caption?: string) {
@@ -27,7 +29,7 @@ export async function promoteScene(caption?: string) {
   await new Promise<void>(ok => {
     let f = 0, t = 0
     const done = () => { clearTimeout(t); root.removeEventListener('pointerdown', done); removeEventListener('keydown', done, true); ok() }
-    const step = () => { if (++f < FRAMES) { show(f); t = setTimeout(step, FRAME_MS) } else { root.classList.add('end'); t = setTimeout(done, HOLD_MS * (caption ? 2 : 1)) } }
+    const step = () => { if (++f < FRAMES) { if (f === SOUND_AT) play('ani', 12); show(f); t = setTimeout(step, FRAME_MS) } else { root.classList.add('end'); t = setTimeout(done, HOLD_MS * (caption ? 2 : 1)) } }
     t = setTimeout(step, FRAME_MS)
     root.addEventListener('pointerdown', done)
     addEventListener('keydown', done, true)

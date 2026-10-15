@@ -371,6 +371,17 @@ def export_promote():
     print('promote', len(imgs), w, h)
 
 
+def export_sfx():
+    """효과음 WAV (tools/voc.py 추출물) 를 sfx/ 로. e1 = ECLIPSE1.FVT (0~110 유닛 초상 번호별 공격·시전음, 104 기본 타격, 105~107 포수 폭발,
+    108 레벨업, 109 아이템 획득, 110 승급·습득, 111 사망), e2 = ECLIPSE2.FVT (마법 id 별), ani = ECPANI.FVT (컷신·전직). formats.md "효과음 호출부"."""
+    import shutil
+    for src, dst in (('ECLIPSE1.FVT', 'e1'), ('ECLIPSE2.FVT', 'e2'), ('ECPANI.FVT', 'ani')):
+        d = mkdir('sfx', dst)
+        fs = sorted(f for f in os.listdir(os.path.join(ROOT, 'build', 'snd', src)) if f.endswith('.wav'))
+        for f in fs: shutil.copy(os.path.join(ROOT, 'build', 'snd', src, f), os.path.join(d, f))
+        print('sfx', dst, len(fs))
+
+
 if __name__ == '__main__':
     if sys.argv[1:] == ['data']:
         export_data()
@@ -386,9 +397,11 @@ if __name__ == '__main__':
         export_figs()
     elif sys.argv[1:] == ['promote']:
         export_promote()
+    elif sys.argv[1:] == ['sfx']:
+        export_sfx()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_data(); font.export()
+        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_sfx(); export_data(); font.export()
     print('ok')

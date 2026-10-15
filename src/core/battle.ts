@@ -3,9 +3,10 @@ import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, 
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
-import { aimsFrom, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
+import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
+import { SFX, play, preload, setSoundOn } from './sfx'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
@@ -161,6 +162,7 @@ async function start(resume?: Suspended) {
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
   S.reserve = all.filter(u => S.troopState[u.troop] === 4)
+  preloadSounds(all)
   S.fired.clear()
   told.clear()
   woke.length = 0
@@ -223,17 +225,28 @@ async function playPose(u: Unit, ms: number) {
   return true
 }
 
+/** 이번 전투에서 낼 효과음을 미리 불러 둔다 (원작 124e:18a5: 유닛 초상 번호별 공격음 + 기본 104) */
+function preloadSounds(units: Unit[]) {
+  preload('e1', [...new Set(units.map(u => u.type.por)), SFX.cannon, SFX.cannon + 1, SFX.cannon + 2, SFX.levelUp, SFX.upgrade, SFX.death])
+  preload('e2', new Set(units.flatMap(u => u.type.magic)))
+}
+
 /** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
 async function attack(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
   const d = c === a ? targets[0] ?? c : c   // 바라볼 쪽
   if (d !== a) a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
   // 원작 공격 동작 (FIG 준비 → 타격). 그림이 없으면 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
+  // 효과음: 공격자 초상 번호의 소리 (원작 20ec:1897·3ab5·4c67, 타격 프레임 무렵 [근사])
   if (!await playPose(a, 280)) {
     a.px += Math.sign(d.x - a.x) * 0.25; a.py += Math.sign(d.y - a.y) * 0.25
+    play('e1', a.type.por)
     await sleep(200 * pace())
     a.px = a.x; a.py = a.y
-  }
+  } else play('e1', a.type.por)
+  // 포수: 포탄이 떨어질 때 폭발음 105 + (무기 − 87) (원작 20ec:33f2, 0x1e30 = 무기 id − 87, 20ec:e507). 투사체 그림이 아직 없어 공격음 뒤 잠시
+  const shell = attackKind(a) === 3 ? a.type.equip[0] - 87 : -1
+  if (shell >= 0 && shell <= 2) { await sleep(240 * pace()); play('e1', SFX.cannon + shell) }
   const area = strikeArea(a) ? strikeCells(a, c) : []
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const hits: { target: Unit; value: number }[] = []
@@ -276,6 +289,7 @@ async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Mag
 /** 레벨업 연출: 머리 위 「Level Up」. 원작판은 승급·습득만 알림 (원작 0aa2:12f2), 개선판은 오른 능력치까지 */
 async function showLevelUp(u: Unit, r: LevelUp) {
   const { sx, sy } = toScreen(u.x, u.y)
+  play('e1', SFX.levelUp)   // 원작 20ec:9eb6
   await levelUpMark(sx, sy, 1100 * pace())
   const STAT = ['생명', '역량', '방어', '정신', '민첩']
   const lines = remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : []
@@ -285,6 +299,7 @@ async function showLevelUp(u: Unit, r: LevelUp) {
     ...r.magic === undefined ? [] : [`<figure><i class="mg" style="background-position:-${r.magic * 32}px 0"></i><figcaption>마법 습득<br><span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span></figcaption></figure>`]]
   if (!lines.length && !got.length) return
   const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '')
+  if (got.length) play('e1', SFX.upgrade)   // 원작 알림 창 0aa2:12f2 모드 1~3 (승급·습득) = 110
   await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 100 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
@@ -298,6 +313,7 @@ function wake(d: Unit) {
 async function fadeDead(units: Unit[]) {
   const dying = units.filter(u => u.hp <= 0 && u.alpha > 0)
   if (!dying.length) return
+  play('e1', SFX.death)   // 원작 사망 연출 20ec:09d8 (적 감소 20ec:9ad8 앞, 중독 20ec:b155)
   for (let i = 10; i >= 0; i--) { for (const d of dying) d.alpha = i / 10; await sleep(30 * pace()) }
 }
 
@@ -310,10 +326,12 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   S.floats.push({ x: a.x, y: a.y, text: m.name, t0: now, color: '#ffe28a' })
   a.flash = now + 200
   // 원작 시전 동작 (FIG: 마법 쓰는 인물은 3장 — 오브·마법진이 커진다). 마지막 프레임을 이펙트 동안 유지
-  if (await playPose(a, 240)) await sleep(200 * pace())
-  else await sleep(300 * pace())
+  // 효과음: 시전자 초상 번호 소리 → 이펙트 때 마법 소리 ECLIPSE2.FVT[마법 id] (원작 20ec:5d5c → 6348, 6924 → 69eb [근사 시점])
+  if (await playPose(a, 240)) { play('e1', a.type.por); await sleep(200 * pace()) }
+  else { play('e1', a.type.por); await sleep(300 * pace()) }
   const step = 90 * pace(), t0 = performance.now(), cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) }))
   const span = (6 + Math.max(0, ...cells.map(p => p.ring))) * step
+  play('e2', m.id)
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
   const foe = S.ed.rules.spellSide(m) === 'foe'
@@ -828,7 +846,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     ['알림', onOff('알림전환', on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
     ['표기', () => { S.marks = !S.marks; closeWin('system') }],
     ['음악', onOff('음악전환')],
-    ['음향', onOff('음향전환')],
+    ['음향', onOff('음향전환', setSoundOn)],   // 원작 +0x1cb4 (효과음 전부). 웹은 설정 sound 로 기억
     ['조건', () => showGoalsWin()],
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],
   ]
