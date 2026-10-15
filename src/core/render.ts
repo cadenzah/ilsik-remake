@@ -139,21 +139,25 @@ export function frame(now: number) {
 
   // 현대식 화면: 범위를 칸 칠하기로 (이동 파랑·공격 빨강), 원작 화면: 범위 밖 STA 5 체크무늬
   const modern = view.modern
-  const fill = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x * TW + 1, y * TH + 1, TW - 2, TH - 2) }
+  // 칸 칠하기 + 밝은 안쪽 테 (맵 색과 같은 계열이어도 — 파란 동굴의 이동 범위 등 — 칸이 보이게)
+  const fill = (x: number, y: number, c: string, edge = 'rgba(255,248,220,0.75)') => {
+    ctx.fillStyle = c; ctx.fillRect(x * TW + 1, y * TH + 1, TW - 2, TH - 2)
+    ctx.strokeStyle = edge; ctx.lineWidth = 1.5; ctx.strokeRect(x * TW + 2.5, y * TH + 2.5, TW - 5, TH - 5)
+  }
 
   if (remake && (S.threat || S.watch)) {
     const red = ditherRed()
     for (const k of threatTiles(S.threat ? null : S.watch))
-      modern ? fill(k % 1000, Math.floor(k / 1000), 'rgba(255,50,50,0.30)') : ctx.drawImage(red, (k % 1000) * TW, Math.floor(k / 1000) * TH)
+      modern ? fill(k % 1000, Math.floor(k / 1000), 'rgba(200,40,16,0.30)', 'rgba(255,190,160,0.55)') : ctx.drawImage(red, (k % 1000) * TW, Math.floor(k / 1000) * TH)
   }
 
   const md = S.mode
   if (md.kind === 'selected') {
-    if (modern) for (const k of md.moves.keys()) fill(k % 1000, Math.floor(k / 1000), 'rgba(80,140,255,0.38)')
+    if (modern) for (const k of md.moves.keys()) fill(k % 1000, Math.floor(k / 1000), 'rgba(60,70,240,0.38)', 'rgba(225,230,255,0.85)')
     else each((x, y) => { if (!md.moves.has(key(x, y))) piece(ctx, 'sta.5', x * TW, y * TH) })   // 범위 밖을 어둡게 (STA 5)
     if (S.ed.features.quickAttack)
       for (const e of alive('enemy')) if (attackSpots(md.unit, md.moves, e).length)
-        modern ? fill(e.x, e.y, 'rgba(255,70,70,0.45)') : piece(ctx, 'sta.2', e.x * TW, e.y * TH)
+        modern ? fill(e.x, e.y, 'rgba(200,32,0,0.45)', 'rgba(255,200,170,0.9)') : piece(ctx, 'sta.2', e.x * TW, e.y * TH)
     if (remake && S.hover && md.moves.has(key(S.hover.x, S.hover.y))) {
       const path = pathTo(md.moves, S.hover.x, S.hover.y)
       ctx.strokeStyle = 'rgba(255,255,255,0.85)'
@@ -166,7 +170,7 @@ export function frame(now: number) {
   if (md.kind === 'targeting') {
     // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀
     const u = md.unit
-    if (modern) each((x, y) => { const d = dist(u, { x, y }); if (d >= u.range[0] && d <= u.range[1]) fill(x, y, 'rgba(255,70,70,0.30)') })
+    if (modern) each((x, y) => { const d = dist(u, { x, y }); if (d >= u.range[0] && d <= u.range[1]) fill(x, y, 'rgba(200,32,0,0.32)', 'rgba(255,200,170,0.8)') })
     else {
       each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
       if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
@@ -180,7 +184,7 @@ export function frame(now: number) {
     const x = u.px * TW, y = u.py * TH
     ctx.globalAlpha = u.alpha
     if (modern && S.marks) {   // 현대식: 발밑 진영 받침 (원작 화면은 머리 위 STA 13~15)
-      ctx.fillStyle = isNpc(u) ? 'rgba(90,210,140,0.55)' : u.side === 'ally' ? 'rgba(79,140,255,0.55)' : 'rgba(255,90,90,0.55)'
+      ctx.fillStyle = isNpc(u) ? 'rgba(44,140,36,0.6)' : u.side === 'ally' ? 'rgba(42,47,216,0.6)' : 'rgba(200,32,0,0.6)'   // 원작 진영 색 (STA 13~15)
       ctx.beginPath()
       ctx.ellipse(x + TW / 2, y + TH - 6, 20, 6, 0, 0, Math.PI * 2)
       ctx.fill()
@@ -211,8 +215,8 @@ export function frame(now: number) {
     ctx.globalAlpha = 1
   }
   if (modern) {   // 고른 유닛 = 금빛 테두리, 공격 대상 = 빨간 테두리
-    if (turnUnit) { ctx.strokeStyle = `rgba(227,192,107,${0.6 + 0.4 * Math.sin(now / 180)})`; ctx.lineWidth = 3; ctx.strokeRect(turnUnit.px * TW + 2, turnUnit.py * TH + 2, TW - 4, TH - 4) }
-    if (S.aim) { ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 3; ctx.strokeRect(S.aim.x * TW + 2, S.aim.y * TH + 2, TW - 4, TH - 4) }
+    if (turnUnit) { ctx.strokeStyle = `rgba(252,180,44,${0.6 + 0.4 * Math.sin(now / 180)})`; ctx.lineWidth = 3; ctx.strokeRect(turnUnit.px * TW + 2, turnUnit.py * TH + 2, TW - 4, TH - 4) }
+    if (S.aim) { ctx.strokeStyle = '#e04020'; ctx.lineWidth = 3; ctx.strokeRect(S.aim.x * TW + 2, S.aim.y * TH + 2, TW - 4, TH - 4) }
   } else {
     if (turnUnit) piece(ctx, 'sta.1', turnUnit.px * TW, turnUnit.py * TH)
     if (S.aim) piece(ctx, 'sta.2', S.aim.x * TW, S.aim.y * TH)

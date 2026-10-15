@@ -314,13 +314,14 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     modal.innerHTML = `<div class="mc-dlg" role="dialog" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${body ? `<p>${body}</p>` : ''}<div class="mc-btns"></div></div>`
     const box = modal.querySelector('.mc-btns')!
     const close = () => { modal?.remove(); modal = null }
-    for (const [label, fn, off] of acts) {
+    acts.forEach(([label, fn, off], n) => {
       const b = document.createElement('button')
+      if (n === 0 && acts.length === 2) b.className = 'primary'   // 결정·취소 창의 결정 (원작 주황 명령 버튼 색)
       b.textContent = label
       b.disabled = !!off
       b.onclick = () => { close(); fn() }
       box.append(b)
-    }
+    })
     modal.onclick = e => { if (e.target === modal) close() }
     root.append(modal)
     modal.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
