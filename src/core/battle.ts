@@ -91,7 +91,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     S.deploy = resume.deploy
   } else if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
     const goal = chapter()?.card?.[1]
-    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first, modern: ed.id === 'remake' && setting('modernUi'),
+    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
       preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
       slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
         const base = snapshot(), rec = { ...base.equip }

@@ -5,7 +5,7 @@
 // 개선판: 같은 화면에서 바로 편성 (앞에서부터 채워 둠), 대원 하나씩 넣고 빼기, 마우스 올리면 능력치, 남은 칸 표시,
 //   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
-// 현대식 (개선판 설정 modernUi): 배치·동작은 같고 원작 그림 바탕 대신 어두운 패널 + 글자 라벨 + 이름 붙은 버튼 (modernFrame·statusFrame)
+// 현대식 (개선판 설정 modernUi): 다른 화면 (campModern.ts, ux-proposal.md 36). 여기 statusFrame 은 전투 중 큰 인물기본자료의 현대식 바탕
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { hud, mapRect, view } from './screen'
 import { winUrl } from './skin'
@@ -25,7 +25,8 @@ export interface CampOptions {
   /** 기록 3칸 (읽기·기록). list = 칸 이름 (빈 칸 null), save = 지금 정비 화면 상태를 그 칸에 */
   slots?: { list: () => (string | null)[]; save: (i: number, items: number[], equip: UnitType['equip'][]) => void }
   preview?: string    // 개선판: 도구설명 칸에 처음 보일 다음 장 이름·목표 (ux-proposal.md 23)
-  modern?: boolean    // 현대식 화면 (ux-proposal.md 32)
+  modern?: boolean    // 현대식 화면 (campModern.ts)
+  header?: { title: string; goal?: string }   // 현대식 위 바: 장 이름·목표
 }
 
 // 원작 좌표 (화면)
@@ -58,7 +59,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`)
 const px = (x: number, y: number, w?: number, h?: number) =>
   `left:${x}px;top:${y}px${w ? `;width:${w}px` : ''}${h ? `;height:${h}px` : ''}`
 
-function sprite(t: UnitType, big: boolean) {
+export function sprite(t: UnitType, big: boolean) {
   const [w, h] = big ? [SLOT.w, SLOT.h] : [WAIT.w, WAIT.h]
   if (t.id < MINI) return `<i class="spr" style="width:${w}px;height:${h}px;background:url(${A}/ui/${big ? 'camp-face' : 'camp-mini'}.png) -${t.id * w}px 0"></i>`
   return `<i class="spr" style="width:${w}px;height:${h}px;background:url(${A}/units/${String(t.id).padStart(3, '0')}.png) 0 0 / auto ${h}px no-repeat"></i>`
@@ -87,7 +88,7 @@ export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fa
       aria-label="${esc(tables.magic.get(id)?.name ?? '')}"></button>`).join('')
 }
 
-// ---------- 현대식 바탕 (원작 camp-bg·camp-status 그림의 창 자리에 패널, 그림 속 글자는 라벨로) ----------
+// ---------- 현대식 큰 인물기본자료 바탕 (camp-status 그림 자리에 패널, 그림 속 글자는 라벨로) ----------
 
 const panel = (x: number, y: number, w: number, h: number, title: string) =>
   `<div class="mpanel" style="${px(x, y, w, h)}"><b>${title}</b></div>`
@@ -108,15 +109,6 @@ function statusFrame(modern: boolean, x = 0, y = 0) {
     L(166, 246, 16, '마', 'c') + L(166, 300, 16, '법', 'c') + `</div>`
 }
 
-/** 정비 화면 바탕 (640×480): 인물기본자료·도구설명·도구·명령·대기인물·출전인물 */
-function modernFrame() {
-  return panel(375, 12, 175, 76, '도구설명') + panel(375, 94, 175, 248, '도구') + panel(565, 12, 50, 330, '명령') +
-    panel(25, 348, 330, 122, '대기인물') + panel(375, 348, 240, 122, '출전인물') + statusFrame(true, 25, 12)
-}
-// 현대식 버튼 글자 (원작은 그림 속 글자)
-const MODERN_LABEL: Record<string, string> = { read: '읽기', write: '기록', music: '음악', quit: '종료', swap: '⇄', act: '행동',
-  trash: '버림', put: '장착', take: '해제', up: '▲', down: '▼' }
-
 /** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
 export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }) {
   document.querySelector('.bigstat')?.remove()
@@ -134,16 +126,16 @@ export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fat
   hud.append(el)
 }
 
-const icon = (id: number) =>
+export const icon = (id: number) =>
   `<i class="icon" style="background-position:-${((id - 1) % 13) * 48}px -${Math.floor((id - 1) / 13) * 56}px"></i>`
 
 export function campScreen(o: CampOptions): Promise<CampResult> {
+  if (o.modern) return import('./campModern').then(m => m.campModern(o))
   const root = document.createElement('section')
   root.id = 'camp'
-  root.className = [o.remake ? 'remake' : '', o.modern ? 'modern' : ''].join(' ').trim()
-  document.documentElement.classList.toggle('ui-modern', !!o.modern)   // 확인창 (.owin) 도 현대식으로
+  if (o.remake) root.className = 'remake'
   root.innerHTML = `<div class="stage">
-      ${o.modern ? modernFrame() : `<img class="bg" src="${A}/ui/camp-bg.png" alt="">${statusFrame(false, 25, 12)}`}
+      <img class="bg" src="${A}/ui/camp-bg.png" alt="">${statusFrame(false, 25, 12)}
       <i class="por" style="${px(33, 31, 96, 111)}"></i>
       <div class="status"></div>
       <div class="desc" style="${px(383, 31, 203, 56)}"></div>
@@ -394,7 +386,6 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     }
     root.querySelectorAll<HTMLButtonElement>('.hit').forEach(b => {
       const k = b.dataset.b!
-      if (o.modern) { b.textContent = MODERN_LABEL[k] ?? ''; b.classList.add(`m-${k}`) }
       b.onclick = () => { if (!dialog) buttons[k]() }
       if (o.remake) {
         const help = k === 'swap' ? PAGE_HELP.swapRemake : PAGE_HELP[k as keyof typeof PAGE_HELP]
@@ -417,7 +408,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
 }
 
 /** 인물기본자료의 글자 항목. 직업·이동방식은 초상 97~99 이면 안 그림 (원작 7c18) */
-function profile(t: UnitType, L: Labels) {
+export function profile(t: UnitType, L: Labels) {
   const hide = t.por >= 97 && t.por <= 99
   return { race: L.race[t.race] ?? '', sex: L.sex[t.sex] ?? '', job: hide ? '' : L.job[t.job] ?? '',
     move: hide ? '' : L.moveKind[t.moveKind] ?? '', rank: L.rank[t.rank] ?? '' }
