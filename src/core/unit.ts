@@ -23,6 +23,7 @@ export interface Unit {
   mods: Record<BuffStat, number>
   poison: number; coma: number   // 남은 차례 (걸리면 3)
   ticked: boolean                // 이번 라운드 차례 처리 (중독·혼수·강화 되돌림) 를 했다
+  again?: boolean                // 이번 라운드 두 번째 행동을 받았다 (Rules.actsTwice)
   // 렌더용 보간 위치
   px: number; py: number
   alpha: number

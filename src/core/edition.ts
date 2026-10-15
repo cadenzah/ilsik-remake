@@ -23,6 +23,8 @@ export interface Rules {
   spellSide(m: Magic): 'foe' | 'own'
   /** 대상 하나에 대한 마법 결과. 난수가 없으므로 예측과 실행이 같다 */
   spell(caster: Unit, target: Unit, m: Magic): SpellHit
+  /** 이 유닛이 한 차례에 두 번 행동하나 (차례를 마칠 때 검사) */
+  actsTwice(u: Unit): boolean
   /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */
   statusTick(u: Unit): { poison: number; coma: boolean }
   /** 행동 하나로 얻는 경험치 (일행만 부른다). hits = 대상마다 값 (물리·생명상해 = 피해, 회복 = 회복량, 그 밖 0), 대상 HP 0 = 쓰러뜨림.

@@ -116,7 +116,7 @@ export function writeSlot(ed: EditionId, i: number, slot: SaveSlot) {
 
 export interface UnitSave { x: number; y: number; hp: number; fatigue: number; acted: boolean; moved: boolean; steps: number
   facing: 'down' | 'up' | 'left' | 'right'; alpha: number; onMap: boolean
-  mods?: Record<BuffStat, number>; poison?: number; coma?: number; ticked?: boolean }   // 마법 상태 (없으면 없음)
+  mods?: Record<BuffStat, number>; poison?: number; coma?: number; ticked?: boolean; again?: boolean }   // 마법 상태 (없으면 없음)
 export interface Suspended {
   def: StageDef; title: string; at: Camp; deploy: number[]
   turn: number; units: UnitSave[]; troopState: number[]; fired: number[]; told: string[]; joined: number[]; flags: string[]; saved: number

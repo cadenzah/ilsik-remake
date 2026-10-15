@@ -145,6 +145,8 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
   return out
 }
 
+const HYEYU = 17, GALE_SHOES = 165   // 두 번 행동 특례 (초상·도구 Item id)
+
 /** 판 규칙. fixComaBug = 혼수 판정 원작 버그 고침 (개선판) */
 export function makeRules(fixComaBug = false): Rules { return {
   damageRange(map, a, d, at) {
@@ -177,6 +179,8 @@ export function makeRules(fixComaBug = false): Rules { return {
   spellRange: m => m.range === 0 ? [0, 0] : [isFoeSpell(m) ? 1 : 0, m.range],
   spellSide: m => isFoeSpell(m) ? 'foe' : 'own',
   spell: (a, d, m) => spell(a, d, m, fixComaBug),
+  // 2ff8:1109 [확정]: 차례를 마칠 때 초상 17 (혜유) 이 도구 질풍화 (165) 를 차고 현재 민첩 > 60 이면 그 차례를 한 번 더 (휴식 포함, 세 번째는 없음)
+  actsTwice: u => u.type.por === HYEYU && u.type.equip[2] === GALE_SHOES && u.agi > 60,
   // 매 차례 (20ec:a419): 중독 → 1 줄고 HP −= max(1, trunc(HP·0.33)) / 혼수 → 1 줄고 휴식하고 넘김 /
   // 강화·약화 남은량 r → d = min(r, 1 + floor(10r/(현재 정신 + 50))) 만큼 원상 쪽으로
   statusTick(u) {

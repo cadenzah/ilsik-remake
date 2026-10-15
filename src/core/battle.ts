@@ -366,7 +366,8 @@ function rest(u: Unit) {
 function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   if (S.ed.features.autoRest && !attacked && !magic && !u.moved) rest(u)
   else tire(u, attacked, magic)
-  u.acted = true
+  const twice = again(u)
+  if (!twice) u.acted = true
   S.mode = { kind: 'idle' }
   hideMenu()
   hideBasic()
@@ -374,6 +375,7 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   void checkEnd().then(over => {
     if (over) stepDone?.(true)
     else if (S.active.every(a => a.acted || a.hp <= 0)) stepDone?.(false)
+    else if (twice && remake() && S.mode.kind === 'idle') select(u)   // 개선판: 두 번째 행동할 대원을 골라 둔다
   })
 }
 
@@ -607,7 +609,7 @@ async function turnEvents() {
 async function runRounds(resumed = false, intro?: () => Promise<void>) {
   for (;;) {
     if (!resumed) {
-      for (const u of [...S.units, ...S.reserve]) { u.acted = false; u.moved = false; u.steps = 0; u.ticked = false }
+      for (const u of [...S.units, ...S.reserve]) { u.acted = false; u.moved = false; u.steps = 0; u.ticked = false; u.again = false }
       S.mode = { kind: 'busy' }
       await turnEvents()
       await intro?.()
@@ -685,25 +687,38 @@ async function aiSteps(units: Unit[]): Promise<boolean> {
     const st = await tickUnit(u)
     if (st === 'over') return true
     if (st === 'skip') continue
-    const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
-    if (plan.rest) { rest(u); continue }
-    const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
-    const acts = path.length > 1 || (plan.target && plan.target.hp > 0) || !!plan.magic
-    if (acts && units.length === 1) updatePhase(phase.side, u.type.name)
-    if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
-    if (plan.magic && plan.at) {
-      centerOnIfOff(plan.at)
-      await castSpell(u, plan.magic, plan.at)
-      tire(u, false, plan.magic)
-      if (await checkEnd()) return true
-      continue
-    }
-    const hits = !!plan.target && plan.target.hp > 0
-    if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
-    tire(u, hits)
-    if (await checkEnd()) return true
+    do { if (await aiAct(u, units.length === 1)) return true } while (again(u))
   }
   return false
+}
+/** 컴퓨터 유닛 행동 하나. 전투가 끝나면 true */
+async function aiAct(u: Unit, alone: boolean): Promise<boolean> {
+  const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
+  if (plan.rest) { rest(u); return false }
+  const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
+  const acts = path.length > 1 || (plan.target && plan.target.hp > 0) || !!plan.magic
+  if (acts && alone) updatePhase(phase.side, u.type.name)
+  if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
+  if (plan.magic && plan.at) {
+    centerOnIfOff(plan.at)
+    await castSpell(u, plan.magic, plan.at)
+    tire(u, false, plan.magic)
+    return checkEnd()
+  }
+  const hits = !!plan.target && plan.target.hp > 0
+  if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
+  tire(u, hits)
+  return checkEnd()
+}
+
+/** 차례를 마친 뒤 두 번째 행동을 받나 (원작 2ff8:1109, 라운드에 한 번). 받으면 이동 기록을 지우고 true */
+function again(u: Unit): boolean {
+  if (u.again || u.hp <= 0 || !S.units.includes(u) || !S.ed.rules.actsTwice(u)) return false
+  u.again = true
+  u.moved = false
+  u.steps = 0
+  if (remake()) S.floats.push({ x: u.x, y: u.y - 0.4, text: '한 번 더', t0: performance.now(), color: '#ffe27a' })
+  return true
 }
 
 /** 차례 시작 (20ec:a419): 판 규칙의 상태 이상 처리. 'over' = 중독으로 전투가 끝남, 'skip' = 혼수·사망으로 이번 차례 없음 */
@@ -793,7 +808,7 @@ function suspend() {
   writeSuspended(S.ed.id, {
     def: S.def, title: chapterTitle(), at: atStart, deploy: S.deploy, turn: S.turn,
     units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u),
-      mods: { ...u.mods }, poison: u.poison, coma: u.coma, ticked: u.ticked })),
+      mods: { ...u.mods }, poison: u.poison, coma: u.coma, ticked: u.ticked, again: u.again })),
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
     grown: snapshot().grown, equip: snapshot().equip,
   })
