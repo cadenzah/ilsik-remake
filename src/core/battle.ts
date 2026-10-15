@@ -2,7 +2,8 @@
 import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
-import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
+import { dist, key, pathTo, reachable, terrainName } from './grid'
+import { aimsFrom, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
@@ -215,25 +216,35 @@ async function playPose(u: Unit, ms: number) {
   return true
 }
 
-async function attack(a: Unit, d: Unit) {
-  a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
+/** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
+async function attack(a: Unit, c: Unit) {
+  const targets = strikeTargets(a, c)
+  const d = c === a ? targets[0] ?? c : c   // 바라볼 쪽
+  if (d !== a) a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
   // 원작 공격 동작 (FIG 준비 → 타격). 그림이 없으면 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
   if (!await playPose(a, 280)) {
     a.px += Math.sign(d.x - a.x) * 0.25; a.py += Math.sign(d.y - a.y) * 0.25
     await sleep(200 * pace())
     a.px = a.x; a.py = a.y
   }
-  const dmg = S.ed.rules.rollDamage(S.map, a, d)
-  d.hp = Math.max(0, d.hp - dmg)
-  d.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
-  wake(d)
-  d.flash = performance.now() + 160
-  S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
+  const area = strikeArea(a) ? strikeCells(a, c) : []
+  if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
+  const hits: { target: Unit; value: number }[] = []
+  for (const t of targets) {
+    const dmg = S.ed.rules.rollDamage(S.map, a, t)
+    t.hp = Math.max(0, t.hp - dmg)
+    t.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
+    wake(t)
+    t.flash = performance.now() + 160
+    S.floats.push({ x: t.x, y: t.y, text: `-${dmg}`, t0: performance.now(), color: t.side === 'ally' ? '#ff8080' : '#ffffff' })
+    hits.push({ target: t, value: dmg })
+  }
   await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
   a.pose = undefined
   await sleep(220 * pace())
-  await fadeDead([d])
-  await gainExp(a, [{ target: d, value: dmg }])
+  S.fx = null
+  await fadeDead(targets)
+  await gainExp(a, hits)
 }
 
 // ---------- 경험치·레벨업 (원작 20ec:9b1d, 0aa2:1afd — 행동 실행 끝, 피로 계산 뒤) ----------
@@ -619,7 +630,7 @@ function firstToMove(units: Unit[]): Unit | null {
   const foes = alive('enemy')
   const score = (u: Unit) => {
     const moves = reachable(S.map, S.units, u)
-    if (foes.some(f => attackSpots(u, moves, f).length)) return 2
+    if (foes.length && strikePlans(u, moves).length) return 2
     return moves.size > 1 ? 1 : 0
   }
   return live.map(u => ({ u, s: score(u) })).sort((a, b) => b.s - a.s)[0]?.u ?? null
@@ -861,7 +872,7 @@ export async function clickTile(t: Pos) {
       return
     }
     if (md.kind === 'targeting' && md.magic) { if (validCenter(md.unit, md.magic, t)) askMagic(md.unit, md.magic, t) }
-    else if (md.kind === 'targeting' && there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
+    else if (md.kind === 'targeting' && there && canAim(md.unit, there)) askAttack(md.unit, there)
     return
   }
   // 개선판
@@ -875,9 +886,10 @@ export async function clickTile(t: Pos) {
     if (there === u) { actionMenu(u, { x: u.x, y: u.y }); return }
     if (there && canCommand(there)) { select(there); return }
     if (there?.side === 'enemy' && S.ed.features.quickAttack) {
-      // 이동 + 공격을 한 번에: 대상에 닿는 칸 중 가장 가까운 곳으로 (확인창 결정 뒤)
-      const spots = attackSpots(u, md.moves, there).sort((a, b) => dist(a, u) - dist(b, u))
-      if (spots.length) { askAttack(u, there, spots[0], md.moves); return }
+      // 이동 + 공격을 한 번에: 그 적을 맞히는 (칸, 중심) 중 아군을 덜 맞히고 가장 가까운 칸으로 (확인창 결정 뒤)
+      const own = (p: { spot: Pos; center: Unit }) => strikeTargets(u, p.center, p.spot).filter(o => o.side === u.side).length
+      const plan = strikePlans(u, md.moves, there).sort((a, b) => own(a) - own(b) || dist(a.spot, u) - dist(b.spot, u))[0]
+      if (plan) { askAttack(u, plan.center, plan.spot, md.moves); return }
       S.watch = S.watch === there ? null : there
       return
     }
@@ -887,7 +899,9 @@ export async function clickTile(t: Pos) {
   }
   if (md.kind !== 'targeting') return
   if (md.magic) { if (validCenter(md.unit, md.magic, t)) askMagic(md.unit, md.magic, t); else back(); return }
-  if (there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
+  // 범위 공격은 맞을 적을 눌러도 된다 (그 적을 맞히는 중심 — 기사는 자기·아군, 포수는 다른 적)
+  const c = there && (canAim(md.unit, there) ? there : aimsFrom(md.unit).find(c => strikeTargets(md.unit, c).includes(there) && there.side !== md.unit.side))
+  if (c) askAttack(md.unit, c)
   else back()   // 대상이 아닌 칸 = 한 단계 뒤로 (행동 메뉴)
 }
 
@@ -911,18 +925,31 @@ export function hoverTile(t: Pos | null) {
   showBasic(there, aboveUnit(sx, sy, 112), { extra: true })
 }
 
-/** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다. spot = 개선판 이동+공격 때 설 칸 */
+/** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸 */
 function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>) {
-  S.aim = { x: target.x, y: target.y }
+  const cp = target === u ? spot ?? u : target
+  S.aim = { x: cp.x, y: cp.y }
   hideBasic()
   let body: string | undefined
+  let lines = 0
   if (S.ed.features.forecast) {
-    const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
     const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
-    const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
-    body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
+    const hit = strikeTargets(u, target, spot ?? u)
+    if (hit.length === 1 && hit[0] === target) {
+      const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
+      const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
+    } else {
+      // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
+      body = hit.map(t => {
+        const [lo] = S.ed.rules.damageRange(S.map, u, t, spot ?? u)
+        const name = t.side === u.side ? `<span class="red">${esc(t.type.name)} (아군)</span>` : esc(t.type.name)
+        return `${name} −${lo}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
+      }).join('<br>')
+      lines = hit.length
+    }
   }
-  const { sx, sy } = toScreen(target.x + 1, target.y)
+  const { sx, sy } = toScreen(cp.x + 1, cp.y)
   const go = () => {
     S.aim = null
     void (async () => {
@@ -936,7 +963,7 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
     })()
   }
   if (remake() ? setting('quickAttack') : !S.notice) { go(); return }   // 원작: 알림을 열었을 때만 확인 (기본 닫기), 개선판: 설정으로 생략
-  confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body)
+  confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, lines ? 200 : undefined)
 }
 
 /** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): [마법]·이동·전투·상황·시스템 (마법은 마법 있는 유닛만) */
@@ -989,7 +1016,7 @@ export function back() {
 export function actionMenu(u: Unit, from: Pos) {
   S.mode = { kind: 'moved', unit: u, from }
   const undo = () => { undoMove(u, from); if (remake()) select(u); else commandMenu(u) }
-  const targets = alive('enemy').filter(e => inRange(u, u, e))
+  const targets = aimsFrom(u)
   const magic: Btn[] = spellsOf(u).length ? [['마법', () => magicMenu(u, from, () => actionMenu(u, from))]] : []
   const items: Btn[] = remake()
     ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ...magic, ['대기', () => finishUnit(u)],

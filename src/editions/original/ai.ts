@@ -1,10 +1,12 @@
 // 적 AI. 행동 여부는 원작 부대 상태(+0x235) [확정, 20ec:a419]:
 //   0 행동 · 1 경계 대기 (일행이 닿으면 또는 맞으면 0) · 2 대기 (장 이벤트로만 풀림) · 3 행동, 이동력 0 · 4 숨김
 // 행동할 때의 대상 고르기는 근사 [근사]: 공격 가능한 대상 중 가장 큰 피해(처치 우선), 없으면 가장 가까운 상대 쪽으로.
+//   범위 공격 (기사·포수, core/attack.ts) 은 맞는 유닛 점수 합, 같은 편이 맞으면 뺀다 (원작 AI 도 포수 중심 둘레의 같은 편 칸을 센다 124e:596e)
 // 마법은 공격 유형 1 (직업 8~14, 124e:22ab) 유닛만 [확정]. 어떤 마법을 어디에 쓰는지는 근사 [근사, 124e:284a / 4d43 미분석]: 아래 점수가 물리보다 크면.
 import type { StageMap } from '../../core/data'
 import type { AiPlan } from '../../core/edition'
-import { attackSpots, DIRS, dist, inside, key, moveCost, reachable } from '../../core/grid'
+import { DIRS, dist, inside, key, moveCost, reachable } from '../../core/grid'
+import { aimsFrom, strikeTargets } from '../../core/attack'
 import type { Magic } from '../../core/data'
 import type { Pos, Unit } from '../../core/unit'
 import { aiCaster, spellCenters, spellTargets, spellsOf } from '../../core/magic'
@@ -40,16 +42,19 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
   const moves = reachable(map, units, u)
   let best: AiPlan | null = null
   let bestScore = -Infinity
-  for (const f of foes) {
-    const spots = attackSpots(u, moves, f)
-    if (!spots.length) continue
-    // 같은 대상이면 이동이 적은 칸 우선
-    spots.sort((a, b) => dist(a, u) - dist(b, u))
-    const [lo, hi] = rules.damageRange(map, u, f, spots[0])
-    const score = (lo >= f.hp ? 1000 : 0) + (lo + hi) / 2 - f.def * 0.1
-    if (score > bestScore) {
-      bestScore = score
-      best = { unit: u, dest: spots[0], target: f }
+  for (const k of moves.keys()) {
+    const spot = { x: k % 1000, y: Math.floor(k / 1000) }
+    for (const c of aimsFrom(u, spot, units)) {
+      let score = -dist(spot, u) * 0.01, own = 0   // 같으면 이동이 적은 칸
+      for (const t of strikeTargets(u, c, spot, units)) {
+        const [lo, hi] = rules.damageRange(map, u, t, spot)
+        const v = (lo >= t.hp ? 1000 : 0) + (lo + hi) / 2 - t.def * 0.1
+        if (t.side === u.side) { own++; score -= 1.5 * Math.max(1, v) } else score += v
+      }
+      if ((!own || score > 0) && score > bestScore) {   // 같은 편이 맞으면 남는 게 있을 때만
+        bestScore = score
+        best = { unit: u, dest: spot, target: c }
+      }
     }
   }
   if (aiCaster(u)) {

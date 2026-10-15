@@ -46,7 +46,7 @@ export const S = {
   marks: true,                 // 진영 표시 (원작 시스템 → 표기)
   notice: false,               // 원작 시스템 → 알림: 공격·마법 확인창 (기본 닫기, 저장 안 됨 — formats.md "시스템 창 설정")
   cam: { x: 0, y: 0, scale: 1 },
-  // 마법 연출: 원작 ECLIPSE.MAG 프레임 (base = 마법 id×6) 을 칸마다 ring 박자 늦게 6장, 밑에 계열 색 칠하기
+  // 마법 연출: 원작 ECLIPSE.MAG 프레임 (base = 마법 id×6) 을 칸마다 ring 박자 늦게 6장, 밑에 계열 색 칠하기. base < 0 = 칠하기만 (기사·포수 범위 공격)
   fx: null as { cells: (Pos & { ring: number })[]; base: number; step: number; color: string; t0: number; until: number } | null,
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }

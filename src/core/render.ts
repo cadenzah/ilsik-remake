@@ -2,10 +2,11 @@
 // 원작 전투 부품 (ux.md 1절): 이동 범위 = 범위 밖 칸에 STA 5 체크무늬, 공격 범위 = 화면을 보랏빛으로 어둡게 + 사거리 칸만 원래 색
 // (사거리 1 이면 STA 3 십자 틀), 차례 유닛 = STA 1 모서리 괄호, 공격 대상 = STA 2 틀, 진영 표시 = 머리 위 STA 13·14·15
 import { A, TH, TW } from './data'
-import { attackSpots, dist, key, pathTo, reachable } from './grid'
+import { key, pathTo, reachable } from './grid'
+import { canAim, inReach, reachCells, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { frameImage, layout, mapRect, view } from './screen'
 import { piece, size } from './skin'
-import { alive, isNpc, S } from './state'
+import { alive, isNpc, S, unitAt } from './state'
 import { aiCaster, areaCells, inSpellRange, spellTargets, spellsOf } from './magic'
 import type { Pos, Unit } from './unit'
 
@@ -84,15 +85,15 @@ export function centerOnIfOff(p: Pos) {
 function threatTiles(only?: Unit | null): Set<number> {
   const out = new Set<number>()
   for (const e of only ? [only] : alive('enemy')) {
-    // 마법을 쓰는 적 (공격 유형 1) 은 쓸 수 있는 공격 마법의 사거리 + 범위까지
-    const reach = Math.max(e.range[1], ...(aiCaster(e) ? spellsOf(e).filter(m => S.ed.rules.spellSide(m) === 'foe' && S.ed.rules.canCast(e, m)).map(m => m.range + m.area) : []))
-    const lo = reach > e.range[1] ? 1 : e.range[0]
+    // 물리는 공격 유형대로 (core/attack.ts). 마법을 쓰는 적 (공격 유형 1) 은 쓸 수 있는 공격 마법의 사거리 + 범위까지
+    const reach = Math.max(0, ...(aiCaster(e) ? spellsOf(e).filter(m => S.ed.rules.spellSide(m) === 'foe' && S.ed.rules.canCast(e, m)).map(m => m.range + m.area) : []))
     for (const k of reachable(S.map, S.units, e).keys()) {
       const x = k % 1000, y = Math.floor(k / 1000)
+      reachCells(e, { x, y }, out)
       for (let dy = -reach; dy <= reach; dy++)
         for (let dx = -reach; dx <= reach; dx++) {
           const d = Math.abs(dx) + Math.abs(dy)
-          if (d >= lo && d <= reach) out.add(key(x + dx, y + dy))
+          if (d >= 1 && d <= reach) out.add(key(x + dx, y + dy))
         }
     }
   }
@@ -165,7 +166,7 @@ export function frame(now: number) {
     if (modern) for (const k of md.moves.keys()) fill(k % 1000, Math.floor(k / 1000), 'rgba(60,70,240,0.38)', 'rgba(225,230,255,0.85)')
     else each((x, y) => { if (!md.moves.has(key(x, y))) piece(ctx, 'sta.5', x * TW, y * TH) })   // 범위 밖을 어둡게 (STA 5)
     if (S.ed.features.quickAttack)
-      for (const e of alive('enemy')) if (attackSpots(md.unit, md.moves, e).length)
+      for (const e of new Set(strikePlans(md.unit, md.moves).flatMap(p => strikeTargets(md.unit, p.center, p.spot)).filter(t => t.side === 'enemy')))
         modern ? fill(e.x, e.y, 'rgba(200,32,0,0.45)', 'rgba(255,200,170,0.9)') : piece(ctx, 'sta.2', e.x * TW, e.y * TH)
     if (remake && S.hover && md.moves.has(key(S.hover.x, S.hover.y))) {
       const path = pathTo(md.moves, S.hover.x, S.hover.y)
@@ -190,12 +191,25 @@ export function frame(now: number) {
       for (const t of spellTargets(S.ed.rules, u, m, S.hover)) ctx.strokeRect(t.x * TW + 3, t.y * TH + 3, TW - 6, TH - 6)
     }
   } else if (md.kind === 'targeting') {
-    // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀
+    // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀.
+    // 궁수·추전수·포수는 같은 행·열만, 기사는 자기 칸부터 (core/attack.ts)
     const u = md.unit
-    if (modern) each((x, y) => { const d = dist(u, { x, y }); if (d >= u.range[0] && d <= u.range[1]) fill(x, y, 'rgba(200,32,0,0.32)', 'rgba(255,200,170,0.8)') })
+    if (modern) each((x, y) => { if (inReach(u, u, { x, y })) fill(x, y, 'rgba(200,32,0,0.32)', 'rgba(255,200,170,0.8)') })
     else {
-      each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
+      each((x, y) => { if (!inReach(u, u, { x, y })) piece(ctx, 'sta.5', x * TW, y * TH) })
       if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
+    }
+    // 범위 공격 (기사·포수): 가리킨 중심의 범위 칸과 맞을 유닛 (원작도 고르는 동안 범위 커서를 그린다 20ec:e1df — 모양 [근사])
+    const c = S.hover && unitAt(S.hover.x, S.hover.y)
+    if (strikeArea(u) && c && canAim(u, c)) {
+      for (const p of strikeCells(u, c)) {
+        ctx.fillStyle = 'rgba(255,170,40,0.40)'; ctx.fillRect(p.x * TW + 2, p.y * TH + 2, TW - 4, TH - 4)
+        ctx.strokeStyle = 'rgba(255,250,210,0.9)'; ctx.lineWidth = 1.5; ctx.strokeRect(p.x * TW + 2.5, p.y * TH + 2.5, TW - 5, TH - 5)
+      }
+      for (const t of strikeTargets(u, c)) {
+        ctx.strokeStyle = t.side === u.side ? '#ff5040' : '#fff2a0'; ctx.lineWidth = 3
+        ctx.strokeRect(t.x * TW + 3, t.y * TH + 3, TW - 6, TH - 6)
+      }
     }
   }
 
@@ -265,7 +279,7 @@ export function frame(now: number) {
 
   // 마법 이펙트 (원작 20ec:5c0f): 박자마다 다음 프레임. 범위 마법은 중심에서 한 칸 멀어질 때마다 한 박자 늦게.
   // 프레임 56×96 을 칸 위로 한 칸 걸쳐 그린다 (y − 48)
-  if (S.fx && now < S.fx.until && fxImg.complete) {
+  if (S.fx && S.fx.base >= 0 && now < S.fx.until && fxImg.complete) {   // base < 0 = 밑칠만 (물리 범위 공격)
     const beat = Math.floor((now - S.fx.t0) / S.fx.step)
     for (const c of S.fx.cells) {
       const n = beat - c.ring

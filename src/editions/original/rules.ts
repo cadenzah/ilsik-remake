@@ -152,10 +152,12 @@ export function makeRules(fixComaBug = false): Rules { return {
     return [v, v]
   },
   rollDamage: (map, a, d) => damage(map, a, d),
-  // 무기 EAD f2 = 사거리, f3 = 범위 (0aa2:17dd → +0x44/+0x46, 무기 없으면 1/0). 사거리 범람 모양·최소 사거리는 [추정] 마름모·1
+  // 무기 EAD f2 = 사거리, f3 = 범위 (0aa2:17dd → +0x44/+0x46, 무기 없으면 1/0). 사거리 범람 모양은 [추정] 마름모.
+  // 사거리 칸은 자기 칸을 포함하고 (f2 = 0 이면 자기 칸만, 20ec:d9b0) 자기 칸은 같은 편 표시라 상대를 노리는 공격에선 빠진다 → 최소 1.
+  // 기사 (직업 15, 공격 유형 2) 는 같은 편을 중심으로 고르므로 자기 칸부터 (core/attack.ts). 그 밖의 f2 = 0 (지팡이·부적 등) 은 [근사] 1
   weaponRange(t, items) {
     const f2 = items.get(t.equip[0])?.f2 ?? 1
-    return [1, Math.max(1, f2)]
+    return t.job === 15 ? [0, f2] : [1, Math.max(1, f2)]
   },
   // 휴식 20ec:038e: HP += int(최대HP × 0.1 + 2), 피로 −= min(30, 피로)
   restHeal: u => Math.trunc(u.maxHp * 0.1 + 2),

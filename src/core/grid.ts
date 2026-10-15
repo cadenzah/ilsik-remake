@@ -64,17 +64,3 @@ export function pathTo(moves: Moves, x: number, y: number): Pos[] {
 }
 
 export const dist = (a: Pos, b: Pos) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-export const inRange = (u: Unit, from: Pos, t: Pos) => {
-  const d = dist(from, t)
-  return d >= u.range[0] && d <= u.range[1]
-}
-
-/** 공격자가 서 있을 수 있는 칸 집합 중 대상에게 닿는 칸들 */
-export function attackSpots(u: Unit, moves: Moves, t: Pos): Pos[] {
-  const out: Pos[] = []
-  for (const k of moves.keys()) {
-    const p = { x: k % 1000, y: Math.floor(k / 1000) }
-    if (inRange(u, p, t)) out.push(p)
-  }
-  return out
-}
