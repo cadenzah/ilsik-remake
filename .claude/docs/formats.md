@@ -175,7 +175,7 @@ FIG = 공격·시전 동작 [확정 2026-10-16, `export_web.py figs` → units/f
 
 ## 효과음 FVT — 확정 (`tools/voc.py`)
 파일 안의 "Creative Voice File\x1a" 위치마다 VOC 하나. 블록1 = 8비트 PCM, rate = 1e6/(256-tc). 22222Hz 모노.
-ECLIPSE1.FVT 112개, ECLIPSE2.FVT 74개, ECPANI 15, ECPMARK 2. 모두 3초 이하 효과음. **배경음악 없음** (원래 CD 오디오 트랙이었을 가능성, ISO엔 없음).
+ECLIPSE1.FVT 112개, ECLIPSE2.FVT 74개, ECPANI 15, ECPMARK 2. 모두 3초 이하 효과음. FVT 에는 배경음악 없음 — 배경음악은 `ECLIPSE.FMT` (CTMF FM, "기타 시그니처" 참고).
 
 ## ECLIPSE.BAD 스테이지 배치 — 확정 (`tools/bad.py`, 2026-10-12)
 레코드 300B × 129, EXE 는 앞 252B(126 u16) 만 읽음. **레코드 = (스테이지-1)*3 + 루트(0~2)**.
