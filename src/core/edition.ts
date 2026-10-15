@@ -1,7 +1,7 @@
 // 판(에디션) 인터페이스. 엔진(core)은 공통이고, 규칙·행동 순서·AI·편의 기능은 판마다 다르다 (.claude/docs/editions.md)
 import type { ScriptSource } from './script'
-import type { ExtraBattle, Item, StageMap, UnitType } from './data'
-import type { Pos, Unit } from './unit'
+import type { ExtraBattle, Item, Magic, StageMap, UnitType } from './data'
+import type { BuffStat, Pos, Unit } from './unit'
 
 export interface Rules {
   /** 피해 범위 [최소, 최대]. at = 공격자가 칠 자리 (없으면 지금 자리, 지형 보정용) */
@@ -13,11 +13,30 @@ export interface Rules {
   restHeal(u: Unit): number
   /** 휴식 뒤 피로 */
   restFatigue(u: Unit): number
-  /** 차례를 마칠 때 피로 (u.steps = 이번 차례에 움직인 칸, attacked = 공격했나) */
-  fatigueAfter(u: Unit, attacked: boolean): number
+  /** 차례를 마칠 때 피로 (u.steps = 이번 차례에 움직인 칸, attacked = 공격했나, magic = 쓴 마법) */
+  fatigueAfter(u: Unit, attacked: boolean, magic?: Magic): number
+  /** 마법을 쓸 수 있나 (피로) */
+  canCast(u: Unit, m: Magic): boolean
+  /** 마법 중심 칸 거리 [최소, 최대] (시전자 자리에서) */
+  spellRange(m: Magic): [number, number]
+  /** 이 마법이 듣는 편: 'foe' = 시전자의 상대편, 'own' = 시전자 편 */
+  spellSide(m: Magic): 'foe' | 'own'
+  /** 대상 하나에 대한 마법 결과. 난수가 없으므로 예측과 실행이 같다 */
+  spell(caster: Unit, target: Unit, m: Magic): SpellHit
+  /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */
+  statusTick(u: Unit): { poison: number; coma: boolean }
 }
 
-export interface AiPlan { unit: Unit; dest: Pos; target?: Unit; rest?: boolean }   // rest = 제자리 휴식
+/** 마법 한 대상의 결과. hp = 피해, heal = 회복 (fatigue = 줄일 피로), stat = 강화·약화 (value 부호), tire = 피로 증가,
+ *  poison·coma = 걸림 (3 차례), cure = 풀기 (what), miss = 듣지 않음 (혼수 실패·면역) */
+export type SpellHit =
+  | { kind: 'hp' | 'tire'; value: number }
+  | { kind: 'heal'; value: number; fatigue: number }
+  | { kind: 'stat'; stat: BuffStat; value: number }
+  | { kind: 'poison' | 'coma' | 'miss' }
+  | { kind: 'cure'; what: 'poison' | 'coma' | 'all' }
+
+export interface AiPlan { unit: Unit; dest: Pos; target?: Unit; rest?: boolean; magic?: Magic; at?: Pos }   // rest = 제자리 휴식, magic = dest 에서 at 칸에 마법
 
 export interface Edition {
   id: 'original' | 'remake'

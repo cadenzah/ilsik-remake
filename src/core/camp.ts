@@ -65,7 +65,7 @@ export function sprite(t: UnitType, big: boolean) {
   return `<i class="spr" style="width:${w}px;height:${h}px;background:url(${A}/units/${String(t.id).padStart(3, '0')}.png) 0 0 / auto ${h}px no-repeat"></i>`
 }
 /** 인물기본자료 글자 (WIN 1 위, 화면 좌표 = 창 + (25,12)). cur = 전투 중 현재 생명·피로 */
-export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fatigue: number }) {
+export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fatigue: number; atk?: number; def?: number; spi?: number; agi?: number }) {
   const st = equippedStats(t, tables.items)
   const p = profile(t, tables.labels)
   const row = (y: number, label: string, now: number, max: number) =>
@@ -76,8 +76,8 @@ export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fa
     `<span class="txt" style="${px(221, 78)}">${esc(p.sex)}</span>` +
     `<span class="txt" style="${px(221, 98)}">${esc(p.job)}</span>` +
     `<span class="txt" style="${px(221, 119)}">${t.lv}</span>` +
-    row(148, '생명', cur?.hp ?? st.maxHp, st.maxHp) + row(168, '역량', st.atk, st.atk) + row(188, '방어', st.def, st.def) +
-    row(208, '정신', st.spi, st.spi) + row(228, '민첩', st.agi, st.agi) +
+    row(148, '생명', cur?.hp ?? st.maxHp, st.maxHp) + row(168, '역량', cur?.atk ?? st.atk, st.atk) + row(188, '방어', cur?.def ?? st.def, st.def) +
+    row(208, '정신', cur?.spi ?? st.spi, st.spi) + row(228, '민첩', cur?.agi ?? st.agi, st.agi) +   // 전투 중 = 강화·약화 반영한 현재치
     `<span class="txt" style="${px(270, 147)}">${st.mov}</span>` +
     `<span class="txt b" style="${px(270, 167)}">${esc(p.move)}</span>` +
     `<span class="txt" style="${px(270, 187)}">${esc(p.rank)}</span>` +
@@ -110,7 +110,7 @@ function statusFrame(modern: boolean, x = 0, y = 0) {
 }
 
 /** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
-export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }, onClose?: () => void) {
+export function statusWindow(t: UnitType, tables: Tables, cur: Parameters<typeof statusMarkup>[2] & {}, onClose?: () => void) {
   document.querySelector('.bigstat')?.remove()
   const m = mapRect()
   const el = document.createElement('div')

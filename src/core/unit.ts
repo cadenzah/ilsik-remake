@@ -17,11 +17,18 @@ export interface Unit {
   acted: boolean
   moved: boolean                 // 이번 차례에 움직였다 (휴식 판정, 이동 취소 때 되돌린다)
   facing: 'down' | 'up' | 'left' | 'right'
+  // 마법 상태 [확정, rules.md "원작 전투 공식"]. atk·def·spi·agi 는 현재치 = base + mods (강화 +, 약화 −, 남은량 = |mods|)
+  base: Record<BuffStat, number> // 최대치 (장비 보정 뒤)
+  mods: Record<BuffStat, number>
+  poison: number; coma: number   // 남은 차례 (걸리면 3)
+  ticked: boolean                // 이번 라운드 차례 처리 (중독·혼수·강화 되돌림) 를 했다
   // 렌더용 보간 위치
   px: number; py: number
   alpha: number
   flash: number
 }
+
+export type BuffStat = 'atk' | 'def' | 'spi' | 'agi'
 
 export interface Pos { x: number; y: number }
 
@@ -41,4 +48,9 @@ export function equippedStats(t: UnitType, items: Map<number, Item>): Stats {
     }
   }
   return s
+}
+
+/** 강화·약화를 반영한 현재 능력치로 맞춘다 */
+export function applyMods(u: Unit) {
+  for (const k of ['atk', 'def', 'spi', 'agi'] as const) u[k] = Math.max(0, u.base[k] + u.mods[k])
 }

@@ -6,6 +6,7 @@ import { attackSpots, dist, key, pathTo, reachable } from './grid'
 import { frameImage, layout, mapRect, view } from './screen'
 import { piece, size } from './skin'
 import { alive, isNpc, S } from './state'
+import { aiCaster, areaCells, inSpellRange, spellTargets, spellsOf } from './magic'
 import type { Pos, Unit } from './unit'
 
 export const canvas = document.getElementById('view') as HTMLCanvasElement
@@ -78,12 +79,15 @@ export function centerOnIfOff(p: Pos) {
 function threatTiles(only?: Unit | null): Set<number> {
   const out = new Set<number>()
   for (const e of only ? [only] : alive('enemy')) {
+    // 마법을 쓰는 적 (공격 유형 1) 은 쓸 수 있는 공격 마법의 사거리 + 범위까지
+    const reach = Math.max(e.range[1], ...(aiCaster(e) ? spellsOf(e).filter(m => S.ed.rules.spellSide(m) === 'foe' && S.ed.rules.canCast(e, m)).map(m => m.range + m.area) : []))
+    const lo = reach > e.range[1] ? 1 : e.range[0]
     for (const k of reachable(S.map, S.units, e).keys()) {
       const x = k % 1000, y = Math.floor(k / 1000)
-      for (let dy = -e.range[1]; dy <= e.range[1]; dy++)
-        for (let dx = -e.range[1]; dx <= e.range[1]; dx++) {
+      for (let dy = -reach; dy <= reach; dy++)
+        for (let dx = -reach; dx <= reach; dx++) {
           const d = Math.abs(dx) + Math.abs(dy)
-          if (d >= e.range[0] && d <= e.range[1]) out.add(key(x + dx, y + dy))
+          if (d >= lo && d <= reach) out.add(key(x + dx, y + dy))
         }
     }
   }
@@ -167,7 +171,20 @@ export function frame(now: number) {
       ctx.stroke()
     }
   }
-  if (md.kind === 'targeting') {
+  if (md.kind === 'targeting' && md.magic) {
+    // 마법: 중심 칸 사거리 밖을 STA 5 로 (원작 모양 미확인 [근사]). 개선판은 가리킨 중심의 범위 칸과 듣는 대상을 밝게
+    const u = md.unit, m = md.magic, own = S.ed.rules.spellSide(m) === 'own'
+    if (modern) each((x, y) => { if (inSpellRange(S.ed.rules, m, u, { x, y })) fill(x, y, own ? 'rgba(40,170,90,0.30)' : 'rgba(200,32,0,0.32)', 'rgba(255,240,200,0.8)') })
+    else each((x, y) => { if (!inSpellRange(S.ed.rules, m, u, { x, y })) piece(ctx, 'sta.5', x * TW, y * TH) })
+    if (remake && S.hover && inSpellRange(S.ed.rules, m, u, S.hover)) {
+      for (const c of areaCells(m, S.hover)) {
+        ctx.fillStyle = 'rgba(255,200,40,0.45)'; ctx.fillRect(c.x * TW + 2, c.y * TH + 2, TW - 4, TH - 4)
+        ctx.strokeStyle = 'rgba(255,250,210,0.9)'; ctx.lineWidth = 1.5; ctx.strokeRect(c.x * TW + 2.5, c.y * TH + 2.5, TW - 5, TH - 5)
+      }
+      ctx.strokeStyle = '#fff2a0'; ctx.lineWidth = 3
+      for (const t of spellTargets(S.ed.rules, u, m, S.hover)) ctx.strokeRect(t.x * TW + 3, t.y * TH + 3, TW - 6, TH - 6)
+    }
+  } else if (md.kind === 'targeting') {
     // 사거리 밖을 이동 범위와 같은 STA 5 체크무늬로 (DOSBox a38: 보랏빛으로 보인 것은 축소 캡처의 착시), 사거리 1 이면 STA 3 십자 틀
     const u = md.unit
     if (modern) each((x, y) => { const d = dist(u, { x, y }); if (d >= u.range[0] && d <= u.range[1]) fill(x, y, 'rgba(200,32,0,0.32)', 'rgba(255,200,170,0.8)') })
@@ -175,6 +192,13 @@ export function frame(now: number) {
       each((x, y) => { const d = dist(u, { x, y }); if (d < u.range[0] || d > u.range[1]) piece(ctx, 'sta.5', x * TW, y * TH) })
       if (u.range[0] === 1 && u.range[1] === 1) piece(ctx, 'sta.3', (u.x - 1) * TW, (u.y - 1) * TH)
     }
+  }
+
+  // 마법 연출: 범위 칸을 계열 색으로 번쩍 [근사] (원작 ECLIPSE.MAG 이펙트 시트는 미반영)
+  if (S.fx && now < S.fx.until) {
+    const k = (now - S.fx.t0) / (S.fx.until - S.fx.t0)
+    ctx.fillStyle = `rgba(${S.fx.color},${(0.65 * Math.sin(Math.PI * Math.min(1, k * 1.3))).toFixed(3)})`
+    for (const c of S.fx.cells) ctx.fillRect(c.x * TW, c.y * TH, TW, TH)
   }
 
   // 유닛 (y 순으로 그려 겹침 자연스럽게)
@@ -211,6 +235,7 @@ export function frame(now: number) {
       ctx.fillRect(x + 8, y + TH - 4, TW - 16, 4)
       ctx.fillStyle = u.side === 'ally' ? '#55d17a' : '#ff6b6b'
       ctx.fillRect(x + 8, y + TH - 4, ((TW - 16) * u.hp) / u.maxHp, 4)
+      statusDots(u, x, y)
     }
     ctx.globalAlpha = 1
   }
@@ -248,6 +273,16 @@ export function frame(now: number) {
   if (!view.modern) ctx.drawImage(frameImage(), 0, 0)
   for (const f of afterFrame) f(now)
   requestAnimationFrame(frame)
+}
+
+/** 개선판: 상태 이상 점 (중독 보라 · 혼수 파랑 · 강화 하늘 · 약화 주황), 생명 막대 위 오른쪽 */
+function statusDots(u: Unit, x: number, y: number) {
+  const mods = Object.values(u.mods)
+  const dots = [u.poison > 0 && '#c070ff', u.coma > 0 && '#5aa8ff', mods.some(v => v > 0) && '#9ad8ff', mods.some(v => v < 0) && '#ff9a40'].filter(Boolean) as string[]
+  dots.forEach((c, i) => {
+    ctx.fillStyle = '#000'; ctx.fillRect(x + TW - 14 - i * 8, y + TH - 12, 7, 7)
+    ctx.fillStyle = c; ctx.fillRect(x + TW - 13 - i * 8, y + TH - 11, 5, 5)
+  })
 }
 
 /** 모서리 괄호를 둘 유닛: 원작판 = 지금 차례 유닛, 개선판 = 고른 유닛 */

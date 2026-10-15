@@ -1,7 +1,8 @@
-// 개선판: 원작판을 바탕으로 덮어쓴다. 지금은 원작판 규칙·AI + 페이즈제 턴 + 편의 기능
+// 개선판: 원작판을 바탕으로 덮어쓴다. 지금은 원작판 규칙 (혼수 버그 고침)·AI + 페이즈제 턴 + 편의 기능
 import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
+import { makeRules } from '../original/rules'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
@@ -16,6 +17,7 @@ export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
+  rules: makeRules(true),   // 원작 규칙에서 혼수 판정 버그만 고침 (정신이 훨씬 높은 대상에게 늘 걸리던 것)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {
     const party = units.filter(u => u.troop === 0)

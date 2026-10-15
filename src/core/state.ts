@@ -1,5 +1,5 @@
 // 전투 상태 — 엔진 모듈들이 함께 읽고 쓴다
-import type { CondRule, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
+import type { CondRule, Magic, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
 import type { Edition } from './edition'
 import type { Moves } from './grid'
 import type { Placement, StageDef } from './stage'
@@ -10,7 +10,7 @@ export type Mode =
   | { kind: 'idle' }
   | { kind: 'selected'; unit: Unit; moves: Moves }
   | { kind: 'moved'; unit: Unit; from: Pos }
-  | { kind: 'targeting'; unit: Unit; from: Pos }
+  | { kind: 'targeting'; unit: Unit; from: Pos; magic?: Magic }   // magic = 마법 중심 칸 고르기
 
 export const S = {
   ed: null as unknown as Edition,
@@ -45,6 +45,7 @@ export const S = {
   marks: true,                 // 진영 표시 (원작 시스템 → 표기)
   notice: false,               // 원작 시스템 → 알림: 공격·마법 확인창 (기본 닫기, 저장 안 됨 — formats.md "시스템 창 설정")
   cam: { x: 0, y: 0, scale: 1 },
+  fx: null as { cells: Pos[]; color: string; t0: number; until: number } | null,   // 마법 연출: 범위 칸 칠하기
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }
 

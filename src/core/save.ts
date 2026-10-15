@@ -1,6 +1,7 @@
 // 진행 저장 (판마다 따로, localStorage). "다음에 할 장"과 그때의 장 사이 상태(플래그·일행·소지품), 클리어한 장을 남긴다
 import type { Camp } from './campaign'
 import type { StageDef } from './stage'
+import type { BuffStat } from './unit'
 
 export type EditionId = 'original' | 'remake'
 
@@ -113,7 +114,8 @@ export function writeSlot(ed: EditionId, i: number, slot: SaveSlot) {
 // ---------- 중단 저장 (개선판 전투 중 메뉴 → 중단, ux-proposal.md 21). 이어하기 때 불러오고 지운다 ----------
 
 export interface UnitSave { x: number; y: number; hp: number; fatigue: number; acted: boolean; moved: boolean; steps: number
-  facing: 'down' | 'up' | 'left' | 'right'; alpha: number; onMap: boolean }
+  facing: 'down' | 'up' | 'left' | 'right'; alpha: number; onMap: boolean
+  mods?: Record<BuffStat, number>; poison?: number; coma?: number; ticked?: boolean }   // 마법 상태 (없으면 없음)
 export interface Suspended {
   def: StageDef; title: string; at: Camp; deploy: number[]
   turn: number; units: UnitSave[]; troopState: number[]; fired: number[]; told: string[]; joined: number[]; flags: string[]; saved: number

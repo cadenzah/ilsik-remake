@@ -26,7 +26,7 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   el.innerHTML = vals.map((v, i) => `<img class="ic" alt="" src="${pieceUrl(`icon.${i}.0`)}" style="left:${(W - NARROW) / 2 + 12 + i * 32}px">
       <span class="v" style="left:${(W - NARROW) / 2 + 8 + i * 32}px">${String(v).padStart(2, '0')}</span>`).join('')
     + `<img class="ic face" alt="큰 창" src="${pieceUrl('icon.4.0')}" style="left:${(W - NARROW) / 2 + 12 + 4 * 32 + 2}px">`
-    + (opts.extra ? `<div class="x"><b>${esc(u.type.name)}</b> Lv ${u.type.lv}${u.side === 'ally' && u.troop !== 0 ? ' · NPC' : ''}
+    + (opts.extra ? `<div class="x"><b>${esc(u.type.name)}</b> Lv ${u.type.lv}${u.side === 'ally' && u.troop !== 0 ? ' · NPC' : ''}${statusTags(u)}
         <br><span class="dim">${esc(terrainName(S.map, u.x, u.y).replace(/ \(.*\)/, ''))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span></div>` : '')
   const face = el.querySelector<HTMLElement>('.face')!
   if (opts.onFace) { face.classList.add('btn'); face.onclick = e => { e.stopPropagation(); opts.onFace!() } }
@@ -39,6 +39,17 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   basic = el
 }
 export const hideBasic = () => showBasic(null)
+
+/** 개선판 줄: 상태 이상 (중독·혼수 남은 차례, 강화·약화) */
+function statusTags(u: Unit) {
+  const name = { atk: '역량', def: '방어', spi: '정신', agi: '민첩' } as const
+  const tags = [
+    ...u.poison > 0 ? [`<span class="red">중독${u.poison}</span>`] : [],
+    ...u.coma > 0 ? [`<span class="blue">혼수${u.coma}</span>`] : [],
+    ...(Object.keys(name) as (keyof typeof name)[]).filter(k => u.mods[k]).map(k => `${name[k]}${u.mods[k] > 0 ? '+' : ''}${u.mods[k]}`),
+  ]
+  return tags.length ? ` · ${tags.join(' ')}` : ''
+}
 
 /** 유닛 위쪽에 둘 자리 (가리지 않게: 위가 모자라면 아래) */
 export function aboveUnit(sx: number, sy: number, h = 74) {

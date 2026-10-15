@@ -1,5 +1,5 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Member } from './data'
+import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
 import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
@@ -21,7 +21,8 @@ import { stageDef, type Placement, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, openWin, showMenu, showResult, type Btn } from './ui'
-import { equippedStats, type Pos, type Unit } from './unit'
+import { applyMods, equippedStats, type Pos, type Unit } from './unit'
+import { SCHOOL_COLOR, applyHit, areaCells, hitLine, hitText, inSpellRange, spellCenters, spellDesc, spellTargets, spellsOf } from './magic'
 
 const STEP_MS = 110
 // 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
@@ -38,6 +39,7 @@ function spawn(p: Placement, side: Unit['side']): Unit {
   return {
     uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: t.fatigue, steps: 0,
     range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
+    base: { atk: st.atk, def: st.def, spi: st.spi, agi: st.agi }, mods: { atk: 0, def: 0, spi: 0, agi: 0 }, poison: 0, coma: 0, ticked: false,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
   }
 }
@@ -190,13 +192,45 @@ async function attack(a: Unit, d: Unit) {
   a.px = a.x; a.py = a.y
   const dmg = S.ed.rules.rollDamage(S.map, a, d)
   d.hp = Math.max(0, d.hp - dmg)
-  if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }   // 경계 부대는 맞으면 깨어난다 (원작 20ec:93b5)
+  d.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
+  wake(d)
   d.flash = performance.now() + 160
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
   await sleep(350 * pace())
-  if (d.hp <= 0) {
-    for (let i = 10; i >= 0; i--) { d.alpha = i / 10; await sleep(30 * pace()) }
+  await fadeDead([d])
+}
+
+/** 경계 부대는 공격·마법에 맞으면 깨어난다 (원작 20ec:93b5) */
+function wake(d: Unit) {
+  if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }
+}
+
+async function fadeDead(units: Unit[]) {
+  const dying = units.filter(u => u.hp <= 0 && u.alpha > 0)
+  if (!dying.length) return
+  for (let i = 10; i >= 0; i--) { for (const d of dying) d.alpha = i / 10; await sleep(30 * pace()) }
+}
+
+/** 마법 (행동 실행 20ec:6e92 마법 분기): 범위 안 대상편마다 판 규칙의 결과. c = 중심 칸 */
+async function castSpell(a: Unit, m: Magic, c: Pos) {
+  if (c.x !== a.x || c.y !== a.y) a.facing = c.x > a.x ? 'right' : c.x < a.x ? 'left' : c.y > a.y ? 'down' : 'up'
+  const targets = spellTargets(S.ed.rules, a, m, c)
+  const now = performance.now()
+  S.fx = { cells: areaCells(m, c), color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0: now, until: now + 520 * pace() }
+  S.floats.push({ x: a.x, y: a.y, text: m.name, t0: now, color: '#ffe28a' })
+  a.flash = now + 200
+  await sleep(380 * pace())
+  const foe = S.ed.rules.spellSide(m) === 'foe'
+  for (const t of targets) {
+    const h = S.ed.rules.spell(a, t, m)   // 예측과 같은 값 (난수 없음)
+    applyHit(t, h)
+    if (foe) wake(t)
+    if (h.kind === 'hp') t.flash = performance.now() + 160
+    S.floats.push({ x: t.x, y: t.y, ...hitText(h, t.side), t0: performance.now() })
   }
+  await sleep(380 * pace())
+  S.fx = null
+  await fadeDead(targets)
 }
 
 /** 휴식 [확정 20ec:038e]: HP 를 판 규칙만큼 (최대HP 까지) 회복 */
@@ -208,9 +242,9 @@ function rest(u: Unit) {
 }
 
 /** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
-function finishUnit(u: Unit, attacked = false) {
-  if (S.ed.features.autoRest && !attacked && !u.moved) rest(u)
-  else tire(u, attacked)
+function finishUnit(u: Unit, attacked = false, magic?: Magic) {
+  if (S.ed.features.autoRest && !attacked && !magic && !u.moved) rest(u)
+  else tire(u, attacked, magic)
   u.acted = true
   S.mode = { kind: 'idle' }
   hideMenu()
@@ -223,8 +257,8 @@ function finishUnit(u: Unit, attacked = false) {
 }
 
 /** 차례를 마칠 때 피로 (공격·이동). 휴식한 차례는 쌓지 않는다 */
-function tire(u: Unit, attacked: boolean) {
-  u.fatigue = S.ed.rules.fatigueAfter(u, attacked)
+function tire(u: Unit, attacked: boolean, magic?: Magic) {
+  u.fatigue = S.ed.rules.fatigueAfter(u, attacked, magic)
   u.steps = 0
 }
 
@@ -452,7 +486,7 @@ async function turnEvents() {
 async function runRounds(resumed = false, intro?: () => Promise<void>) {
   for (;;) {
     if (!resumed) {
-      for (const u of S.units) { u.acted = false; u.moved = false; u.steps = 0 }
+      for (const u of [...S.units, ...S.reserve]) { u.acted = false; u.moved = false; u.steps = 0; u.ticked = false }
       S.mode = { kind: 'busy' }
       await turnEvents()
       await intro?.()
@@ -466,6 +500,10 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
       const side = party ? 'ally' : isNpc(lead) ? 'npc' : 'enemy'
       if (party && live.every(u => u.acted)) continue   // 중단 저장에서 이어 온 턴: 이미 마친 단계
       updatePhase(side, step.length > 1 ? '' : lead.type.name)
+      if (party) {   // 차례 시작 처리 (중독·혼수·강화 되돌림). 혼수 대원은 휴식하고 넘긴다
+        for (const u of live) if (await tickUnit(u) === 'over') return
+        if (live.every(u => u.acted || u.hp <= 0)) continue
+      }
       if (party && step.length > 1) await goGo(900)
       if (await (party ? playerStep(live) : aiStep(step))) return
     }
@@ -481,7 +519,7 @@ function playerStep(units: Unit[]): Promise<boolean> {
     stepDone = over => { stepDone = null; S.active = []; updatePhase(); ok(over) }
     S.mode = { kind: 'idle' }
     // 원작판은 유닛을 눌러 명령부터 고른다. 개선판은 차례가 오면 움직일 대원을 골라 둔다
-    const first = units.length === 1 ? units[0] : remake() ? firstToMove(units) : null
+    const first = units.length === 1 ? units[0] : remake() ? firstToMove(units) : null   // 혼수로 넘긴 대원은 runRounds 가 미리 거른다
     if (first) {
       centerOnIfOff(first)
       if (remake()) select(first)
@@ -523,18 +561,52 @@ async function aiStep(units: Unit[]): Promise<boolean> {
 async function aiSteps(units: Unit[]): Promise<boolean> {
   for (const u of units) {
     if (u.hp <= 0 || !S.units.includes(u)) continue
+    const st = await tickUnit(u)
+    if (st === 'over') return true
+    if (st === 'skip') continue
     const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
     if (plan.rest) { rest(u); continue }
     const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
-    const acts = path.length > 1 || (plan.target && plan.target.hp > 0)
+    const acts = path.length > 1 || (plan.target && plan.target.hp > 0) || !!plan.magic
     if (acts && units.length === 1) updatePhase(phase.side, u.type.name)
     if (path.length > 1) { centerOnIfOff(u); await walk(u, path) }
+    if (plan.magic && plan.at) {
+      centerOnIfOff(plan.at)
+      await castSpell(u, plan.magic, plan.at)
+      tire(u, false, plan.magic)
+      if (await checkEnd()) return true
+      continue
+    }
     const hits = !!plan.target && plan.target.hp > 0
     if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
     tire(u, hits)
     if (await checkEnd()) return true
   }
   return false
+}
+
+/** 차례 시작 (20ec:a419): 판 규칙의 상태 이상 처리. 'over' = 중독으로 전투가 끝남, 'skip' = 혼수·사망으로 이번 차례 없음 */
+async function tickUnit(u: Unit): Promise<'ok' | 'skip' | 'over'> {
+  if (u.ticked) return u.acted ? 'skip' : 'ok'
+  u.ticked = true
+  const r = S.ed.rules.statusTick(u)
+  if (r.poison) {
+    centerOnIfOff(u)
+    u.flash = performance.now() + 160
+    S.floats.push({ x: u.x, y: u.y, text: `-${r.poison}`, t0: performance.now(), color: '#d48cff' })
+    await sleep(350 * pace())
+    await fadeDead([u])
+    if (await checkEnd()) return 'over'
+  }
+  if (u.hp <= 0) return 'skip'
+  if (r.coma) {
+    rest(u)
+    S.floats.push({ x: u.x, y: u.y - 0.4, text: '혼수', t0: performance.now(), color: '#9ad8ff' })
+    u.acted = true
+    if (!aiTurn) await sleep(300 * pace())
+    return 'skip'
+  }
+  return 'ok'
 }
 
 // ---------- 화면 (띠·미니맵) ----------
@@ -599,7 +671,8 @@ function suspend() {
   const all = [...S.units, ...S.reserve].sort((a, b) => a.uid - b.uid)
   writeSuspended(S.ed.id, {
     def: S.def, title: chapterTitle(), at: atStart, deploy: S.deploy, turn: S.turn,
-    units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u) })),
+    units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u),
+      mods: { ...u.mods }, poison: u.poison, coma: u.coma, ticked: u.ticked })),
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
   })
   toTitle()
@@ -608,7 +681,7 @@ function suspend() {
 /** 중단 저장에서 이어 하기: 유닛·부대·발동 기록을 되돌리고 그 턴 아군 차례부터 */
 async function resumeAt(r: Suspended, all: Unit[]) {
   writeSuspended(S.ed.id, null)   // 한 번 불러오면 지운다
-  all.forEach((u, i) => { const v = r.units[i]; if (!v) return; const { onMap: _, ...rest } = v; Object.assign(u, rest, { px: v.x, py: v.y }) })
+  all.forEach((u, i) => { const v = r.units[i]; if (!v) return; const { onMap: _, ...rest } = v; Object.assign(u, rest, { px: v.x, py: v.y }); applyMods(u) })
   S.units = all.filter((_, i) => r.units[i]?.onMap ?? true)
   S.reserve = all.filter((_, i) => r.units[i] && !r.units[i].onMap)
   S.troopState = [...r.troopState]
@@ -701,7 +774,8 @@ export async function clickTile(t: Pos) {
       if (md.moves.has(key(t.x, t.y)) || there === md.unit) await moveTo(md.unit, t)
       return
     }
-    if (md.kind === 'targeting' && there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
+    if (md.kind === 'targeting' && md.magic) { if (validCenter(md.unit, md.magic, t)) askMagic(md.unit, md.magic, t) }
+    else if (md.kind === 'targeting' && there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
     return
   }
   // 개선판
@@ -726,6 +800,7 @@ export async function clickTile(t: Pos) {
     return
   }
   if (md.kind !== 'targeting') return
+  if (md.magic) { if (validCenter(md.unit, md.magic, t)) askMagic(md.unit, md.magic, t); else back(); return }
   if (there?.side === 'enemy' && inRange(md.unit, md.unit, there)) askAttack(md.unit, there)
   else back()   // 대상이 아닌 칸 = 한 단계 뒤로 (행동 메뉴)
 }
@@ -745,7 +820,7 @@ export function hoverTile(t: Pos | null) {
   if (!remake()) return
   setTerrain(t ? terrainName(S.map, t.x, t.y) : null)
   const there = t && unitAt(t.x, t.y)
-  if (!there || S.mode.kind === 'busy' || modalOpen()) { hideBasic(); return }
+  if (!there || S.mode.kind === 'busy' || modalOpen() || (S.mode.kind === 'targeting' && S.mode.magic)) { hideBasic(); return }   // 마법 범위 미리보기를 가리지 않게
   const { sx, sy } = toScreen(there.x, there.y)
   showBasic(there, aboveUnit(sx, sy, 112), { extra: true })
 }
@@ -778,11 +853,12 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
   confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body)
 }
 
-/** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): 이동·전투·상황·시스템 (마법은 마법 구현 때) */
+/** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): [마법]·이동·전투·상황·시스템 (마법은 마법 있는 유닛만) */
 export function commandMenu(u: Unit) {
   const here = { x: u.x, y: u.y }
   S.mode = { kind: 'idle' }
   showMenu([
+    ...spellsOf(u).length ? [['마법', () => magicMenu(u, here, () => commandMenu(u))] as Btn] : [],
     ['이동', () => select(u)],
     ['전투', () => { S.mode = { kind: 'targeting', unit: u, from: here } }],   // 원작: 사거리에 적이 없어도 들어간다
     ['상황', () => { const p = beside(u); showBasic(u, { x: p.x, y: p.y }, { onFace: () => bigStatus(u) }) }],
@@ -793,7 +869,7 @@ export function commandMenu(u: Unit) {
 /** 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘 → 정비 화면 상태창과 같은 창) — 정비 화면 상태창을 맵 가운데에. onClose = 닫은 뒤 */
 function bigStatus(u: Unit, onClose?: () => void) {
   hideBasic()
-  void import('./camp').then(m => m.statusWindow(u.type, S.tables, { hp: u.hp, fatigue: u.fatigue }, onClose))
+  void import('./camp').then(m => m.statusWindow(u.type, S.tables, { hp: u.hp, fatigue: u.fatigue, atk: u.atk, def: u.def, spi: u.spi, agi: u.agi }, onClose))
 }
 
 /** 휴식 확인 「휴식」 (원작 DS:0x1f64, 20ec:c25c: 결정 → 회복하고 차례 끝). 원작판: 창이 없을 때 오른쪽 클릭 */
@@ -828,10 +904,11 @@ export function actionMenu(u: Unit, from: Pos) {
   S.mode = { kind: 'moved', unit: u, from }
   const undo = () => { undoMove(u, from); if (remake()) select(u); else commandMenu(u) }
   const targets = alive('enemy').filter(e => inRange(u, u, e))
+  const magic: Btn[] = spellsOf(u).length ? [['마법', () => magicMenu(u, from, () => actionMenu(u, from))]] : []
   const items: Btn[] = remake()
-    ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ['대기', () => finishUnit(u)],
+    ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ...magic, ['대기', () => finishUnit(u)],
       ['상태', () => bigStatus(u, () => actionMenu(u, from))], ['취소', undo]]   // 상태 = 터치 기기용 (마우스는 올리면 작은 창)
-    : [['전투', () => { S.mode = { kind: 'targeting', unit: u, from } }], ['결정', () => finishUnit(u)], ['취소', undo]]
+    : [...magic, ['전투', () => { S.mode = { kind: 'targeting', unit: u, from } }], ['결정', () => finishUnit(u)], ['취소', undo]]
   const p = beside(u)
   showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() })
 }
@@ -842,6 +919,56 @@ export async function doAttack(u: Unit, target: Unit) {
   hideBasic()
   await attack(u, target)
   finishUnit(u, true)
+}
+
+// ---------- 마법 ----------
+
+/** 고를 수 있는 중심 칸: 사거리 안이고 범위에 대상편이 있다 */
+function validCenter(u: Unit, m: Magic, c: Pos) {
+  return inSpellRange(S.ed.rules, m, u, c) && spellTargets(S.ed.rules, u, m, c).length > 0
+}
+
+/** 마법 목록 「마법」. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다. 개선판은 닿는 대상이 없어도 못 고르고, 설명 칸에 효과·사거리·피로.
+ *  [근사] 원작 마법 창 (ECPMAG) 모양은 미확인 — comma 창 글자 버튼으로 */
+function magicMenu(u: Unit, from: Pos, onBack: () => void) {
+  const list = spellsOf(u)
+  const usable = (m: Magic) => S.ed.rules.canCast(u, m) && (!remake() || spellCenters(S.ed.rules, u, m).length > 0)
+  const hint = `피로 ${u.fatigue} · 쓸 마법을 고른다`
+  const el = openWin({ title: '마법', kind: 'menu', at: beside(u), btnW: 112,
+    body: remake() ? `<span class="hint">${esc(hint)}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? 220 : undefined,
+    buttons: list.map((m): Btn => [m.name, () => { S.mode = { kind: 'targeting', unit: u, from, magic: m } }, { disabled: !usable(m), title: spellDesc(m) }]),
+    onBack: () => { closeWin('menu'); onBack() } })
+  if (!remake()) return
+  const box = el.querySelector<HTMLElement>('.hint')!
+  el.querySelectorAll<HTMLButtonElement>('.obtn').forEach((b, i) => {
+    const m = list[i]
+    const why = !S.ed.rules.canCast(u, m) ? ' (피로가 모자람)' : !usable(m) ? ' (닿는 대상 없음)' : ''
+    b.onmouseenter = b.onfocus = () => { box.textContent = spellDesc(m) + why }
+    b.onmouseleave = () => { box.textContent = hint }
+  })
+}
+
+/** 「마 법」 확인 (원작 DS:0x1f6a, 알림을 열었을 때만). 개선판은 대상마다 예측 줄 */
+function askMagic(u: Unit, m: Magic, c: Pos) {
+  S.aim = { x: c.x, y: c.y }
+  hideBasic()
+  let body: string | undefined
+  if (S.ed.features.forecast) {
+    const lines = spellTargets(S.ed.rules, u, m, c).map(t => esc(hitLine(t, S.ed.rules.spell(u, t, m))))
+    body = [esc(m.name), ...lines.slice(0, 6), ...lines.length > 6 ? [`외 ${lines.length - 6}명`] : []].join('<br>')
+  }
+  const go = () => { S.aim = null; void doMagic(u, m, c) }
+  if (remake() ? setting('quickAttack') : !S.notice) { go(); return }
+  const { sx, sy } = toScreen(c.x + 1, c.y)
+  confirmWin('마 법', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, body ? 240 : undefined)
+}
+
+async function doMagic(u: Unit, m: Magic, c: Pos) {
+  S.mode = { kind: 'busy' }
+  hideMenu()
+  hideBasic()
+  await castSpell(u, m, c)
+  finishUnit(u, false, m)
 }
 
 /** 오른쪽 클릭·Esc 입구 (개선판은 맵·창 바깥 누르기도): 큰 상태창 → 떠 있는 창 → 맵 순서 */
