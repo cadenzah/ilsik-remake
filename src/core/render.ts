@@ -1,7 +1,7 @@
 // 캔버스 렌더와 카메라. 캔버스는 창 전체 (장치 픽셀), 그림은 논리 좌표 (screen.ts) 로 그린다.
 // 원작 전투 부품 (ux.md 1절): 이동 범위 = 범위 밖 칸에 STA 5 체크무늬, 공격 범위 = 화면을 보랏빛으로 어둡게 + 사거리 칸만 원래 색
 // (사거리 1 이면 STA 3 십자 틀), 차례 유닛 = STA 1 모서리 괄호, 공격 대상 = STA 2 틀, 진영 표시 = 머리 위 STA 13·14·15
-import { TH, TW } from './data'
+import { A, TH, TW } from './data'
 import { attackSpots, dist, key, pathTo, reachable } from './grid'
 import { frameImage, layout, mapRect, view } from './screen'
 import { piece, size } from './skin'
@@ -14,6 +14,11 @@ const ctx = canvas.getContext('2d')!
 
 // 이동 프레임: 0~2 아래, 3~4 위, 5~6 왼쪽, 7~8 오른쪽
 const FRAMES = { down: [0, 1, 2, 1], up: [3, 4], left: [5, 6], right: [7, 8] } as const
+
+// 마법 이펙트 아틀라스 (export_web.py magic-fx): 56×96 칸 24열, 칸 = 원작 프레임 번호
+const FX_W = 56, FX_H = 96, FX_COLS = 24
+const fxImg = new Image()
+fxImg.src = `${A}/ui/magic-fx.png`
 
 // ---------- 카메라 (맵 픽셀, cam.scale = 확대) ----------
 
@@ -194,10 +199,10 @@ export function frame(now: number) {
     }
   }
 
-  // 마법 연출: 범위 칸을 계열 색으로 번쩍 [근사] (원작 ECLIPSE.MAG 이펙트 시트는 미반영)
+  // 마법 연출 밑칠: 범위 칸을 계열 색으로 은은히 (웹 보탬 — 원작은 이펙트만)
   if (S.fx && now < S.fx.until) {
     const k = (now - S.fx.t0) / (S.fx.until - S.fx.t0)
-    ctx.fillStyle = `rgba(${S.fx.color},${(0.65 * Math.sin(Math.PI * Math.min(1, k * 1.3))).toFixed(3)})`
+    ctx.fillStyle = `rgba(${S.fx.color},${(0.35 * Math.sin(Math.PI * k)).toFixed(3)})`
     for (const c of S.fx.cells) ctx.fillRect(c.x * TW, c.y * TH, TW, TH)
   }
 
@@ -252,6 +257,18 @@ export function frame(now: number) {
     ctx.strokeStyle = 'rgba(255,226,138,.9)'
     ctx.lineWidth = 2
     ctx.strokeRect(S.hover.x * TW + 1, S.hover.y * TH + 1, TW - 2, TH - 2)
+  }
+
+  // 마법 이펙트 (원작 20ec:5c0f): 박자마다 다음 프레임. 범위 마법은 중심에서 한 칸 멀어질 때마다 한 박자 늦게.
+  // 프레임 56×96 을 칸 위로 한 칸 걸쳐 그린다 (y − 48)
+  if (S.fx && now < S.fx.until && fxImg.complete) {
+    const beat = Math.floor((now - S.fx.t0) / S.fx.step)
+    for (const c of S.fx.cells) {
+      const n = beat - c.ring
+      if (n < 0 || n > 5) continue
+      const f = S.fx.base + n
+      ctx.drawImage(fxImg, (f % FX_COLS) * FX_W, Math.floor(f / FX_COLS) * FX_H, FX_W, FX_H, c.x * TW, c.y * TH - (FX_H - TH), FX_W, FX_H)
+    }
   }
 
   // 피해 숫자 (원작: 빨강)

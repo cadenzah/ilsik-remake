@@ -3,7 +3,7 @@
 import json, os, struct, sys
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__))
-import stage, units, tables, bad, script, cond
+import stage, units, tables, bad, script, cond, font
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 IMG = os.path.join(ROOT, 'build', 'img')
@@ -131,6 +131,8 @@ def export_camp():
         bg.paste(E[k], xy)
     bg.paste(Image.open(os.path.join(IMG, 'ECLIPSE.WIN', '002.png')).convert('RGB'), (25, 12))
     bg.save(os.path.join(d, 'camp-bg.png'))
+    camp_setting_button(bg).save(os.path.join(d, 'camp-setting.png'))
+    button_sprite(bg, 147).save(os.path.join(d, 'camp-quit.png'))   # 개선판: 종료를 한 칸 아래로 옮겨 그린다
     Image.open(os.path.join(IMG, 'ECLIPSE.WIN', '001.png')).convert('RGB').save(os.path.join(d, 'camp-status.png'))
     for name, src, (w, h), cols in (('camp-face', '001', (56, 48), 11), ('camp-mini', '002', (46, 39), 13)):
         sheet = rgba(os.path.join(IMG, 'ECLIPSE.BS', src + '.png'))
@@ -153,6 +155,42 @@ def export_camp():
     rgba(os.path.join(IMG, 'ECLIPSE.STA', '011.png')).save(os.path.join(d, 'camp-x.png'))   # STA 11 = 장착 불가 빨간 X (46×39)
 
 
+def button_sprite(bg, y, face=None):
+    """정비 화면 명령 버튼 (화면 (568,y) 46×25) 을 바깥 테 안쪽만 남겨 RGBA 로. face = 버튼 면을 바꾼 그림 (없으면 원래 그대로)"""
+    EDGE = ((0, 0, 0), (0, 24, 12))
+    src = bg.crop((568, y, 614, y + 25)); s = src.load(); p = (face or src).load()
+    out = Image.new('RGBA', src.size); o = out.load()
+    for yy in range(src.height):
+        xs = [x for x in range(src.width) if s[x, yy] in EDGE]
+        for x in range(xs[0], xs[-1] + 1) if xs else ():
+            o[x, yy] = p[x, yy] + (255,)
+    return out
+
+
+def camp_setting_button(bg):
+    """개선판 원작 모양 정비 화면의 「설정」 버튼 46×25 (웹 보탬). 음악 다음 = 원래 종료 칸 (화면 (568,147)), 종료는 한 칸 아래 (568,182) 로 (camp-quit).
+    원작 「음악」 버튼 (화면 (568,112)) 의 글자·그림자를 지워 줄마다 띠 색으로 메우고, 원작 글꼴 (FULLSOFT) 로 '설정' 을
+    흰 1px 획 + 오른쪽 검은 그림자 1px (원작 버튼 글자 규칙) 으로 얹는다. 자리 = 원작 버튼 글자 여백에 맞춤
+    (안쪽 면 6~40열 중 글자 8~38열·그림자 39 이하, 세로 6~19행). 버튼 바깥 테 밖은 투명"""
+    from collections import Counter
+    W, K = (252, 252, 252), (0, 0, 0)
+    b = bg.crop((568, 112, 614, 137)); p = b.load()
+    for y in range(4, 22):
+        c = Counter(p[x, y] for x in range(6, 40) if p[x, y] not in (W, K)).most_common(1)[0][0]
+        for x in range(5, 41):
+            if p[x, y] in (W, K): p[x, y] = c
+    pts = set()
+    for i, ch in enumerate('설정'):
+        w, rows = font.glyph(ch)
+        for r, bits in enumerate(rows):
+            for c in range(w):
+                if bits >> (w - 1 - c) & 1: pts.add((7 + i * 17 + c, 6 + r))
+    for x, y in pts: p[x, y] = W
+    for x, y in pts:
+        if (x + 1, y) not in pts: p[x + 1, y] = K
+    return button_sprite(bg, 112, b)
+
+
 def export_status_icons():
     """인물 상태창 아이콘 (124e:7c18, formats.md "정비 화면").
     magic-icons = ECLIPSE.MAR 9번 시트 (19열 × 4줄, 32×40, 간격 33) 를 한 줄로 32×40 × 74, 칸 = MAD id (−1 없음).
@@ -168,6 +206,20 @@ def export_status_icons():
     for i in range(2):
         st.paste(rgba(os.path.join(IMG, 'ECLIPSE.OTH', f'{i:03d}.png')), (i * 13, 0))
     st.save(os.path.join(d, 'status-icons.png'))
+
+
+def export_magic_fx():
+    """마법 이펙트 (ECLIPSE.MAG, 124e:0f31 적재·20ec:5c0f 재생). 시트 0~9 = 11열 × 4줄 중 42프레임, 시트 10 = 24프레임 (프레임 420~443),
+    칸 56×96 간격 57×97 (테두리 1). 마법 id 의 프레임 = id×6 ~ id×6+5. 444프레임을 24열 아틀라스 한 장으로 (칸 = 프레임 번호). 팔레트 255 = 투명"""
+    d = mkdir('ui')
+    W, H, COLS = 56, 96, 24
+    out = Image.new('RGBA', (W * COLS, H * ((444 + COLS - 1) // COLS)))
+    for f in range(444):
+        s, k = divmod(f, 42)
+        r, c = divmod(k, 11)
+        sheet = rgba(os.path.join(IMG, 'ECLIPSE.MAG', f'{s:03d}.png'))
+        out.paste(sheet.crop((1 + c * 57, 1 + r * 97, 1 + c * 57 + W, 1 + r * 97 + H)), ((f % COLS) * W, (f // COLS) * H))
+    out.save(os.path.join(d, 'magic-fx.png'), optimize=True)
 
 
 def export_battle_ui():
@@ -272,11 +324,13 @@ if __name__ == '__main__':
         export_ui()
     elif sys.argv[1:] == ['icons']:
         export_status_icons()
+    elif sys.argv[1:] == ['magic-fx']:
+        export_magic_fx()
     elif sys.argv[1:] == ['battle-ui']:
         export_battle_ui()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_battle_ui(); export_data(); font.export()
+        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_data(); font.export()
     print('ok')

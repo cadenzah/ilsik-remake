@@ -1,12 +1,16 @@
 // 현대식 정비 화면 (개선판 설정 modernUi, ux-proposal.md 36). 원작 640×480 배치를 버리고 창 크기에 맞춘 패널 배치:
-//   위 바 = 장 이름·목표·출전 수·[출전], 왼쪽 = 부대 명단 (출전 → 대기 두 무리, 필터 칩), 오른쪽 = 고른 인물 카드 + 소지품, 아래 바 = 기록·불러오기·타이틀.
+//   위 바 = 장 이름·목표·출전 수·[출전], 왼쪽 = 부대 명단 (출전 → 대기 두 무리, 필터 칩), 오른쪽 = 고른 인물 카드 + 소지품, 아래 바 = 기록·불러오기·설정·타이틀.
+// 출전 확인창은 짧게 (명단이 옆에 있으니 이름을 다시 늘어놓지 않는다). 설정에서 '개선된 UI' 를 끄면 지금 편성 그대로 원작 모양 정비 화면으로 다시 연다 (restyle).
 // 규칙은 원작·개선판 정비 화면과 같다: 선두(일행 0번)는 늘 출전 맨 앞, 출전 상한 o.max, 정비 화면에서 바꿀 수 있는 장비는 도구 칸 (canEquip).
 // 조작: 명단 클릭·Space = 출전 넣고 빼기, 끌기 = 순서·넣고 빼기, Alt+↑↓ = 순서. 소지품 클릭 = 고르기 (비교·[장착][버리기]),
 //   두 번 클릭·E = 장착, Del = 버리기, 끌어서 도구 칸·명단 인물에 놓기 = 장착, 도구 칸을 소지품으로 끌기 = 해제.
 //   ↑↓←→ = 목록 안 이동, Tab = 다음 무리, Enter = 출전 확인, Esc = 고른 것 풀기·창 닫기.
-import { MAGIC_EFFECTS, STAT_NAMES, type Item, type UnitType } from './data'
+import { STAT_NAMES, type Item, type UnitType } from './data'
 import { canEquip, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
+import { applyFont } from './font'
+import { spellDesc } from './magic'
+import { SETTINGS, setSetting, setting } from './settings'
 import { esc } from './ui'
 import { equippedStats, type Stats } from './unit'
 
@@ -55,7 +59,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       </div>
     </main>
     <footer class="mc-foot">
-      <button data-f="write">기록</button><button data-f="read">불러오기</button>
+      <button data-f="write">기록</button><button data-f="read">불러오기</button><button data-f="settings">설정</button>
       <span class="mc-note" role="status"></span>
       <button data-f="quit">타이틀</button>
     </footer>`
@@ -192,8 +196,12 @@ export function campModern(o: CampOptions): Promise<CampResult> {
         </div>
       </div>
       <div class="mc-slots">${[0, 1, 2].map(slot).join('')}</div>
-      <div class="mc-magic">${magic.length ? magic.map(m => `<span class="mc-mg" title="${esc(MAGIC_EFFECTS[m!.effect] ?? '')} · 피로 +${m!.fatigue}">
-        <i style="background-position:-${m!.id * 16}px 0"></i>${esc(m!.name)}</span>`).join('') : '<span class="dim">마법 없음</span>'}</div>`
+      <div class="mc-magic">${magic.length ? magic.map(m => `<button class="mc-mg" data-id="${m!.id}" title="${esc(spellDesc(m!))}">
+        <i style="background-position:-${m!.id * 16}px 0"></i>${esc(m!.name)}</button>`).join('') : '<span class="dim">마법 없음</span>'}</div>`
+    detail.querySelectorAll<HTMLButtonElement>('.mc-mg').forEach(b => {   // 터치 기기엔 올리기가 없으니 누르면 아래 바에 설명
+      const m = o.tables.magic.get(Number(b.dataset.id))!
+      b.onclick = () => say(`${m.name} — ${spellDesc(m)}`)
+    })
     detail.querySelector<HTMLButtonElement>('.mc-take')?.addEventListener('click', take)
     const toolSlot = detail.querySelector<HTMLElement>('.mc-slot.tool')!
     if (t.equip[2]) draggable(toolSlot, () => ({ kind: 'tool' }))
@@ -307,13 +315,16 @@ export function campModern(o: CampOptions): Promise<CampResult> {
 
   // ---------- 창 (확인·기록 칸) ----------
   type Act = [string, () => void, boolean?]   // 세 번째 = 막음
-  function ask(title: string, body: string, acts: Act[]) {
+  let dismiss: (() => void) | null = null   // 버튼 말고 Esc·바깥 누르기·오른쪽 클릭으로 닫을 때
+  const dismissModal = () => { modal?.remove(); modal = null; const d = dismiss; dismiss = null; d?.() }
+  function ask(title: string, body: string, acts: Act[], onDismiss?: () => void) {
     modal?.remove()
+    dismiss = onDismiss ?? null
     modal = document.createElement('div')
     modal.className = 'mc-modal'
     modal.innerHTML = `<div class="mc-dlg" role="dialog" aria-label="${esc(title)}"><h3>${esc(title)}</h3>${body ? `<p>${body}</p>` : ''}<div class="mc-btns"></div></div>`
     const box = modal.querySelector('.mc-btns')!
-    const close = () => { modal?.remove(); modal = null }
+    const close = () => { modal?.remove(); modal = null; dismiss = null }
     acts.forEach(([label, fn, off], n) => {
       const b = document.createElement('button')
       if (n === 0 && acts.length === 2) b.className = 'primary'   // 결정·취소 창의 결정 (원작 주황 명령 버튼 색)
@@ -322,7 +333,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       b.onclick = () => { close(); fn() }
       box.append(b)
     })
-    modal.onclick = e => { if (e.target === modal) close() }
+    modal.onclick = e => { if (e.target === modal) dismissModal() }
     root.append(modal)
     modal.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
   }
@@ -334,9 +345,28 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     }]), ['취소', () => {}]]),
     read: () => ask('불러오기', '기록한 정비 화면을 불러옵니다. 지금 편성은 버려집니다.', [...slotNames().map((n, i): Act => [`${i + 1} · ${n ?? '무기록'}`,
       () => finish({ go: 'load', slot: i }), !n]), ['취소', () => {}]]),
+    settings: () => openSettings(),
     quit: () => ask('타이틀로', '정비 화면을 닫고 타이틀로 돌아갑니다.', [['타이틀로', () => finish({ go: 'title' })], ['취소', () => {}]]),
   }
-  const go = () => ask('출전', `${sel.map(i => esc(party[i].name)).join(' · ')}`, [['출전', () => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip) })], ['취소', () => {}]])
+  const go = () => ask('출전', `${sel.length}명으로 전투를 시작합니다.`, [['출전', () => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip) })], ['취소', () => {}]])
+
+  // 설정 (타이틀 '설정' 과 같은 스위치). 글꼴은 바로, '개선된 UI' 는 창을 닫을 때 정비 화면을 바꿔 다시 연다
+  const modern0 = setting('modernUi')
+  function openSettings(focus = 0) {
+    const done = () => { if (setting('modernUi') !== modern0) finish({ go: 'restyle', deploy: [...sel], items, equip: party.map(t => t.equip) }) }
+    ask('설정', '', [['닫기', done]], done)
+    const dlg = modal!.querySelector('.mc-dlg')!
+    const box = document.createElement('div')
+    box.className = 'mc-opts'
+    box.innerHTML = SETTINGS.map((o, n) => `<button role="switch" aria-checked="${setting(o.k)}" data-n="${n}" title="${esc(o.title)}">
+      <span>${esc(o.label)}<small>${esc(o.title.replace(/^개선판: /, ''))}</small></span><i class="mc-switch" aria-hidden="true"></i></button>`).join('')
+    box.querySelectorAll<HTMLButtonElement>('button').forEach(b => {
+      const o = SETTINGS[Number(b.dataset.n)]
+      b.onclick = () => { setSetting(o.k, !setting(o.k)); if (o.k === 'bitmapFont') applyFont(); openSettings(Number(b.dataset.n)) }
+    })
+    dlg.insertBefore(box, dlg.querySelector('.mc-btns'))
+    box.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
+  }
 
   // ---------- 키보드 ----------
   const rows = () => [...list.querySelectorAll<HTMLButtonElement>('.mc-row')]
@@ -345,7 +375,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
   const onKey = (e: KeyboardEvent) => {
     const a = document.activeElement as HTMLElement | null
     if (modal) {
-      if (e.key === 'Escape') { e.preventDefault(); modal.remove(); modal = null }
+      if (e.key === 'Escape') { e.preventDefault(); dismissModal() }
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const bs = [...modal.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')], i = bs.indexOf(a as HTMLButtonElement)
         bs[(i + (e.key === 'ArrowRight' ? 1 : -1) + bs.length) % bs.length]?.focus(); e.preventDefault()
@@ -378,7 +408,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     } else if ((e.key === 'e' || e.key === 'E') && picked !== null) { e.preventDefault(); equipTo(picked, shown) }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && picked !== null) { e.preventDefault(); trash(picked) }
   }
-  root.oncontextmenu = e => { e.preventDefault(); if (modal) { modal.remove(); modal = null } else if (picked !== null) { picked = null; renderDetail(); renderInv() } }
+  root.oncontextmenu = e => { e.preventDefault(); if (modal) dismissModal(); else if (picked !== null) { picked = null; renderDetail(); renderInv() } }
 
   let finish: (r: CampResult) => void = () => {}
   return new Promise(done => {

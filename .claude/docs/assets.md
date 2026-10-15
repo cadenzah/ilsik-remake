@@ -11,7 +11,7 @@
 - `MAIN.ECP` 메인 메뉴 버튼·돌 창틀, `ECPCOM/BUT/BAS/MAI/LEV/MAG/SPE.ECP` 창틀·명령 아이콘 (FRTWND/FRTBTN, formats.md) (확인)
 - `ECLIPSE.UND` / `ECLIPSE1.UND` / `ECLIPSE2.UND` 1240 / 808 / 505 × 640×480 — 첫 항목들이 ECP01.ECP와 동일. 용도 미확인
 - `ECLIPSE.POR` 111 × 96×111 — 인물 초상화 (확인)
-- `ECLIPSE.MAG` 11 × 640×480 — 마법 이펙트 스프라이트 시트 (확인)
+- `ECLIPSE.MAG` 11 × 640×480 — 마법 이펙트 시트 (확정, formats.md "마법 이펙트 ECLIPSE.MAG"): 444프레임 56×96, 마법 id 마다 6프레임
 - `ECLIPSE.SHA` 104 × 56×48 — 유닛 정지 아이콘 (확인)
 - `ECLIPSE.EQU` 182 × 48×56 — 장비 아이콘 추정
 - `ECLIPSE.INS` 57 × 48×48 — 도구 아이콘 추정
@@ -35,6 +35,8 @@
 - `ui/battle-ui.png` + `.json` 전투 화면 UI 조각 묶음 (skin.ts, `export_web.py battle-ui`): FRTWND 9조각 `mw.*` (ECPMAI mapwin 전투 창틀), `comma.*`, `speak.*`, `basic.*`, `level.*`, `magic.*`,
   `btn.0~5` (ECPBUT 0005 글자 버튼, 3~5 눌림), `icon.N.S` (ECPBUT 000N 아이콘), `sta.N` (STA 0·1·2·3·5·12·13·14·15), `oth.N` (OTH 3·4·5). 팔레트 = WIN 2
 - `ui/` 정비 화면 (camp.ts): camp-bg (ECPMAI tactics 창틀 + WIN 2), camp-status (WIN 1), camp-face·camp-mini (BS 1·2, 칸 = 유닛 0~28), equip (EQU 182, 칸 = 품목 id−1), camp-por (POR 투명 배경, 12열), magic-icons (MAR 9, 칸 = MAD id), status-icons (OTH 0·1). `export_web.py ui` 에 포함 (magic/status 아이콘은 `icons`)
+- `ui/camp-setting.png`·`camp-quit.png` 개선판 원작 모양 정비 화면 「설정」 버튼 46×25 (웹 보탬, 원래 종료 칸에) 과 한 칸 아래로 옮긴 종료 (원작 그림 그대로). 설정 = 원작 「음악」 버튼 글자를 지운 바탕 + 원작 글꼴 '설정' (흰 획 + 오른쪽 그림자, 원작 버튼 글자 여백에 맞춤). `export_web.py ui` (export_camp)
+- `ui/magic-fx.png` 마법 이펙트 아틀라스 (ECLIPSE.MAG 444프레임, 56×96 칸 24열, 칸 = 프레임 번호 = 마법 id×6+단계). `export_web.py magic-fx`
 - `ui/worldmap.png` 대륙 지도 (SCR 43), `ui/places.png` 장소 이름표 시트, `data/worldmap.json` 장마다 {name, x, y, w, h, sy} — 장 사이 지도(worldmap.ts)·개선판 장 지도
 - `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)

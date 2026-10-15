@@ -5,15 +5,19 @@
 // 개선판: 같은 화면에서 바로 편성 (앞에서부터 채워 둠), 대원 하나씩 넣고 빼기, 마우스 올리면 능력치, 남은 칸 표시,
 //   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
+// 개선판만: 음악 다음에 「설정」 (원작 버튼을 본뜬 camp-setting.png 를 종료 자리에, 종료는 한 칸 아래 camp-quit.png, export_web.py) → 원작 창틀 설정 창. '개선된 UI' 를 켜고 닫으면 현대식으로 다시 연다 (restyle)
 // 현대식 (개선판 설정 modernUi): 다른 화면 (campModern.ts, ux-proposal.md 36). 여기 statusFrame 은 전투 중 큰 인물기본자료의 현대식 바탕
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { hud, mapRect, view } from './screen'
 import { winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
+import { applyFont } from './font'
+import { SETTINGS, setSetting, setting } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
 export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] } | { go: 'title' } | { go: 'load'; slot: number }
+  | { go: 'restyle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] }   // 현대식 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시 연다
 
 export interface CampOptions {
   party: UnitType[]   // 일행 (0번 = 선두, 뺄 수 없음)
@@ -34,6 +38,7 @@ const WAIT = { x: 26, y: 376, dx: 47, dy: 46, cols: 7, w: 46, h: 39 }   // 대�
 const SLOT = { x: 379, y: 370, dx: 57, dy: 50, cols: 4, w: 56, h: 48 }  // 출전 줄 BS 1, 4열 × 2줄
 const ITEM = { x: 379, y: 115, dx: 51, dy: 57, cols: 3, per: 12 }        // 도구 목록 MAR/EQU 48×56, 3열 × 4줄
 const BTN = { x: 571, w: 40, h: 24, read: 42, write: 77, music: 112, quit: 148, swap: 271, act: 305 }
+const STEP = 35   // 명령 버튼 간격. 개선판은 종료 자리에 설정, 종료는 한 칸 아래
 const TOOL = { x: 530, w: 18, trash: [128, 37], put: [192, 25], take: [238, 25] } as const   // 도구 옆 작은 아이콘 (원작 판정 범위)
 const MINI = 29   // BS 얼굴 수 (유닛 0~28). 그 밖의 유닛은 이동 그림 첫 장으로
 
@@ -46,6 +51,7 @@ const PAGE_HELP = {
   swapRemake: '앞에서부터 다시 채운다.',
   act: '출전인물로 전투를 시작한다.',
   quit: '타이틀(주화면)로 돌아간다.',
+  settings: '글꼴·화면·편의 기능을 바꾼다.',
   trash: '고른 도구를 버린다.',
   put: '고른 도구를 지금 보이는 인물에게 장착한다.',
   take: '지금 보이는 인물의 도구를 풀어 소지품에 넣는다.',
@@ -146,7 +152,10 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       <button class="hit" data-b="read" style="${px(BTN.x, BTN.read, BTN.w, BTN.h)}" aria-label="읽기"></button>
       <button class="hit" data-b="write" style="${px(BTN.x, BTN.write, BTN.w, BTN.h)}" aria-label="기록"></button>
       <button class="hit" data-b="music" style="${px(BTN.x, BTN.music, BTN.w, BTN.h)}" aria-label="음악"></button>
-      <button class="hit" data-b="quit" style="${px(BTN.x, BTN.quit, BTN.w, BTN.h)}" aria-label="종료"></button>
+      ${o.remake ? `<img class="setbtn" src="${A}/ui/camp-setting.png" alt="" style="${px(568, BTN.quit - 1, 46, 25)}">
+      <img class="setbtn" src="${A}/ui/camp-quit.png" alt="" style="${px(568, BTN.quit - 1 + STEP, 46, 25)}">
+      <button class="hit" data-b="settings" style="${px(BTN.x, BTN.quit, BTN.w, BTN.h)}" aria-label="설정"></button>` : ''}
+      <button class="hit" data-b="quit" style="${px(BTN.x, BTN.quit + (o.remake ? STEP : 0), BTN.w, BTN.h)}" aria-label="종료"></button>
       <button class="hit" data-b="swap" style="${px(BTN.x, BTN.swap, BTN.w, BTN.h)}" aria-label="출전 편성"></button>
       <button class="hit" data-b="act" style="${px(BTN.x, BTN.act, BTN.w, BTN.h + 1)}" aria-label="행동"></button>
       <button class="hit" data-b="trash" style="${px(TOOL.x, TOOL.trash[0], TOOL.w, TOOL.trash[1])}" aria-label="버리기"></button>
@@ -349,6 +358,26 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelector<HTMLButtonElement>('.obtn:not(:disabled)')?.focus()
   }
 
+  /** 개선판 「설정」 창 (원작 창틀·글자 버튼, slotWin 과 같은 모양): 항목마다 켬/끔, 올리면 도구설명 칸에 설명. 종료·Esc·오른쪽 클릭 = 닫기 */
+  const settingsWin = (onClose: () => void, focus = 0) => {
+    const w = 184, bw = 160, n = SETTINGS.length, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9
+    dialog?.remove()
+    dialog = document.createElement('div')
+    dialog.className = 'dlg owin slots opts'
+    dialog.style.cssText = px((640 - w) / 2, 110, w, h) + `;background-image:url(${winUrl('comma', w, h)})`
+    dialog.innerHTML = `<div class="t">설 정</div>` + SETTINGS.map((s, i) =>
+      `<button class="obtn sl opt" data-i="${i}" role="switch" aria-checked="${setting(s.k)}" style="${px((w - bw) / 2, 30 + i * 29, bw)}">${esc(s.label)}<b>${setting(s.k) ? '켬' : '끔'}</b></button>`).join('')
+      + `<button class="obtn no" style="${px((w - bw) / 2, 30 + n * 29, bw)}">종료</button>`
+    stage.append(dialog)
+    dialog.querySelectorAll<HTMLButtonElement>('.opt').forEach(b => {
+      const s = SETTINGS[Number(b.dataset.i)]
+      b.onclick = () => { setSetting(s.k, !setting(s.k)); if (s.k === 'bitmapFont') applyFont(); settingsWin(onClose, Number(b.dataset.i)) }
+      b.onmouseenter = b.onfocus = () => say(s.title.replace(/^개선판: /, ''))
+    })
+    dialog.querySelector<HTMLButtonElement>('.no')!.onclick = () => { dialog?.remove(); dialog = null; onClose() }
+    dialog.querySelectorAll<HTMLButtonElement>('.obtn')[focus]?.focus()
+  }
+
   return new Promise(done => {
     const finish = (r: CampResult) => {
       removeEventListener('resize', fit)
@@ -375,6 +404,10 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       })),
       music: () => say(PAGE_HELP.music),
       quit: () => confirm('주화면', 155, () => finish({ go: 'title' })),
+      settings: () => {
+        const modern0 = setting('modernUi')
+        settingsWin(() => { if (setting('modernUi') !== modern0) finish({ go: 'restyle', deploy: [...sel], items, equip: party.map(t => t.equip) }) })
+      },
       swap: () => {
         if (o.remake) sel = [...o.initial]
         else { editing = true; sel = [0] }   // 원작: 누를 때마다 선두만으로 다시 시작

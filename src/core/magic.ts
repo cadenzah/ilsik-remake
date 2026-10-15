@@ -83,5 +83,21 @@ export function spellDesc(m: Magic) {
   return `${MAGIC_EFFECTS[m.effect] ?? '?'} · 사거리 ${m.range || '자기 주변'} · 범위 ${m.area ? `반경 ${m.area}` : '한 명'} · 피로 +${m.fatigue}`
 }
 
+/** 효과를 풀어 쓴 말 (개선판 마법 목록 둘째 줄). 번호 = MAGIC_EFFECTS */
+const EFFECT_TEXT = ['생명 회복', '역량 강화', '방어 강화', '민첩 강화', '정신 강화', '중독 치료', '혼수에서 깨움', '생명 피해',
+  '역량 약화', '방어 약화', '민첩 약화', '정신 약화', '중독시킴', '혼수에 빠뜨림', '중독·혼수 치료', '피로를 쌓음']
+export const SCHOOL_NAME = ['빛', '어둠', '바람', '물', '불', '땅', '소환', '노래', '기원']
+
+/** 개선판 마법 목록 한 줄 정보: 대상편·효과 말·사거리·범위 */
+export function spellInfo(rules: Rules, m: Magic) {
+  const [lo, hi] = rules.spellRange(m)
+  return {
+    side: rules.spellSide(m) === 'foe' ? '적' : '아군',
+    what: EFFECT_TEXT[m.effect] ?? MAGIC_EFFECTS[m.effect] ?? '?',
+    range: hi === 0 ? '자기 자리' : lo === hi ? `${hi}칸` : `${lo}~${hi}칸`,
+    area: m.area ? `반경 ${m.area}` : '한 명',
+  }
+}
+
 /** 계열 색 (빛·어둠·바람·물·불·땅·소환·노래·기원) — 시전 연출 칸 칠하기 */
 export const SCHOOL_COLOR = ['255,240,150', '170,90,230', '140,240,150', '120,200,255', '255,140,60', '200,160,90', '255,150,220', '160,210,255', '255,255,255']

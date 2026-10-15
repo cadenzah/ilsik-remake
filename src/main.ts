@@ -22,6 +22,32 @@ function lockPage() {
   addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
   addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
   for (const g of ['gesturestart', 'gesturechange', 'gestureend']) addEventListener(g, e => e.preventDefault())
+  // 두 번 톡 확대 (iOS Safari 는 user-scalable=no·touch-action 을 늘 따르지는 않는다): 빠른 두 번째 톡의 기본 동작을 막고
+  // 그 톡의 클릭은 직접 보낸다 (버튼 연타가 씹히지 않게). 글 입력 칸은 그대로
+  let lastTap = 0
+  addEventListener('touchend', e => {
+    const now = e.timeStamp, t = e.target as HTMLElement
+    if (now - lastTap < 350 && e.changedTouches.length === 1 && !t.closest?.('textarea, input, select')) {
+      e.preventDefault()
+      if (t.closest?.('canvas') === null) t.click()   // 캔버스는 포인터 이벤트로 받으니 클릭을 따로 보내지 않는다
+    }
+    lastTap = now
+  }, { passive: false })
+  // 그래도 확대된 채 굳으면 (확대를 막아 손가락으로 되돌릴 수 없다) viewport 를 다시 적어 1배로 돌린다
+  const meta = document.querySelector<HTMLMetaElement>('meta[name=viewport]')
+  const vv = window.visualViewport
+  if (meta && vv) {
+    let timer = 0
+    vv.addEventListener('resize', () => {
+      clearTimeout(timer)
+      if (vv.scale <= 1.01) return
+      timer = window.setTimeout(() => {
+        const c = meta.content
+        meta.content = `${c}, minimum-scale=1`   // 내용이 바뀌어야 Safari 가 다시 읽는다
+        requestAnimationFrame(() => { meta.content = c })
+      }, 250)
+    })
+  }
 }
 
 async function main() {

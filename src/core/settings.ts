@@ -22,3 +22,13 @@ export function setting(k: Setting): boolean {
 export function setSetting(k: Setting, on: boolean) {
   try { localStorage.setItem(KEYS[k], on ? '1' : '0') } catch { /* 저장 불가 — 이번 화면에서만 */ }
 }
+
+/** 설정 화면 목록 (타이틀 '설정'·개선판 정비 화면 '설정') */
+export const SETTINGS: { k: Setting; label: string; title: string }[] = [
+  { k: 'bitmapFont', label: '원작 글꼴', title: '개선판: 원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴). 원작판은 늘 원작 글꼴' },
+  { k: 'modernUi', label: '개선된 UI', title: '개선판: 원작 창틀 없이 맵을 화면 가득, 다듬은 창·색 칸 범위 (끄면 원작 창틀을 복각한 화면)' },
+  { k: 'logoSound', label: '로고 효과음', title: '시작 로고 연출의 천둥소리' },
+  { k: 'fastEnemy', label: '적 차례 빠르게', title: '개선판: 적·NPC 가 움직이는 속도를 높인다' },
+  { k: 'shortAnim', label: '전투 연출 짧게', title: '개선판: 공격·쓰러짐 연출을 짧게' },
+  { k: 'quickAttack', label: '공격 확인 생략', title: '개선판: 「전 투」 확인창 없이 대상을 누르면 바로 공격' },
+]

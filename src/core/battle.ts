@@ -3,7 +3,7 @@ import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitS
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition } from './edition'
 import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
-import { campScreen } from './camp'
+import { campScreen, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
@@ -22,7 +22,8 @@ import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, openWin, showMenu, showResult, type Btn } from './ui'
 import { applyMods, equippedStats, type Pos, type Unit } from './unit'
-import { SCHOOL_COLOR, applyHit, areaCells, hitLine, hitText, inSpellRange, spellCenters, spellDesc, spellTargets, spellsOf } from './magic'
+import type { UnitType } from './data'
+import { SCHOOL_COLOR, SCHOOL_NAME, applyHit, areaCells, hitLine, hitText, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
 const STEP_MS = 110
 // 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
@@ -93,13 +94,23 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     S.deploy = resume.deploy
   } else if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
     const goal = chapter()?.card?.[1]
-    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
-      preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
-      slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
-        const base = snapshot(), rec = { ...base.equip }
-        equip.forEach((e, k) => { rec[PARTY[k]] = e })
-        writeSlot(ed.id, i, { n: def.n, route: def.route, title: chapterTitle(), at: Date.now(), camp: { ...base, items, equip: rec } })
-      } } })
+    const keep = (r: { items: number[]; equip: UnitType['equip'][] }) => {   // 정비 화면에서 고친 소지품·장비
+      ITEMS.splice(0, ITEMS.length, ...r.items)
+      r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
+    }
+    let initial = first, r: CampResult
+    for (;;) {   // restyle = 현대식 정비 화면 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시
+      r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
+        preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
+        slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
+          const base = snapshot(), rec = { ...base.equip }
+          equip.forEach((e, k) => { rec[PARTY[k]] = e })
+          writeSlot(ed.id, i, { n: def.n, route: def.route, title: chapterTitle(), at: Date.now(), camp: { ...base, items, equip: rec } })
+        } } })
+      if (r.go !== 'restyle') break
+      keep(r)
+      initial = r.deploy
+    }
     if (r.go === 'title') { toTitle(); return }
     if (r.go === 'load') {   // 기록한 칸의 정비 화면부터
       const s = loadSlots(ed.id)[r.slot]
@@ -107,8 +118,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     }
     if (r.go !== 'battle') return
     S.deploy = r.deploy
-    ITEMS.splice(0, ITEMS.length, ...r.items)
-    r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
+    keep(r)
     atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
   }
   if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
@@ -211,15 +221,19 @@ async function fadeDead(units: Unit[]) {
   for (let i = 10; i >= 0; i--) { for (const d of dying) d.alpha = i / 10; await sleep(30 * pace()) }
 }
 
-/** 마법 (행동 실행 20ec:6e92 마법 분기): 범위 안 대상편마다 판 규칙의 결과. c = 중심 칸 */
+/** 마법 (행동 실행 20ec:6e92 마법 분기): 범위 안 대상편마다 판 규칙의 결과. c = 중심 칸.
+ *  연출 = 원작 ECLIPSE.MAG 이펙트 (20ec:5c0f): 프레임 id×6 ~ +5 를 박자마다, 범위 반경 r 만큼 바깥 칸이 늦게 (박자 6 + 범위). 결과는 이펙트가 끝난 뒤 */
 async function castSpell(a: Unit, m: Magic, c: Pos) {
   if (c.x !== a.x || c.y !== a.y) a.facing = c.x > a.x ? 'right' : c.x < a.x ? 'left' : c.y > a.y ? 'down' : 'up'
   const targets = spellTargets(S.ed.rules, a, m, c)
   const now = performance.now()
-  S.fx = { cells: areaCells(m, c), color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0: now, until: now + 520 * pace() }
   S.floats.push({ x: a.x, y: a.y, text: m.name, t0: now, color: '#ffe28a' })
   a.flash = now + 200
-  await sleep(380 * pace())
+  await sleep(260 * pace())
+  const step = 90 * pace(), t0 = performance.now(), cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) }))
+  const span = (6 + Math.max(0, ...cells.map(p => p.ring))) * step
+  S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
+  await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
   const foe = S.ed.rules.spellSide(m) === 'foe'
   for (const t of targets) {
     const h = S.ed.rules.spell(a, t, m)   // 예측과 같은 값 (난수 없음)
@@ -228,8 +242,9 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
     if (h.kind === 'hp') t.flash = performance.now() + 160
     S.floats.push({ x: t.x, y: t.y, ...hitText(h, t.side), t0: performance.now() })
   }
-  await sleep(380 * pace())
+  await sleep(step)
   S.fx = null
+  await sleep(300 * pace())
   await fadeDead(targets)
 }
 
@@ -928,24 +943,47 @@ function validCenter(u: Unit, m: Magic, c: Pos) {
   return inSpellRange(S.ed.rules, m, u, c) && spellTargets(S.ed.rules, u, m, c).length > 0
 }
 
-/** 마법 목록 「마법」. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다. 개선판은 닿는 대상이 없어도 못 고르고, 설명 칸에 효과·사거리·피로.
- *  [근사] 원작 마법 창 (ECPMAG) 모양은 미확인 — comma 창 글자 버튼으로 */
+/** 마법 목록 「마법」. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다.
+ *  원작판: comma 창 글자 버튼 [근사] (원작 마법 창 ECPMAG 모양은 미확인).
+ *  개선판: 아이콘 (MAR 9) · 이름 · 효과 · 사거리·범위·피로를 늘 보이는 목록 (터치 기기는 올리기가 없어 설명을 숨기지 않는다). 못 쓰면 까닭을 붉게 */
 function magicMenu(u: Unit, from: Pos, onBack: () => void) {
   const list = spellsOf(u)
   const usable = (m: Magic) => S.ed.rules.canCast(u, m) && (!remake() || spellCenters(S.ed.rules, u, m).length > 0)
-  const hint = `피로 ${u.fatigue} · 쓸 마법을 고른다`
-  const el = openWin({ title: '마법', kind: 'menu', at: beside(u), btnW: 112,
-    body: remake() ? `<span class="hint">${esc(hint)}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? 220 : undefined,
-    buttons: list.map((m): Btn => [m.name, () => { S.mode = { kind: 'targeting', unit: u, from, magic: m } }, { disabled: !usable(m), title: spellDesc(m) }]),
-    onBack: () => { closeWin('menu'); onBack() } })
-  if (!remake()) return
-  const box = el.querySelector<HTMLElement>('.hint')!
-  el.querySelectorAll<HTMLButtonElement>('.obtn').forEach((b, i) => {
+  const pick = (m: Magic) => { closeWin('menu'); S.mode = { kind: 'targeting', unit: u, from, magic: m } }
+  if (!remake()) {
+    openWin({ title: '마법', kind: 'menu', at: beside(u), btnW: 112,
+      buttons: list.map((m): Btn => [m.name, () => pick(m), { disabled: !usable(m), title: spellDesc(m) }]),
+      onBack: () => { closeWin('menu'); onBack() } })
+    return
+  }
+  const m0 = mapRect(), ROW = 50
+  const rows = list.map((m, i) => {
+    const inf = spellInfo(S.ed.rules, m), ok = usable(m)
+    const why = !S.ed.rules.canCast(u, m) ? '피로가 모자람' : !ok ? '닿는 대상 없음' : ''
+    return `<button class="mgrow ${inf.side === '적' ? 'foe' : 'own'}" data-i="${i}" ${ok ? '' : 'aria-disabled="true"'}>
+      <i class="mgicon" style="background-position:-${m.id * 32}px 0"></i>
+      <span class="mgtop"><b>${esc(m.name)}</b><small>${SCHOOL_NAME[m.school] ?? ''}</small><em class="mgfat">피로 +${m.fatigue}</em></span>
+      <span class="mgsub">${why ? `<span class="mgwhy">${why}</span>` : `<span class="mgside">${inf.side}</span>${esc(inf.what)}`}<span class="mgmeta">사거리 ${inf.range} · ${inf.area}</span></span>
+    </button>`
+  }).join('')
+  const pct = Math.min(100, u.fatigue / 90 * 100)
+  const head = `<div class="mghead"><span>피로</span><span class="mgbar"><i style="width:${pct}%"></i></span><b>${u.fatigue} / 90</b></div>`
+  const w = Math.min(340, m0.w - 16)
+  const bodyH = Math.min(list.length * ROW + 30, m0.h - 70)
+  const el = openWin({ title: '마법', kind: 'menu', at: beside(u), width: w, bodyH,
+    body: `<div class="mglist">${head}${rows}</div>`, onBack: () => { closeWin('menu'); onBack() } })
+  const btns = [...el.querySelectorAll<HTMLButtonElement>('.mgrow')]
+  btns.forEach((b, i) => {
     const m = list[i]
-    const why = !S.ed.rules.canCast(u, m) ? ' (피로가 모자람)' : !usable(m) ? ' (닿는 대상 없음)' : ''
-    b.onmouseenter = b.onfocus = () => { box.textContent = spellDesc(m) + why }
-    b.onmouseleave = () => { box.textContent = hint }
+    b.onclick = e => { e.stopPropagation(); if (b.getAttribute('aria-disabled')) return; pick(m) }
+    b.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); closeWin('menu'); onBack() }
+    b.onkeydown = e => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      e.preventDefault(); e.stopPropagation()
+      btns[(i + (e.key === 'ArrowDown' ? 1 : -1) + btns.length) % btns.length].focus()
+    }
   })
+  ;(btns.find(b => !b.getAttribute('aria-disabled')) ?? btns[0])?.focus({ preventScroll: true })
 }
 
 /** 「마 법」 확인 (원작 DS:0x1f6a, 알림을 열었을 때만). 개선판은 대상마다 예측 줄 */
