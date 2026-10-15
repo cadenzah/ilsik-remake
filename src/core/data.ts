@@ -34,8 +34,13 @@ export interface Magic {
 export const MAGIC_EFFECTS = ['생명회복', '공격증가', '방어증가', '민첩증가', '정신증가', '해독', '혼수해제', '생명상해',
   '공격감소', '방어감소', '민첩감소', '정신감소', '중독', '혼수', '상태회복', '피로증가']
 
+/** 레벨업 표 (EXE DS, 0aa2:1afd, tools/units.py growth). 색인 = 인물 id, stat 만 초상 번호.
+ *  letters[id][(새 레벨−1) div 5] = 성장 문자 a~g / weapon·armor·magic[id] = 승급·습득 레벨 간격 / cap[세부] = 승급 상한 Item id /
+ *  stat[초상] = 생명·역량·방어·정신·민첩 상한 / raymond[루트][마법 수] = 레이몬이 배울 마법 */
+export interface Growth { letters: string[]; weapon: number[]; armor: number[]; cap: number[]; magic: number[]; stat: number[][]; raymond: number[][] }
+
 /** 게임 데이터 표. items·magic 은 id 로 바로 찾도록 Map */
-export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic>; labels: Labels }
+export interface Tables { types: UnitType[]; items: Map<number, Item>; magic: Map<number, Magic>; labels: Labels; growth: Growth }
 
 export interface StageMap {
   w: number; h: number; atlasCols: number
@@ -63,11 +68,11 @@ async function json<T>(src: string): Promise<T> {
 }
 
 export async function loadTables(): Promise<Tables> {
-  const [types, items, magic, labels] = await Promise.all([
+  const [types, items, magic, labels, growth] = await Promise.all([
     json<UnitType[]>(`${A}/data/units.json`), json<Item[]>(`${A}/data/items.json`), json<Magic[]>(`${A}/data/magic.json`),
-    json<Labels>(`${A}/data/labels.json`),
+    json<Labels>(`${A}/data/labels.json`), json<Growth>(`${A}/data/growth.json`),
   ])
-  return { types, items: new Map(items.map(i => [i.id, i])), magic: new Map(magic.map(m => [m.id, m])), labels }
+  return { types, items: new Map(items.map(i => [i.id, i])), magic: new Map(magic.map(m => [m.id, m])), labels, growth }
 }
 export const loadDialogue = () => json<string[]>(`${A}/data/dialogue.json`)
 

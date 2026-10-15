@@ -12,6 +12,7 @@ export interface Progress {
   party?: number[]                       // 없으면 (옛 저장) 초기 일행
   items?: number[]
   equip?: Camp['equip']
+  grown?: Camp['grown']                  // 레벨업한 일행 대원 값
   // 다시 하기·진엔딩 (replay.ts, 개선판에서 씀)
   branch?: Camp                          // 진로 선택 직전 장(9장)을 클리어한 상태
   branchNext?: [number, number, number]  // 그 뒤 루트별 첫 장
@@ -23,7 +24,7 @@ export interface Progress {
 }
 
 /** 이어하기 상태 */
-export const progressCamp = (p: Progress): Camp => ({ flags: p.flags, party: p.party ?? [], items: p.items ?? [], equip: p.equip })
+export const progressCamp = (p: Progress): Camp => ({ flags: p.flags, party: p.party ?? [], items: p.items ?? [], equip: p.equip, grown: p.grown })
 
 const key = (ed: EditionId) => `eclipse.progress.${ed}`
 
@@ -119,6 +120,7 @@ export interface UnitSave { x: number; y: number; hp: number; fatigue: number; a
 export interface Suspended {
   def: StageDef; title: string; at: Camp; deploy: number[]
   turn: number; units: UnitSave[]; troopState: number[]; fired: number[]; told: string[]; joined: number[]; flags: string[]; saved: number
+  grown?: Camp['grown']; equip?: Camp['equip']   // 이 전투에서 레벨업한 일행 값·승급한 장비 (at 은 장 시작 때라 따로)
 }
 const susKey = (ed: EditionId) => `eclipse.suspend.${ed}`
 export function loadSuspended(ed: EditionId): Suspended | null {

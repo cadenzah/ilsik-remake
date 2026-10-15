@@ -1,8 +1,8 @@
 // 원작판 전투 규칙 [확정] — 행동 실행 20ec:6e92, 수치 함수 0aa2:0e17(유닛, x, k) (rules.md "원작 전투 공식").
 // 전투 계산에 난수가 없다: 명중 판정·치명타·피해 흔들림·반격 모두 없음. 정수화는 0 쪽 절사, 중간값 일부는 float32
-import type { Magic, StageMap } from '../../core/data'
-import type { Rules, SpellHit } from '../../core/edition'
-import { applyMods, type BuffStat, type Pos, type Unit } from '../../core/unit'
+import type { Item, Magic, StageMap, Tables, UnitType } from '../../core/data'
+import type { LevelUp, Rules, SpellHit } from '../../core/edition'
+import { applyMods, equippedStats, type BuffStat, type Pos, type Unit } from '../../core/unit'
 
 const f32 = Math.fround
 const tr = Math.trunc
@@ -66,6 +66,85 @@ function spell(a: Unit, d: Unit, m: Magic, fixBug: boolean): SpellHit {
   return { kind: 'cure', what: e === 5 ? 'poison' : e === 6 ? 'coma' : 'all' }
 }
 
+/** 경험치 (20ec:9b1d~9fa8, 일행만). 대상마다 g = 1 + 0.25(대상 레벨 − 행동자 레벨), 쓰러뜨렸으면 trunc(32g), 아니면 trunc(g·값) 을 더해 [1, 64].
+ *  마법은 내부 효과로 덮어쓴다: 회복 = 회복량 합, 해독·혼수해제·상태회복 = 풀린 대상 ×10, 중독·혼수 = 대상 수 ×10, 피로증가 ×7,
+ *  강화·약화 ×5, 생명상해 = 위 식. 다시 [1, 64] */
+function expGain(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cured = 0) {
+  let sum = 0
+  for (const { target: t, value } of hits) {
+    const g = 1 + 0.25 * (t.type.lv - a.type.lv)
+    sum += t.hp <= 0 ? tr(32 * g) : tr(g * value)
+  }
+  sum = clamp(sum, 1, 64)
+  if (m) {
+    const e = m.effect, n = hits.length
+    if (e === 0) sum = hits.reduce((s, h) => s + h.value, 0)
+    else if (e === 5 || e === 6 || e === 14) sum = cured * 10
+    else if (e === 12 || e === 13) sum = n * 10
+    else if (e === 15) sum = n * 7
+    else if (e !== 7) sum = n * 5
+  }
+  return clamp(sum, 1, 64)
+}
+
+/** 레벨업 0aa2:1afd (레벨은 부르기 전에 +1). 표는 data/growth.json (EXE DS).
+ *  1) 능력치: 생명·역량·방어·정신·민첩 마다 최대치 (장비 포함) 가 상한 stat[초상] 미만이면 random(n) + 보너스 를 최대치·현재치에 (생명은 최대치만).
+ *     기본 n = 2, 보너스 (2,0,0,0,1). 성장 문자 letters[id×8 + (레벨−1) div 5] 가 바꾼다. 상한에 걸려도 난수는 뽑는다
+ *  2) 레벨이 weapon[id] 의 배수면 무기 Item id +1, armor[id] 의 배수면 방어구 +1 (cap[세부] 미만일 때). 장비 해제 → 승급 → 다시 장착 (현재치 채우기 없음)
+ *  3) 레벨이 magic[id] 의 배수이고 마법 < 8 이면 마지막 마법 id + 1. 레이몬 (초상 16) 만 raymond[루트][마법 수], 마법 7개면 배우지 않음
+ *  4) 피로 0 */
+function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, items: Map<number, Item>) => [number, number]): LevelUp {
+  const t = u.type, G = tables.growth
+  let n = 2
+  const bonus = [2, 0, 0, 0, 1]
+  // 8글자를 넘는 레벨 (41~) 은 원작처럼 다음 인물 줄을 읽는다
+  switch (G.letters.join('')[t.id * 8 + Math.floor((t.lv - 1) / 5)]) {
+    case 'a': bonus[1] = 1; break
+    case 'b': bonus[2] = 1; break
+    case 'c': bonus[3] = 1; break
+    case 'd': bonus[4] = 2; break
+    case 'e': bonus[0] = 1; break
+    case 'f': bonus[0] = 1; n = 3; break
+    case 'g': bonus.splice(0, 5, 2, 2, 2, 1, 1); break
+  }
+  const cap = G.stat[t.por] ?? [], keys = ['atk', 'def', 'spi', 'agi'] as const
+  const cur = [u.maxHp, ...keys.map(k => u.base[k])]
+  const gains = cur.map((v, i) => {
+    const r = Math.floor(Math.random() * n)
+    return v < (cap[i] ?? Infinity) ? r + bonus[i] : 0   // 표 밖 인물 (일행이 아닌 종류) 은 상한 없음 [근사: 원작은 표 너머를 읽음]
+  }) as LevelUp['gains']
+  u.maxHp += gains[0]; t.hp += gains[0]
+  keys.forEach((k, i) => { u.base[k] += gains[i + 1]; t[k] += gains[i + 1] })
+  const out: LevelUp = { gains }
+  // 장비 승급. 원작은 세부만 남은 빈 칸 (id 0) 도 올려 id 1 이 되지만 웹은 빈 칸을 건너뛴다 [근사]
+  const W = G.weapon[t.id] ?? 100, Ar = G.armor[t.id] ?? 100
+  if (t.lv % W === 0 || t.lv % Ar === 0) {
+    const before = equippedStats(t, tables.items)
+    const up = (slot: 0 | 1, every: number) => {
+      const it = tables.items.get(t.equip[slot])
+      if (!it || t.lv % every || it.id >= (G.cap[it.sub] ?? 0)) return undefined
+      t.equip[slot] = it.id + 1
+      return it.id + 1
+    }
+    out.weapon = up(0, W)
+    out.armor = up(1, Ar)
+    const after = equippedStats(t, tables.items)
+    u.maxHp += after.maxHp - before.maxHp
+    u.hp = Math.max(1, u.hp + after.maxHp - before.maxHp)
+    keys.forEach(k => { u.base[k] += after[k] - before[k] })
+    u.mov += after.mov - before.mov
+    u.range = range(t, tables.items)
+  }
+  applyMods(u)
+  const M = G.magic[t.id] ?? 100
+  if (t.lv % M === 0 && t.magic.length < 8 && !(t.por === 16 && t.magic.length === 7)) {
+    const id = t.por === 16 ? G.raymond[route]?.[t.magic.length] : (t.magic.at(-1) ?? 0) + 1
+    if (id !== undefined) { t.magic.push(id); out.magic = id }
+  }
+  u.fatigue = 0
+  return out
+}
+
 /** 판 규칙. fixComaBug = 혼수 판정 원작 버그 고침 (개선판) */
 export function makeRules(fixComaBug = false): Rules { return {
   damageRange(map, a, d, at) {
@@ -111,6 +190,8 @@ export function makeRules(fixComaBug = false): Rules { return {
     applyMods(u)
     return { poison, coma }
   },
+  expGain,
+  levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange) },
 } }
 
 /** 효과 7~13·15 = 상대편 (124e:c1b6 대상편) */

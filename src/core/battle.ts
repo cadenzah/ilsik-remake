@@ -1,7 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
-import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
-import type { Edition } from './edition'
+import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import type { Edition, LevelUp } from './edition'
 import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
 import { campScreen, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
@@ -10,7 +10,7 @@ import { layout, mapRect, view } from './screen'
 import { loadSkin, pieceUrl } from './skin'
 import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
-import { aboveUnit, goGo, hideBasic, showBasic, showConditions } from './info'
+import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
 import { playDialogue } from './dialogue'
 import { loadSlots, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
 import { FOUND, carryOf } from './replay'
@@ -142,7 +142,9 @@ async function start(resume?: Suspended) {
   await fadeOut()   // 다시 하기 (boot 에서 오면 이미 어둡다)
   uidSeq = 0
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
+  if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
   S.joined = []
+  leveled.clear()
   const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
@@ -208,6 +210,44 @@ async function attack(a: Unit, d: Unit) {
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
   await sleep(350 * pace())
   await fadeDead([d])
+  await gainExp(a, [{ target: d, value: dmg }])
+}
+
+// ---------- 경험치·레벨업 (원작 20ec:9b1d, 0aa2:1afd — 행동 실행 끝, 피로 계산 뒤) ----------
+
+const leveled = new Set<Unit>()   // 이번 차례에 레벨업 → 차례 끝 피로 0 (원작은 피로를 더한 뒤 레벨업이 0 으로)
+
+/** 일행(부대 0) 행동자에게 경험치. 100 이상이면 −100, 레벨 +1, 레벨업. 바뀐 값은 장 사이 상태로 (다시 하기는 장 시작 때로 되돌린다) */
+async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cured = 0) {
+  if (a.troop !== 0 || a.hp <= 0) return
+  const t = a.type
+  t.exp += S.ed.rules.expGain(a, hits, m, cured)
+  if (t.exp >= 100) {
+    t.exp -= 100
+    t.lv++
+    const r = S.ed.rules.levelUp(a, S.tables, S.def.route)
+    leveled.add(a)
+    await showLevelUp(a, r)
+  }
+  keepGrowth(t)
+}
+
+/** 레벨업 연출: 머리 위 「Level Up」. 원작판은 승급·습득만 알림 (원작 0aa2:12f2), 개선판은 오른 능력치까지 */
+async function showLevelUp(u: Unit, r: LevelUp) {
+  const { sx, sy } = toScreen(u.x, u.y)
+  await levelUpMark(sx, sy, 1100 * pace())
+  const STAT = ['생명', '역량', '방어', '정신', '민첩']
+  const name = (id?: number) => id === undefined ? '' : S.tables.items.get(id)?.name ?? ''
+  const lines = [
+    ...remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : [],
+    ...r.weapon ? [`무기 승급: <span class="blue">${esc(name(r.weapon))}</span>`] : [],
+    ...r.armor ? [`방어구 승급: <span class="blue">${esc(name(r.armor))}</span>`] : [],
+    ...r.magic !== undefined ? [`마법 습득: <span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span>`] : [],
+  ]
+  if (!lines.length) return
+  await new Promise<void>(ok => openWin({ title: '레벨 업', body: lines.join('<br>'), at: 'center', kind: 'levelup', dir: 'row',
+    width: Math.max(180, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
+    buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
 }
 
 /** 경계 부대는 공격·마법에 맞으면 깨어난다 (원작 20ec:93b5) */
@@ -235,8 +275,12 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
   const foe = S.ed.rules.spellSide(m) === 'foe'
+  const hits: { target: Unit; value: number }[] = []
+  let cured = 0
   for (const t of targets) {
     const h = S.ed.rules.spell(a, t, m)   // 예측과 같은 값 (난수 없음)
+    if (h.kind === 'cure' && ((h.what !== 'coma' && t.poison > 0) || (h.what !== 'poison' && t.coma > 0))) cured++   // 풀린 대상 (20ec:7e3f~7f2f)
+    hits.push({ target: t, value: h.kind === 'hp' || h.kind === 'heal' ? h.value : 0 })
     applyHit(t, h)
     if (foe) wake(t)
     if (h.kind === 'hp') t.flash = performance.now() + 160
@@ -246,6 +290,7 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   S.fx = null
   await sleep(300 * pace())
   await fadeDead(targets)
+  await gainExp(a, hits, m, cured)
 }
 
 /** 휴식 [확정 20ec:038e]: HP 를 판 규칙만큼 (최대HP 까지) 회복 */
@@ -273,7 +318,7 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
 
 /** 차례를 마칠 때 피로 (공격·이동). 휴식한 차례는 쌓지 않는다 */
 function tire(u: Unit, attacked: boolean, magic?: Magic) {
-  u.fatigue = S.ed.rules.fatigueAfter(u, attacked, magic)
+  u.fatigue = leveled.delete(u) ? 0 : S.ed.rules.fatigueAfter(u, attacked, magic)
   u.steps = 0
 }
 
@@ -689,6 +734,7 @@ function suspend() {
     units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u),
       mods: { ...u.mods }, poison: u.poison, coma: u.coma, ticked: u.ticked })),
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
+    grown: snapshot().grown, equip: snapshot().equip,
   })
   toTitle()
 }

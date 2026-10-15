@@ -3,22 +3,33 @@ import type { PostStep, UnitType } from './data'
 import { S } from './state'
 
 /** 장 사이 상태. 진행 저장(save.ts)에 그대로 들어간다 */
-export interface Camp { flags: string[]; party: number[]; items: number[]; equip?: Record<number, Equip> }
+export interface Camp { flags: string[]; party: number[]; items: number[]; equip?: Record<number, Equip>; grown?: Record<number, Grown> }
 type Equip = UnitType['equip']
+/** 레벨업으로 바뀐 일행 대원 값 (PAD 값 대신, 장비 보정 전). 없으면 PAD 그대로 */
+export type Grown = Pick<UnitType, 'lv' | 'exp' | 'hp' | 'atk' | 'def' | 'spi' | 'agi' | 'magic'>
 
 // 캠페인 플래그 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류, black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
 export const FLAGS = new Set<string>()
 export const PARTY: number[] = []   // 일행 유닛 종류, 순서 = 출전 칸 순서 (0번 = 선두, 쓰러지면 패배)
 export const ITEMS: number[] = []   // 소지품 Item id
 export const EQUIP = new Map<number, Equip>()   // 정비 화면에서 바꾼 일행 장비 (유닛 종류 → 장비). 없으면 PAD 기본 장비
+export const GROWN = new Map<number, Grown>()   // 레벨업한 일행 대원 (유닛 종류 → 값). 종류가 바뀌면 (교체) 새 종류는 PAD 값부터
 
-/** 일행 대원의 종류 — 바꾼 장비를 덮어쓴 사본 */
+/** 일행 대원의 종류 — 레벨업 값·바꾼 장비를 덮어쓴 사본 (전투 중 레벨업이 이 사본을 고친다) */
 export const partyType = (t: number): UnitType => {
-  const e = EQUIP.get(t)
-  return e ? { ...S.types[t], equip: e } : S.types[t]
+  const b = S.types[t], g = GROWN.get(t)
+  return { ...b, ...g, equip: [...EQUIP.get(t) ?? b.equip], magic: [...g?.magic ?? b.magic] }
 }
 
-export const snapshot = (): Camp => ({ flags: [...FLAGS], party: [...PARTY], items: [...ITEMS], equip: Object.fromEntries([...EQUIP].map(([t, e]) => [t, [...e] as Equip])) })
+/** 전투 중 레벨업·경험치를 장 사이 상태에 옮긴다 (승급한 장비 포함) */
+export function keepGrowth(t: UnitType) {
+  GROWN.set(t.id, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic] })
+  if (t.equip.join() !== S.types[t.id].equip.join() || EQUIP.has(t.id)) EQUIP.set(t.id, [...t.equip])
+}
+
+const copyMap = <V>(m: Map<number, V>, f: (v: V) => V) => Object.fromEntries([...m].map(([t, v]) => [t, f(v)]))
+export const snapshot = (): Camp => ({ flags: [...FLAGS], party: [...PARTY], items: [...ITEMS],
+  equip: copyMap(EQUIP, e => [...e] as Equip), grown: copyMap(GROWN, g => ({ ...g, magic: [...g.magic] })) })
 
 /** 상태를 바꿔 넣는다. 없는 값은 새 게임 기본값 — 빈 일행은 boot 가 원작 초기 일행으로 채운다 (scenes.json 로드 뒤).
  *  캠페인 밖에서 바로 연 장(장 선택 옛 기록·?stage=N)은 npc19 를 켜 둬 36장 루이스 장면을 볼 수 있게 한다 */
@@ -29,6 +40,8 @@ export function restore(c: Partial<Camp> | null) {
   ITEMS.splice(0, ITEMS.length, ...(c?.items ?? []))
   EQUIP.clear()
   Object.entries(c?.equip ?? {}).forEach(([t, e]) => EQUIP.set(Number(t), [...e] as Equip))
+  GROWN.clear()
+  Object.entries(c?.grown ?? {}).forEach(([t, g]) => GROWN.set(Number(t), { ...g, magic: [...g.magic] }))
 }
 
 /** 소지품이나 일행 장비에 그 도구가 있나 (원작 [bp-0x1a4] 소지품 + 일행 장비 +0x5e 검사) */

@@ -111,3 +111,15 @@ export function goGo(ms?: number): Promise<void> {
   })
 }
 
+
+// ---------- Level Up (OTH 3) ----------
+
+/** 레벨업 그림 (원작 20ec:0f92 모드 5 가 ECLIPSE.OTH 3 「Level Up」 을 그린다). 유닛 머리 위에 ms 동안 */
+export function levelUpMark(sx: number, sy: number, ms: number): Promise<void> {
+  const img = document.createElement('img'), w = 47 * 2
+  img.className = 'gogo'
+  img.src = pieceUrl('oth.3')
+  Object.assign(img.style, { left: `${sx + TW * S.cam.scale / 2 - w / 2}px`, top: `${sy - 28 * S.cam.scale}px`, width: `${w}px` })
+  hud.append(img)
+  return new Promise(ok => setTimeout(() => { img.remove(); ok() }, ms))
+}

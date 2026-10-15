@@ -1,6 +1,6 @@
 // 판(에디션) 인터페이스. 엔진(core)은 공통이고, 규칙·행동 순서·AI·편의 기능은 판마다 다르다 (.claude/docs/editions.md)
 import type { ScriptSource } from './script'
-import type { ExtraBattle, Item, Magic, StageMap, UnitType } from './data'
+import type { ExtraBattle, Item, Magic, StageMap, Tables, UnitType } from './data'
 import type { BuffStat, Pos, Unit } from './unit'
 
 export interface Rules {
@@ -25,7 +25,15 @@ export interface Rules {
   spell(caster: Unit, target: Unit, m: Magic): SpellHit
   /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */
   statusTick(u: Unit): { poison: number; coma: boolean }
+  /** 행동 하나로 얻는 경험치 (일행만 부른다). hits = 대상마다 값 (물리·생명상해 = 피해, 회복 = 회복량, 그 밖 0), 대상 HP 0 = 쓰러뜨림.
+   *  magic = 쓴 마법, cured = 마법으로 상태가 풀린 대상 수 */
+  expGain(a: Unit, hits: { target: Unit; value: number }[], magic?: Magic, cured?: number): number
+  /** 레벨 하나 오른 뒤 처리 (u.type.lv 는 이미 올렸다). 유닛·u.type (일행 사본) 을 바꾸고 바뀐 것을 돌려준다. route = 지금 루트 */
+  levelUp(u: Unit, tables: Tables, route: number): LevelUp
 }
+
+/** 레벨업 결과. gains = 생명(최대)·역량·방어·정신·민첩 증가, weapon·armor = 승급한 장비 Item id, magic = 배운 마법 id */
+export interface LevelUp { gains: [number, number, number, number, number]; weapon?: number; armor?: number; magic?: number }
 
 /** 마법 한 대상의 결과. hp = 피해, heal = 회복 (fatigue = 줄일 피로), stat = 강화·약화 (value 부호), tire = 피로 증가,
  *  poison·coma = 걸림 (3 차례), cure = 풀기 (what), miss = 듣지 않음 (혼수 실패·면역) */

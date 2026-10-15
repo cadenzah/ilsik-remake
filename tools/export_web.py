@@ -280,6 +280,7 @@ def export_data():
     lb = units.labels()
     lb['moveKind'] = lb.pop('move_kind')
     json.dump(lb, open(os.path.join(d, 'labels.json'), 'w'), ensure_ascii=False, indent=0)
+    json.dump(units.growth(), open(os.path.join(d, 'growth.json'), 'w'), separators=(',', ':'))   # 레벨업 표 (EXE DS)
     json.dump(tables.load_magic(), open(os.path.join(d, 'magic.json'), 'w'), ensure_ascii=False, indent=0)
     # stat/stat2 = [능력치 번호, 보정량], 번호 의미는 tables.STATS (9~16 = 1~8 감소)
     items = [{k: it[k] for k in ('id', 'cat', 'sub', 'name', 'f1', 'f2', 'f3')}

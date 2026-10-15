@@ -22,6 +22,21 @@ def labels(exe='ECP.EXE'):
     return out
 
 
+def growth(exe='ECP.EXE'):
+    """레벨업 표 (0aa2:1afd 가 DS 에서 스택으로 복사해 쓰는 것, rules.md "레벨업"). 색인: 인물 = PAD id (+0x10), 상한만 초상 번호 (+0x12).
+    letters[id] = 8글자, (새 레벨−1) div 5 번째가 그 레벨 성장 문자 / weapon·armor·magic[id] = 레벨이 이 수의 배수면 무기·방어구 승급·마법 습득 (100 = 사실상 없음) /
+    cap[세부] = 승급 상한 EAD id / stat[초상] = 다섯 능력치 (생명·역량·방어·정신·민첩) 상한. 원작 복사는 28명분 (0x8c) 이지만 초상 28 은
+    바로 뒤 레이몬 표를 읽으므로 그대로 29명분 / raymond[루트] = 레이몬 (초상 16) 이 마법 수 k 일 때 배우는 마법 id"""
+    raw = open(os.path.join(ROOT, 'original', exe), 'rb').read()
+    img = raw[struct.unpack_from('<H', raw, 8)[0] * 16:]
+    ds = 0x573a * 16
+    b = lambda off, n: list(img[ds + off: ds + off + n])
+    st = b(0x51f, 29 * 5)
+    return dict(letters=[img[ds + 0x3c8 + 8 * i: ds + 0x3c8 + 8 * i + 8].decode('ascii') for i in range(29)],
+                weapon=b(0x4b0, 29), armor=b(0x4cd, 29), cap=b(0x4ea, 24), magic=b(0x502, 29),
+                stat=[st[5 * i: 5 * i + 5] for i in range(29)], raymond=[b(0x5ab, 7), b(0x5b2, 7), b(0x5b9, 7)])
+
+
 def load(path='ECLIPSE1.PAD'):
     d = open(os.path.join(ROOT, 'original', path), 'rb').read()
     out = []
