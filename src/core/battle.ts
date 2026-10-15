@@ -91,7 +91,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     S.deploy = resume.deploy
   } else if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
     const goal = chapter()?.card?.[1]
-    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first,
+    const r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial: first, modern: ed.id === 'remake' && setting('modernUi'),
       preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
       slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
         const base = snapshot(), rec = { ...base.equip }
@@ -641,7 +641,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     ['조건', () => showGoalsWin()],
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],
   ]
-  openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 96 : 64,
+  openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 112 : 64,
     closeOnPick: !!remake(), onBack: () => { closeWin('system'); if (from) commandMenu(from) } })   // 원작: 오른쪽 클릭 = 명령창으로
 }
 

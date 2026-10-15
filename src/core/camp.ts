@@ -5,8 +5,9 @@
 // 개선판: 같은 화면에서 바로 편성 (앞에서부터 채워 둠), 대원 하나씩 넣고 빼기, 마우스 올리면 능력치, 남은 칸 표시,
 //   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
 // 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
+// 현대식 (개선판 설정 modernUi): 배치·동작은 같고 원작 그림 바탕 대신 어두운 패널 + 글자 라벨 + 이름 붙은 버튼 (modernFrame·statusFrame)
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
-import { hud, mapRect } from './screen'
+import { hud, mapRect, view } from './screen'
 import { winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
@@ -24,6 +25,7 @@ export interface CampOptions {
   /** 기록 3칸 (읽기·기록). list = 칸 이름 (빈 칸 null), save = 지금 정비 화면 상태를 그 칸에 */
   slots?: { list: () => (string | null)[]; save: (i: number, items: number[], equip: UnitType['equip'][]) => void }
   preview?: string    // 개선판: 도구설명 칸에 처음 보일 다음 장 이름·목표 (ux-proposal.md 23)
+  modern?: boolean    // 현대식 화면 (ux-proposal.md 32)
 }
 
 // 원작 좌표 (화면)
@@ -85,6 +87,36 @@ export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fa
       aria-label="${esc(tables.magic.get(id)?.name ?? '')}"></button>`).join('')
 }
 
+// ---------- 현대식 바탕 (원작 camp-bg·camp-status 그림의 창 자리에 패널, 그림 속 글자는 라벨로) ----------
+
+const panel = (x: number, y: number, w: number, h: number, title: string) =>
+  `<div class="mpanel" style="${px(x, y, w, h)}"><b>${title}</b></div>`
+const label = (x: number, y: number, w: number, text: string, cls = '') =>
+  `<span class="mlabel ${cls}" style="${px(x, y, w)}">${text}</span>`
+
+/** 인물기본자료 바탕 (330×330, camp-status 자리). 원작 그림 속 항목 이름·'/'·구분선을 글자로 */
+function statusFrame(modern: boolean, x = 0, y = 0) {
+  if (!modern) return `<img class="status-bg" src="${A}/ui/camp-status.png" alt="" style="${px(x, y)}">`
+  const L = label   // 아래 좌표는 창 안 (330×330) 좌표
+  return `<div class="mstatus" style="${px(x, y, 330, 330)}">${panel(0, 0, 330, 330, '인물기본자료')}` +
+    `<i class="mpor" style="${px(7, 18, 98, 113)}"></i>` +
+    ['이름', '종족', '성별', '직업', '등급'].map((t, i) => L(128, [26, 46, 66, 86, 107][i], 64, `${t}:`, 'r')).join('') +
+    ['생명', '역량', '방어', '정신', '민첩'].map((t, i) => L(8, 136 + 20 * i, 48, `${t}:`) + L(118, 136 + 20 * i, 10, '/', 'dim')).join('') +
+    ['이동력', '이동방식', '부하상태', '피로도', '경험치'].map((t, i) => L(164, 136 + 20 * i, 76, `${t}:`, 'r')).join('') +
+    `<i class="mrule" style="${px(12, 236, 306, 1)}"></i>` +
+    ['무기', '방어', '도구'].map((t, i) => L(10 + 51 * i, 245, 48, t, 'c')).join('') +
+    L(166, 246, 16, '마', 'c') + L(166, 300, 16, '법', 'c') + `</div>`
+}
+
+/** 정비 화면 바탕 (640×480): 인물기본자료·도구설명·도구·명령·대기인물·출전인물 */
+function modernFrame() {
+  return panel(375, 12, 175, 76, '도구설명') + panel(375, 94, 175, 248, '도구') + panel(565, 12, 50, 330, '명령') +
+    panel(25, 348, 330, 122, '대기인물') + panel(375, 348, 240, 122, '출전인물') + statusFrame(true, 25, 12)
+}
+// 현대식 버튼 글자 (원작은 그림 속 글자)
+const MODERN_LABEL: Record<string, string> = { read: '읽기', write: '기록', music: '음악', quit: '종료', swap: '⇄', act: '행동',
+  trash: '버림', put: '장착', take: '해제', up: '▲', down: '▼' }
+
 /** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
 export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }) {
   document.querySelector('.bigstat')?.remove()
@@ -92,7 +124,8 @@ export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fat
   const el = document.createElement('div')
   el.className = 'bigstat'
   Object.assign(el.style, { left: `${Math.round(m.x + (m.w - 330) / 2)}px`, top: `${Math.round(m.y + Math.max(0, (m.h - 330) / 2))}px` })
-  el.innerHTML = `<img class="status-bg" src="${A}/ui/camp-status.png" alt="">
+  el.classList.toggle('modern', view.modern)
+  el.innerHTML = `${statusFrame(view.modern)}
     <i class="por" style="${px(8, 19, 96, 111)};background-position:-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px"></i>
     <div class="status" style="left:-25px;top:-12px">${statusMarkup(t, tables, cur)}</div>`
   const close = (e: Event) => { e.preventDefault(); e.stopPropagation(); el.remove() }
@@ -107,10 +140,10 @@ const icon = (id: number) =>
 export function campScreen(o: CampOptions): Promise<CampResult> {
   const root = document.createElement('section')
   root.id = 'camp'
-  if (o.remake) root.className = 'remake'
+  root.className = [o.remake ? 'remake' : '', o.modern ? 'modern' : ''].join(' ').trim()
+  document.documentElement.classList.toggle('ui-modern', !!o.modern)   // 확인창 (.owin) 도 현대식으로
   root.innerHTML = `<div class="stage">
-      <img class="bg" src="${A}/ui/camp-bg.png" alt="">
-      <img class="status-bg" src="${A}/ui/camp-status.png" alt="" style="${px(25, 12)}">
+      ${o.modern ? modernFrame() : `<img class="bg" src="${A}/ui/camp-bg.png" alt="">${statusFrame(false, 25, 12)}`}
       <i class="por" style="${px(33, 31, 96, 111)}"></i>
       <div class="status"></div>
       <div class="desc" style="${px(383, 31, 203, 56)}"></div>
@@ -361,6 +394,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     }
     root.querySelectorAll<HTMLButtonElement>('.hit').forEach(b => {
       const k = b.dataset.b!
+      if (o.modern) { b.textContent = MODERN_LABEL[k] ?? ''; b.classList.add(`m-${k}`) }
       b.onclick = () => { if (!dialog) buttons[k]() }
       if (o.remake) {
         const help = k === 'swap' ? PAGE_HELP.swapRemake : PAGE_HELP[k as keyof typeof PAGE_HELP]

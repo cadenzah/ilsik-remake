@@ -334,6 +334,32 @@ html.ui-modern .speak.dim { filter: brightness(.7); opacity: .8; }
 #camp .dlg .obtn:hover, #camp .dlg .obtn:focus-visible { filter: brightness(1.12); }
 #camp .dlg .ok { left: 9px; } #camp .dlg:not(.slots) .no { left: 67px; }
 #camp .dlg.slots .obtn { width: 100px; } #camp .dlg .obtn:disabled { color: #7a6a58; cursor: default; filter: saturate(.4); }
+/* 현대식 정비 화면·큰 인물기본자료 (camp.ts modernFrame·statusFrame, 개선판 설정 modernUi): 같은 자리에 어두운 패널과 글자 라벨 */
+#camp.modern { background: #0d0f14; }
+.mpanel { position: absolute; box-sizing: border-box; background: rgba(18, 21, 30, .94); border: 1px solid #3a4157; border-radius: 8px; }
+.mpanel b { display: block; height: 18px; line-height: 18px; text-align: center; font-size: 13px; color: #e3c06b;
+  background: rgba(227, 192, 107, .10); border-bottom: 1px solid #3a4157; border-radius: 7px 7px 0 0; }
+.mstatus > * { position: absolute; }
+.mlabel { color: #9aa0b2; text-shadow: none; white-space: nowrap; }
+.mlabel.r { text-align: right; } .mlabel.c { text-align: center; } .mlabel.dim { color: #5a6072; }
+.mrule { background: #3a4157; }
+.mpor { box-sizing: border-box; border: 1px solid #3a4157; border-radius: 4px; background: #0d0f14; }
+#camp.modern .txt, #camp.modern .num, .bigstat.modern .txt, .bigstat.modern .num { color: #e8e6df; text-shadow: none; }
+#camp.modern .num.cur, .bigstat.modern .num.cur, #camp.modern .txt.pos { color: #8fb4ff; text-shadow: none; }
+#camp.modern .txt.neg { color: #ff8a8a; text-shadow: none; }
+#camp.modern .desc .say { color: #e8e6df; text-shadow: none; }
+#camp.modern .hit { text-align: center; line-height: 22px; color: #e8e6df; background: #262c3d; border: 1px solid #3a4157; border-radius: 5px; cursor: pointer; }
+#camp.modern .hit:hover, #camp.modern .hit:focus-visible { background: #313952; border-color: #e3c06b; outline: none; }
+#camp.modern .m-trash, #camp.modern .m-put, #camp.modern .m-take { writing-mode: vertical-rl; text-orientation: upright; font-size: 11px; line-height: 16px; letter-spacing: -1px; }
+#camp.modern .m-up, #camp.modern .m-down { font-size: 9px; line-height: 16px; }
+#camp.modern .m-act { color: #ffd27a; border-color: #c06a10; }
+#camp.modern .count { color: #e3c06b; font-weight: 400; }
+#camp.modern .empty { border-color: rgba(143, 180, 255, .35); border-radius: 5px; }
+#camp.modern .mb:hover:not(.gone), #camp.modern .sb:hover, #camp.modern .it:hover, #camp.modern .eq:hover, #camp.modern .mb.shown:not(.gone) { outline-color: #e3c06b; }
+#camp.modern .it.picked { outline-color: #e3c06b; }
+#camp.modern .dlg .obtn { border: 1px solid #3a4157; border-image: none; border-radius: 6px; background: #262c3d; color: #e8e6df; line-height: 23px; filter: none; }
+#camp.modern .dlg .obtn:hover:not(:disabled), #camp.modern .dlg .obtn:focus-visible { background: #313952; border-color: #e3c06b; }
+#camp.modern .dlg .obtn:disabled { color: #6a7082; }
 /* 화면 전환 페이드 (fade.ts) */
 /* 장 사이 대륙 지도 (worldmap.ts) — 640×480 을 화면에 맞게, 페이드 막 아래 */
 #worldmap { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; cursor: pointer; }
