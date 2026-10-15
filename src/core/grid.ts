@@ -4,17 +4,17 @@ import type { Pos, Unit } from './unit'
 
 export const key = (x: number, y: number) => y * 1000 + x
 
-// 레이어2: 0 평지, 2 숲·바위, 4 절벽
-export function moveCost(map: StageMap, x: number, y: number): number {
+// 통행 [확정, 124e:2d08·124e:5039·20ec:a5e0]: 레이어2 값 ≤ 유닛 이동방식 이면 지나갈 수 있다. 이동방식 3(물)은 레이어2 3 칸만.
+// 이동방식 1 평지 · 2 숲 · 3 물 · 4 비행. 칸마다 비용 1 (통행 마스크 0/1 위를 범람 35ae:1253)
+export function moveCost(map: StageMap, x: number, y: number, kind: number): number {
   const v = map.layer2[y * map.w + x]
-  if (v >= 4) return Infinity
-  if (v >= 2) return 2
-  return 1
+  return (kind === 3 ? v === 3 : v <= kind) ? 1 : Infinity
 }
 
+// 레이어2 이름 [추정: 통행하는 이동방식으로 붙임] 0 평지 · 1 거친 땅 · 2 숲 · 3 물 · 4 절벽 · 5 벽
+const TERRAIN = ['평지', '거친 땅', '숲 (숲·비행 이동만)', '물 (물·비행 이동만)', '절벽 (비행 이동만)', '벽 (통행 불가)']
 export function terrainName(map: StageMap, x: number, y: number): string {
-  const v = map.layer2[y * map.w + x]
-  return v >= 4 ? '절벽 (통행 불가)' : v >= 2 ? '숲 (이동 비용 2)' : '평지'
+  return TERRAIN[map.layer2[y * map.w + x]] ?? '벽 (통행 불가)'
 }
 
 export const inside = (map: StageMap, x: number, y: number) => x >= 0 && y >= 0 && x < map.w && y < map.h
@@ -39,7 +39,7 @@ export function reachable(map: StageMap, units: Unit[], u: Unit): Moves {
       if (!inside(map, nx, ny)) continue
       const o = occ.get(key(nx, ny))
       if (o && o.side !== u.side) continue
-      const nc = c + moveCost(map, nx, ny)
+      const nc = c + moveCost(map, nx, ny, u.type.moveKind)
       if (nc > u.mov || nc >= (cost.get(key(nx, ny)) ?? Infinity)) continue
       cost.set(key(nx, ny), nc)
       prev.set(key(nx, ny), key(x, y))

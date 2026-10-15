@@ -1,5 +1,5 @@
 // 마우스·키보드·터치 입력 (ux-proposal.md 7·8·19·28). 좌표는 모두 논리 좌표 (screen.toLogical)
-// 두 판: 왼쪽 = 고르기, 오른쪽·Esc = 한 단계 뒤로, 끌기·방향키 = 화면 이동, 창틀(기둥·띠) 클릭 = 그쪽으로 몇 칸 이동 (원작)
+// 두 판: 왼쪽 = 고르기, 오른쪽·Esc = 한 단계 뒤로 (개선판은 창 바깥 누르기도), 끌기·방향키 = 화면 이동, 창틀(기둥·띠) 클릭 = 그쪽으로 몇 칸 이동 (원작)
 // 개선판만: 휠·핀치·+/− = 확대 (맵 창 안), Enter = 결정, E 턴 종료, T 위험 범위, M 미니맵, 터치 길게 누르기 = 정보 창
 import { clickTile, endPlayerStep, goBack, hoverTile, restPrompt, toggleMinimap, toggleThreat } from './battle'
 import { TH, TW } from './data'
@@ -75,6 +75,8 @@ export function bindInput() {
     drag = null
     if (!d || d.moved || e.button !== 0 || !S.map || dialogueOpen()) return
     const p = toLogical(e.clientX, e.clientY)
+    // 개선판: 창 (명령·확인·메뉴·큰 상태창) 바깥을 누르면 그 창의 '뒤로' (오른쪽 클릭·Esc 와 같다)
+    if (remake() && (modalOpen() || document.querySelector('.bigstat'))) { goBack(); return }
     const t = toTile(p.x, p.y)
     if (!t) { frameScroll(p.x, p.y); return }
     if (modalOpen()) return   // 원작 창은 모달: 창 밖 클릭 무시

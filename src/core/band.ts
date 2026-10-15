@@ -1,8 +1,8 @@
 // 위·아래 띠 (ux-proposal.md 30). 원작 띠 = 가운데 크림색 제목 칸 + 양옆 장식.
 // 원작판: 제목 칸에 장 제목만. 개선판: 제목 칸 왼쪽에 턴 패, 양옆 장식 위에 원작 글자 버튼,
 //   버튼에 마우스를 올리면 제목 칸 글자가 그 버튼 설명으로 (정비 화면 도구설명 칸 방식). 자리가 모자라면 순위 낮은 버튼부터 숨기고 메뉴에서 쓴다.
-//   아래 띠 왼쪽 = 가리킨 칸 지형 패, 오른쪽 = [뒤로] (터치 기기)
-// 현대식 화면 (view.modern): 창틀 대신 위 바 한 줄 = [턴 패][제목 (버튼 설명)] … [버튼들], 지형 패·[뒤로] 는 맵 아래 모서리에 떠 있게
+//   아래 띠 왼쪽 = 가리킨 칸 지형 패. '뒤로' 는 맵·창 바깥을 누르면 된다 (input.ts)
+// 현대식 화면 (view.modern): 창틀 대신 위 바 한 줄 = [턴 패][제목 (버튼 설명)] … [버튼들], 지형 패는 맵 아래 모서리에 떠 있게
 import { cartouche, FRAME, hud, onLayout, TOP_BAR, view } from './screen'
 import { button, esc, textWidth } from './ui'
 
@@ -16,13 +16,13 @@ export interface BandButton {
 }
 
 let root: HTMLElement | null = null
-let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null, backBtn: HTMLButtonElement | null = null
+let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null
 let title = '', buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
 const hiddenIds = new Set<string>()
 const BTN_Y = 14, GAP = 4, EDGE = 14
 
 /** 띠를 만든다. remake = 개선판 (버튼·턴 패·지형 패) */
-export function initBand(remake: boolean, btns: BandButton[] = [], onBack?: () => void) {
+export function initBand(remake: boolean, btns: BandButton[] = []) {
   root?.remove()
   root = document.createElement('div')
   root.className = 'band'
@@ -35,7 +35,7 @@ export function initBand(remake: boolean, btns: BandButton[] = [], onBack?: () =
   root.append(titleEl)
   buttons = remake ? btns : []
   els = new Map()
-  plate = terrain = backBtn = null
+  plate = terrain = null
   if (remake) {
     plate = document.createElement('div')
     plate.className = 'plate turn'
@@ -50,10 +50,6 @@ export function initBand(remake: boolean, btns: BandButton[] = [], onBack?: () =
       e.onmouseleave = e.onblur = () => say()
       els.set(b.id, e)
       root.append(e)
-    }
-    if (onBack && matchMedia('(pointer: coarse)').matches) {
-      backBtn = button(['뒤로', onBack])
-      root.append(backBtn)
     }
   }
   place()
@@ -127,7 +123,6 @@ function place() {
   for (const [id, e] of els) e.hidden = hiddenIds.has(id)
   const by = view.h - FRAME.b + 7
   if (terrain) Object.assign(terrain.style, { left: `${EDGE + 54}px`, top: `${by}px` })
-  if (backBtn) Object.assign(backBtn.style, { left: `${view.w - EDGE - 54 - parseFloat(backBtn.style.width)}px`, top: `${by}px` })
 }
 
 /** 현대식 위 바: 왼쪽부터 턴 패·제목, 오른쪽 끝부터 버튼 (자리가 모자라면 순위 낮은 것부터 메뉴로) */
@@ -158,7 +153,6 @@ function placeModern() {
   for (const [id, e] of els) e.hidden = hiddenIds.has(id)
   const fy = view.h - 25 - PAD
   if (terrain) Object.assign(terrain.style, { left: `${PAD}px`, top: `${fy}px` })
-  if (backBtn) Object.assign(backBtn.style, { left: `${view.w - PAD - parseFloat(backBtn.style.width)}px`, top: `${fy}px` })
 }
 
 onLayout(place)

@@ -7,7 +7,7 @@ import { attackSpots, DIRS, dist, inside, key, moveCost, reachable } from '../..
 import type { Pos, Unit } from '../../core/unit'
 import { rules } from './rules'
 
-/** 상태 1 깨어남: 이동력+1 걸음 안(지형 비용)에 일행(부대 0) 대원이 있다. 다른 유닛에 막히는지는 근사로 무시 */
+/** 상태 1 깨어남: 이동력+1 걸음 안(통행 마스크)에 일행(부대 0) 대원이 있다. 다른 유닛에 막히는지는 근사로 무시 */
 function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
   const party = new Set(units.filter(o => o.troop === 0 && o.hp > 0).map(o => key(o.x, o.y)))
   const cost = new Map([[key(u.x, u.y), 0]])
@@ -18,7 +18,7 @@ function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy
       if (!inside(map, nx, ny)) continue
-      const nc = c + moveCost(map, nx, ny)
+      const nc = c + moveCost(map, nx, ny, u.type.moveKind)
       if (nc > u.mov + 1 || nc >= (cost.get(key(nx, ny)) ?? Infinity)) continue
       if (party.has(key(nx, ny))) return true
       cost.set(key(nx, ny), nc)

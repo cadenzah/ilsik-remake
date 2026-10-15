@@ -28,6 +28,8 @@ html.bmfont #camp .desc .say { font-size: 16px; line-height: 16px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   font-family: var(--font); overflow: hidden; }
+/* 브라우저 확대(핀치·두 번 누르기) 막기 — 확대는 전투 맵 캔버스의 게임 확대만 (main.ts lockPage) */
+html, body { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
 canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: default; }
 button { font: inherit; color: var(--text); background: #262c3d; border: 1px solid var(--line);
   border-radius: 6px; padding: 6px 12px; cursor: pointer; }

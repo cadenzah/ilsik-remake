@@ -110,7 +110,7 @@ function statusFrame(modern: boolean, x = 0, y = 0) {
 }
 
 /** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
-export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }) {
+export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fatigue: number }, onClose?: () => void) {
   document.querySelector('.bigstat')?.remove()
   const m = mapRect()
   const el = document.createElement('div')
@@ -120,7 +120,7 @@ export function statusWindow(t: UnitType, tables: Tables, cur: { hp: number; fat
   el.innerHTML = `${statusFrame(view.modern)}
     <i class="por" style="${px(8, 19, 96, 111)};background-position:-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px"></i>
     <div class="status" style="left:-25px;top:-12px">${statusMarkup(t, tables, cur)}</div>`
-  const close = (e: Event) => { e.preventDefault(); e.stopPropagation(); el.remove() }
+  const close = (e: Event) => { e.preventDefault(); e.stopPropagation(); el.remove(); onClose?.() }
   el.onclick = close
   el.oncontextmenu = close
   hud.append(el)

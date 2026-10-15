@@ -1,7 +1,7 @@
 // 타이틀·메인 메뉴 — 원작 124e:e404 재현 (formats.md "메인 메뉴")
 // 원작: 돌판 로고(ECPMARK 0)가 세 번 번쩍(세 번째에 천둥) → 밝아져 4초 → 어두워지고 두루마리 노인(ECPMARK 1) 위
 // (460,0) 돌 창틀에 유랑천하·지난흔적·게임종료. 게임종료는 제작진·발행 화면(ECPPLANE)을 보여 주고 끝난다.
-// 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 장 선택·제작진(팬 게임 고지 포함)·설정(글꼴·로고 효과음)·판 선택.
+// 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 제작진(팬 게임 고지 포함)·판 선택. 개선판만 장 지도·도감·설정 (글꼴·화면·편의·기록 옮기기).
 // 화면은 640×480 을 통째로 확대
 import type { Camp } from './campaign'
 import { A } from './data'
@@ -28,12 +28,12 @@ export const SKIP_INTRO = 'eclipse.skipIntro'
 // 로고 효과음 (천둥, 설정 logoSound): 켜면 원본 음량의 1/2
 const THUNDER_VOLUME = 0.5
 const SETTINGS: { k: Setting; label: string; title: string }[] = [
-  { k: 'bitmapFont', label: '원작 글꼴', title: '원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴)' },
+  { k: 'bitmapFont', label: '원작 글꼴', title: '개선판: 원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴). 원작판은 늘 원작 글꼴' },
+  { k: 'modernUi', label: '개선된 UI', title: '개선판: 원작 창틀 없이 맵을 화면 가득, 다듬은 창·색 칸 범위 (끄면 원작 창틀을 복각한 화면)' },
   { k: 'logoSound', label: '로고 효과음', title: '시작 로고 연출의 천둥소리' },
   { k: 'fastEnemy', label: '적 차례 빠르게', title: '개선판: 적·NPC 가 움직이는 속도를 높인다' },
   { k: 'shortAnim', label: '전투 연출 짧게', title: '개선판: 공격·쓰러짐 연출을 짧게' },
   { k: 'quickAttack', label: '공격 확인 생략', title: '개선판: 「전 투」 확인창 없이 대상을 누르면 바로 공격' },
-  { k: 'modernUi', label: '현대식 전투 화면', title: '개선판: 원작 창틀 없이 맵을 화면 가득, 어두운 반투명 창·색 칸 범위 (끄면 원작 창틀을 복각한 화면)' },
 ]
 const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
 
@@ -132,6 +132,7 @@ export function showTitle(): Promise<Launch> {
 
     const menu = () => {
       const p = loadProgress(ed)
+      applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
       win.classList.remove('wide')
       rows([
         { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
@@ -140,21 +141,22 @@ export function showTitle(): Promise<Launch> {
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
           ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
           { label: '도    감', on: p?.seen ? () => void openCodex() : undefined, title: p?.seen ? '만난 인물·손에 넣은 도구' : '기록 없음' },
-        ] : [{ label: '장 선택', on: p?.cleared.length ? chapters : undefined, title: p?.cleared.length ? '클리어한 장 다시 하기' : '클리어한 장이 없음' }],
+          { label: '설 정', title: '글꼴·화면·편의 기능·기록 옮기기', on: () => settings() },
+        ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },
-        { label: '설 정', title: '글꼴·효과음', on: () => settings() },
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
     }
 
-    // 설정: 켬/끔 스위치들 (두 판 공통). 바꾸면 그 자리에 초점을 둔 채 다시 그린다
+    // 설정 (개선판 메뉴): 켬/끔 스위치들 + 기록 옮기기. 바꾸면 그 자리에 초점을 둔 채 다시 그린다
     const settings = (focus = 0) => {
       win.classList.add('wide')
       rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.title,
         on: () => { setSetting(o.k, !setting(o.k)); applyFont(); settings(SETTINGS.indexOf(o)) } })),
+        { label: '기록 옮기기', sub: '다른 브라우저·기기로', title: '코드·파일로 진행을 보내고 받는다', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
-      body.querySelectorAll<HTMLButtonElement>('.opt')[focus]?.focus()
+      body.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
     }
 
     // 지난흔적: 자동 기록 (장을 마칠 때마다) + 정비 화면 기록 3칸 (원작 「불러오기」)
@@ -168,7 +170,6 @@ export function showTitle(): Promise<Launch> {
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
           on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
-        { label: '기록 옮기기', sub: '다른 브라우저·기기로', title: '코드·파일로 진행을 보내고 받는다', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
     }
 
@@ -180,7 +181,7 @@ export function showTitle(): Promise<Launch> {
       return `<li><b>${e.name}</b> ${parts.join(' · ') || '<span class="dim">없음</span>'}</li>`
     }).join('')
     const openTransfer = async (note = '') => {
-      openPage()
+      openPage(() => settings(SETTINGS.length))
       const mine = currentBundle(), has = Object.keys(mine.data).length > 0
       const code = has ? await bundleCode(mine) : ''
       page.innerHTML = `<div class="transfer">
@@ -235,18 +236,9 @@ export function showTitle(): Promise<Launch> {
           try { applyBundle(pending); await openTransfer('가져왔습니다. 지난흔적에서 이어 하세요.') } catch (err) { inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
         },
         undo: async () => { undoImport(); await openTransfer('가져오기 전 기록으로 되돌렸습니다.') },
-        close: () => { closeCredits(); loadMenu() },
+        close: () => closeCredits(pageBack),
       }
       page.querySelectorAll<HTMLButtonElement>('button[data-act]').forEach(b => b.onclick = () => void acts[b.dataset.act!]())
-    }
-
-    // 클리어한 장 다시 하기 (진행 저장에는 영향 없음)
-    const chapters = () => {
-      const p = loadProgress(ed)!
-      const list = [...p.cleared].sort((a, b) => a.n - b.n || a.route - b.route)
-      win.classList.add('wide')
-      rows([...list.map(c => ({ label: chapterName(c.n, c.route), on: () => launch(stageDef(c.n, c.route), c.at) })),
-        { label: '돌아가기', cls: 'back', on: menu }])
     }
 
     // 다른 길로: 분기점 상태 + 마지막 엔딩의 장비로 고른 루트의 첫 장부터 (이어하기도 그 판으로)
@@ -260,7 +252,8 @@ export function showTitle(): Promise<Launch> {
     }
 
     // 장 지도·도감 (개선판). page 를 쓰고 Esc·돌아가기로 메뉴로
-    const openPage = () => { pageAt = -2; win.hidden = true; page.hidden = false }
+    let pageBack = () => menu()   // 장 지도·도감·기록 옮기기에서 돌아갈 메뉴
+    const openPage = (back = menu) => { pageAt = -2; pageBack = back; win.hidden = true; page.hidden = false }
     const openMap = async () => {
       openPage()
       await chapterMap(page, loadProgress(ed), c => launch(stageDef(c.n, c.route), c.at),
@@ -289,16 +282,16 @@ export function showTitle(): Promise<Launch> {
       })
       page.querySelector<HTMLButtonElement>(`nav button[data-go="${i === PAGES.length - 1 ? 0 : 1}"]`)?.focus()
     }
-    const closeCredits = () => {
+    const closeCredits = (then = menu) => {
       pageAt = -1
       page.hidden = true
       win.hidden = false
-      menu()
+      then()
     }
 
     // 메뉴: 위·아래 화살표로 항목 이동, Esc 로 돌아가기. 제작진: 좌·우 화살표로 이전·다음, Esc 로 돌아가기
     const onKey = (e: KeyboardEvent) => {
-      if (pageAt === -2) { if (e.key === 'Escape') closeCredits(); return }   // 장 지도·도감
+      if (pageAt === -2) { if (e.key === 'Escape') closeCredits(pageBack); return }   // 장 지도·도감·기록 옮기기
       if (pageAt >= 0) {
         if (e.key === 'ArrowLeft' && pageAt > 0) credits(pageAt - 1)
         else if (e.key === 'ArrowRight' && pageAt < PAGES.length - 1) credits(pageAt + 1)

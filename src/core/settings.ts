@@ -1,4 +1,4 @@
-// 사용자 설정 (두 판 공통, localStorage). 메인 메뉴 '설정' 에서 바꾼다
+// 사용자 설정 (localStorage). 개선판 메인 메뉴 '설정' 에서 바꾼다. 원작판은 쓰지 않는다 (글꼴은 늘 원작, 로고 효과음만 따른다)
 const KEYS = {
   bitmapFont: 'eclipse.bitmapFont',   // 원작 비트맵 글꼴 (FULLSOFT.FNT) 로 화면 글자를 그린다. 기본 켬
   logoSound: 'eclipse.introSound',    // 로고 연출의 천둥 효과음. 기본 끔 (옛 '인트로 소리' 키 그대로)
@@ -6,7 +6,7 @@ const KEYS = {
   fastEnemy: 'eclipse.fastEnemy',     // 적·NPC 차례 빠르게
   shortAnim: 'eclipse.shortAnim',     // 전투 연출 짧게
   quickAttack: 'eclipse.quickAttack', // 공격 확인창 없이 바로
-  modernUi: 'eclipse.modernUi',       // 현대식 전투 화면 (창틀 없이 맵 가득·어두운 반투명 창). 끄면 원작 창틀
+  modernUi: 'eclipse.modernUi',       // 설정 이름 '개선된 UI' (코드에선 현대식 화면): 창틀 없이 맵 가득·다듬은 창. 끄면 원작 창틀
 } as const
 const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, fastEnemy: false, shortAnim: false, quickAttack: false, modernUi: false }
 
