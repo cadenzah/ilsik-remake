@@ -358,7 +358,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelector<HTMLButtonElement>('.obtn:not(:disabled)')?.focus()
   }
 
-  /** 개선판 「설정」 창 (원작 창틀·글자 버튼, slotWin 과 같은 모양): 항목마다 켬/끔, 올리면 도구설명 칸에 설명. 종료·Esc·오른쪽 클릭 = 닫기 */
+  /** 개선판 「설정」 창 (원작 창틀·글자 버튼, slotWin 과 같은 모양): 항목마다 켬/끔, 올리면 도구설명 칸에 설명. 닫기 (현대식 설정 창과 같은 이름)·Esc·오른쪽 클릭 = 닫기 */
   const settingsWin = (onClose: () => void, focus = 0) => {
     const w = 184, bw = 160, n = SETTINGS.length, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9
     dialog?.remove()
@@ -367,7 +367,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.style.cssText = px((640 - w) / 2, 110, w, h) + `;background-image:url(${winUrl('comma', w, h)})`
     dialog.innerHTML = `<div class="t">설 정</div>` + SETTINGS.map((s, i) =>
       `<button class="obtn sl opt" data-i="${i}" role="switch" aria-checked="${setting(s.k)}" style="${px((w - bw) / 2, 30 + i * 29, bw)}">${esc(s.label)}<b>${setting(s.k) ? '켬' : '끔'}</b></button>`).join('')
-      + `<button class="obtn no" style="${px((w - bw) / 2, 30 + n * 29, bw)}">종료</button>`
+      + `<button class="obtn no" style="${px((w - bw) / 2, 30 + n * 29, bw)}">닫기</button>`
     stage.append(dialog)
     dialog.querySelectorAll<HTMLButtonElement>('.opt').forEach(b => {
       const s = SETTINGS[Number(b.dataset.i)]
