@@ -36,6 +36,7 @@
   `btn.0~5` (ECPBUT 0005 글자 버튼, 3~5 눌림), `icon.N.S` (ECPBUT 000N 아이콘), `sta.N` (STA 0·1·2·3·5·12·13·14·15), `oth.N` (OTH 3·4·5). 팔레트 = WIN 2
 - `ui/` 정비 화면 (camp.ts): camp-bg (ECPMAI tactics 창틀 + WIN 2), camp-status (WIN 1), camp-face·camp-mini (BS 1·2, 칸 = 유닛 0~28), equip (EQU 182, 칸 = 품목 id−1), camp-por (POR 투명 배경, 12열), magic-icons (MAR 9, 칸 = MAD id), status-icons (OTH 0·1). `export_web.py ui` 에 포함 (magic/status 아이콘은 `icons`)
 - `ui/camp-setting.png`·`camp-quit.png` 개선판 원작 모양 정비 화면 「설정」 버튼 46×25 (웹 보탬, 원래 종료 칸에) 과 한 칸 아래로 옮긴 종료 (원작 그림 그대로). 설정 = 원작 「음악」 버튼 글자를 지운 바탕 + 원작 글꼴 '설정' (흰 획 + 오른쪽 그림자, 원작 버튼 글자 여백에 맞춤). `export_web.py ui` (export_camp)
+- `ui/promote.png` 애슬 전직 장면 (ECLIPSE1.FAT 11, 112×85 × 38프레임, 10열). `export_web.py promote`
 - `ui/magic-fx.png` 마법 이펙트 아틀라스 (ECLIPSE.MAG 444프레임, 56×96 칸 24열, 칸 = 프레임 번호 = 마법 id×6+단계). `export_web.py magic-fx`
 - `ui/worldmap.png` 대륙 지도 (SCR 43), `ui/places.png` 장소 이름표 시트, `data/worldmap.json` 장마다 {name, x, y, w, h, sy} — 장 사이 지도(worldmap.ts)·개선판 장 지도
 - `data/dialogue.json` 대사 440줄 배열, `data/units.json` 유닛 111종 능력치 + equip[무기,방어구,도구 EAD id]·canMagic·magic[MAD id] (PAD1 기준)

@@ -1,10 +1,12 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
-import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
 import { aimsFrom, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
+import { promoteScene } from './promote'
+import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
@@ -121,6 +123,11 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     S.deploy = r.deploy
     keep(r)
     atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
+  }
+  if (!resume) for (const i of promoteDeployed(S.deploy)) {   // 원작: 정비 화면 뒤 애슬 전직 장면 (도구 미지의책), 그 뒤 대륙 지도
+    const t = S.types[PARTY[i]]
+    await promoteScene(ed.id === 'remake' ? `${josa(t.name, '이/가')} ${josa(tables.labels.job[t.job], '으로/로')} 전직했다.` : undefined)
+    atStart = snapshot()
   }
   if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
   Object.assign(S, placements(rec))
@@ -414,7 +421,7 @@ export async function checkEnd(): Promise<boolean> {
     S.mode = { kind: 'busy' }
     closeAll()
     hideBasic()
-    if (remake()) showResult('패 배', `${fallen.type.name}이(가) 쓰러졌다.`, [['다시 하기', () => void start()], ['정비 화면', toCamp], ['타이틀로', toTitle]])
+    if (remake()) showResult('패 배', `${josa(fallen.type.name, '이/가')} 쓰러졌다.`, [['다시 하기', () => void start()], ['정비 화면', toCamp], ['타이틀로', toTitle]])
     // 원작: 패배 화면·메시지 없이 어두워졌다가 1장 정비 화면 (초기 일행, formats "기본 패배"). 장 선택으로 연 장은 그 장 처음부터
     else if (S.def.campaign) void boot(S.ed, stageDef(1, 0, true), { flags: [], party: [], items: [] })
     else void start()

@@ -113,10 +113,10 @@ export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
  *  장면 키 "phase:scene" — phase 0 전투 시작, 1 전투 중 트리거, 2 전투 후. scene = 스테이지 번호 또는 스테이지*10+k */
 export type SceneLine = [who: number, line: number, branch: number]  // who -1 = 초상화 없음, branch 0 항상 / 1 선택 '예' / 2 '아니오'
 // flag = 그 캠페인 플래그가 켜져야 실행, routes = 그 루트(0~2)에서만 (없으면 모든 루트), item/noItem = 그 도구를 가졌을 때/없을 때
-// leave = 그 종류 대원 이탈, swap = [종류, 새 종류] 교체, promote = 그 종류 대원 직업 단계 +1 (if62 일 때, 미반영)
+// leave = 그 종류 대원 이탈, swap = [종류, 새 종류] 교체, learn = [종류, 마법] 그 대원이 마법을 배움 (ifMagic = 마법 수가 그 값일 때만, 원작 +0x62)
 // take/give = 소지품 빼기/넣기, setFlag = alive 대원 [부대, 번호] 이 살아 있으면 그 플래그 켜기. 실행 = campaign.ts finishStage
 export type PostStep = ({ join: number } | { count: number } | { set: [number, number] } | { scene: string }
-  | { leave: number } | { swap: [number, number] } | { promote: number; if62: number }
+  | { leave: number } | { swap: [number, number] } | { learn: [number, number]; ifMagic?: number }
   | { take: number } | { give: number } | { setFlag: string; alive: [number, number] }) & { routes?: number[]; flag?: string; item?: number; noItem?: number }
 export interface Scenes {
   scenes: Record<string, SceneLine[]>

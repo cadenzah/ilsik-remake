@@ -352,6 +352,25 @@ def export_battles(d):
               ensure_ascii=False, separators=(',', ':'))
 
 
+def export_promote():
+    """애슬 전직 애니메이션 (2ff8:0799: ECLIPSE1.FAT 묶음 11, 112×85, (264,200) 에 프레임 0~36 을 0xa0 간격, 끝에 0x5dc 멈춤).
+    마지막 프레임 38 은 FLC 고리 프레임 (= 0) 이라 뺀 0~37 을 10열 띠로. 불투명 (검은 바탕 그대로)"""
+    import fat
+    d = mkdir('ui')
+    b = open(os.path.join(ROOT, 'original', 'ECLIPSE1.FAT'), 'rb').read()
+    k, w, h, pal, px, frames = next(x for x in fat.blocks(b) if x[0] == 11)
+    imgs = []
+    for cur, cp in fat.play(w, h, pal, px, frames):
+        im = Image.frombytes('P', (w, h), bytes(cur)); im.putpalette(cp)
+        imgs.append(im.convert('RGB'))
+    imgs = imgs[:len(frames)]
+    COLS = 10
+    out = Image.new('RGB', (w * COLS, h * ((len(imgs) + COLS - 1) // COLS)))
+    for f, im in enumerate(imgs): out.paste(im, ((f % COLS) * w, (f // COLS) * h))
+    out.save(os.path.join(d, 'promote.png'), optimize=True)
+    print('promote', len(imgs), w, h)
+
+
 if __name__ == '__main__':
     if sys.argv[1:] == ['data']:
         export_data()
@@ -365,9 +384,11 @@ if __name__ == '__main__':
         export_battle_ui()
     elif sys.argv[1:] == ['figs']:
         export_figs()
+    elif sys.argv[1:] == ['promote']:
+        export_promote()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_data(); font.export()
+        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_data(); font.export()
     print('ok')

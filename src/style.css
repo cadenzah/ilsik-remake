@@ -514,6 +514,13 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #worldmap .map { position: absolute; inset: 0; width: 640px; height: 480px; }
 #worldmap .place, #titlescreen .place { position: absolute; display: block; image-rendering: pixelated; }
 
+/* 애슬 전직 장면 (promote.ts): 원작 화면 640×480 의 (264,200) 에 112×85 프레임 */
+#promote { position: fixed; inset: 0; z-index: 900; background: #000; overflow: hidden; cursor: pointer; }
+#promote .stage { position: absolute; left: 50%; top: 50%; width: 640px; height: 480px; transform-origin: 50% 50%; }
+#promote .anim { position: absolute; left: 264px; top: 200px; width: 112px; height: 85px; image-rendering: pixelated; }
+#promote .cap { position: absolute; left: 0; right: 0; top: 300px; margin: 0; text-align: center; color: #e8dcb0; font-size: 16px; opacity: 0; transition: opacity .4s; }
+#promote.end .cap { opacity: 1; }
+
 #fade { position: fixed; inset: 0; z-index: 1000; background: #000; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 #fade.on { opacity: 1; pointer-events: auto; }
 

@@ -45,7 +45,7 @@ goal 금위대장을 지켜 낸다 keep alive=1.0               ← 보조 목�
 - 블록 = `== 시점 [조건…]`. 시점: `pre` · `post` · `turn N` · `troop N` (부대 N 이 움직이기 시작할 때, 원작 상태 0 전환) · `dead 유닛` · `hp 유닛 <30%` · `win` · `lose`.
 - 조건 (모두 AND): `route=A|B|C` · `flag=npc19` / `!flag=…` · `item=168` / `!item=…` · `in=페니` / `!in=…` (출전 중) · `party=페니` / `!party=…` (일행에 있음) · `alive=부대.번호`.
 - 부대 번호 = 0 일행, NPC 가 있으면 1 = NPC, 그다음부터 원작 적 무리 순 (battle.ts placements). `tools/ecs_draft.py` 가 이름으로 풀어 보여 준다.
-- 캠페인 동작 `do …` 은 지금 `PostStep` 과 같은 말: `join 유닛` · `leave` · `swap a b` · `give`/`take 도구` · `flag 이름` · `promote`. 개선판에서 장 순서를 바꾸는 `goto 장` 도 같은 자리에.
+- 캠페인 동작 `do …` 은 지금 `PostStep` 과 같은 말: `join 유닛` · `leave` · `swap a b` · `give`/`take 도구` · `flag 이름` · `learn 유닛 마법id`. 개선판에서 장 순서를 바꾸는 `goto 장` 도 같은 자리에.
 - 화자는 이름으로 쓰고 `names.json` 이 번호로 바꾼다. 같은 이름의 다른 유닛(아리크스 0/1, 아티스 25/26)은 지금 일행에 있는 쪽, 명시하려면 `아티스#26`.
 
 ## 3. 덮어쓰기 규칙

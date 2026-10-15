@@ -1,4 +1,5 @@
 // 캠페인: 장 사이에 이어지는 상태 (플래그·일행·소지품)와 원작 장면 재생 목록
+import { josa } from 'es-hangul'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
 
@@ -47,7 +48,7 @@ export function restore(c: Partial<Camp> | null) {
 /** 소지품이나 일행 장비에 그 도구가 있나 (원작 [bp-0x1a4] 소지품 + 일행 장비 +0x5e 검사) */
 export const hasItem = (id: number) => ITEMS.includes(id) || PARTY.some(t => S.types[t] && partyType(t).equip.includes(id))
 
-export const joinLine = (type: number) => ({ text: `${S.types[type].name}이(가) 일행에 합류했다.` })
+export const joinLine = (type: number) => ({ text: `${josa(S.types[type].name, '이/가')} 일행에 합류했다.` })
 
 // 선택지 분기는 아직 UI 가 없어 '예'(1) 쪽을 재생한다
 export function sceneLines(keys: string[]) {
@@ -71,8 +72,34 @@ export function applyStep(s: PostStep, notes: Note[], alive: Alive) {
   else if ('take' in s) { const i = ITEMS.indexOf(s.take); if (i >= 0) ITEMS.splice(i, 1) }
   else if ('give' in s) ITEMS.push(s.give)
   else if ('setFlag' in s) { if (alive(...s.alive)) FLAGS.add(s.setFlag) }
-  // promote (40장 레이몬 직업 단계 +0x62) 는 직업 단계가 아직 없어 건너뛴다
+  else if ('learn' in s) learn(s.learn[0], s.learn[1], s.ifMagic, notes)
 }
+
+/** 일행의 그 종류 대원이 마법을 배운다 (원작 40장 2ff8:37c7: 레이몬이 마법 7개일 때만 8번째로 마수신).
+ *  개선판은 마법 수와 상관없이 (레벨이 모자라 서약 장면을 놓치지 않게), 이미 알거나 8개면 그대로 */
+function learn(type: number, magic: number, ifMagic: number | undefined, notes: Note[]) {
+  if (!PARTY.includes(type)) return
+  const t = partyType(type), strict = S.ed.id === 'original'
+  if (t.magic.includes(magic) || t.magic.length >= 8 || (strict && ifMagic !== undefined && t.magic.length !== ifMagic)) return
+  GROWN.set(type, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic, magic] })
+  notes.push({ text: `${josa(t.name, '이/가')} ${S.tables.magic.get(magic)?.name ?? '새'} 마법을 익혔다.` })
+}
+
+/** 애슬 전직 (원작 2ff8:0799, 정비 화면 뒤·대륙 지도 전): 출전 대원 중 애슬 (초상 8) 이 도구 미지의책 (174) 을 들고 있으면 그 일행 칸을 유닛 9 (SM여왕) 로.
+ *  원작 124e:73d3 이 칸을 PAD 값으로 다시 채우므로 레벨·경험·장비는 새 종류의 기본값이 되고 미지의책은 사라진다. 바뀐 일행 칸 번호를 돌려준다 */
+export function promoteDeployed(deploy: number[]): number[] {
+  const done = deploy.filter(i => {
+    const t = PARTY[i]
+    return t !== undefined && S.types[t]?.por === ATH && partyType(t).equip[2] === UNKNOWN_BOOK
+  })
+  for (const i of done) {
+    const t = PARTY[i]
+    PARTY[i] = ATH_QUEEN
+    for (const m of [GROWN, EQUIP] as Map<number, unknown>[]) { m.delete(t); m.delete(ATH_QUEEN) }
+  }
+  return done
+}
+const ATH = 8, ATH_QUEEN = 9, UNKNOWN_BOOK = 174
 
 /** 승리 처리: 전투 중 합류(joined)·클리어 보상(reward, 추정)을 넣고, 전투 후 단계를 순서대로 실행해 일행·소지품·플래그를 고친다.
  *  돌려주는 scenes = 재생할 원작 장면 키, notes = 장면 뒤에 보일 합류 알림 (원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에).

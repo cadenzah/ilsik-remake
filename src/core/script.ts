@@ -41,6 +41,7 @@ function parseDo(src: string, name: (s: string) => number, err: (m: string) => n
       case 'join': return { join: name(a.join(' ')) }
       case 'leave': return { leave: name(a.join(' ')) }
       case 'swap': return { swap: [name(a[0]), name(a[1])] as [number, number] }
+      case 'learn': return { learn: [name(a.slice(0, -1).join(' ')), num(a.at(-1))] as [number, number] }
       case 'give': return { give: num(a[0]) }
       case 'take': return { take: num(a[0]) }
       case 'flag': return { setFlag: a[0], alive: [0, 0] as [number, number] }   // 선두는 늘 살아 있으므로 무조건 켬
