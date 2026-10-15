@@ -137,3 +137,17 @@ export async function loadStage(n: number) {
 export const unitSpriteUrl = (type: number) => `${A}/units/${String(type).padStart(3, '0')}.png`
 export const portraitUrl = (por: number) => `${A}/portraits/${String(por).padStart(3, '0')}.png`
 export const loadUnitSprite = (type: number) => loadImage(unitSpriteUrl(type))
+
+/** 공격·시전 동작 ECPnn.FIG (export_web.py figs). f = 프레임 [시트 x, 폭, 발밑 그림자 중심 x], 높이 h.
+ *  8장 = 아래·위·왼쪽·오른쪽 × (준비, 타격), 3장 = 방향 없는 시전·공격 (마법 쓰는 인물·보스) */
+export interface FigMeta { h: number; f: [number, number, number][] }
+export interface Fig { img: HTMLImageElement; meta: FigMeta }
+let figMeta: Promise<FigMeta[]> | null = null
+/** 유닛 종류의 동작 그림. 없으면 (자원이 옛것이거나 104 이상) null → 동작 없이 밀기만 */
+export async function loadFig(type: number): Promise<Fig | null> {
+  try {
+    figMeta ??= json<FigMeta[]>(`${A}/data/fig.json`)
+    const meta = (await figMeta)[type]
+    return meta ? { img: await loadImage(`${A}/units/fig/${String(type).padStart(3, '0')}.png`), meta } : null
+  } catch { figMeta = null; return null }
+}

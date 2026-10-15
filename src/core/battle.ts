@@ -1,9 +1,9 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { loadBattles, loadDialogue, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
+import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { attackSpots, dist, inRange, key, pathTo, reachable, terrainName } from './grid'
-import { campScreen, type CampResult } from './camp'
+import { campScreen, icon, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
@@ -25,7 +25,7 @@ import { applyMods, equippedStats, type Pos, type Unit } from './unit'
 import type { UnitType } from './data'
 import { SCHOOL_COLOR, SCHOOL_NAME, applyHit, areaCells, hitLine, hitText, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
-const STEP_MS = 110
+const STEP_MS = 135   // 한 칸 걷기 (ms)
 // 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
 let aiTurn = false
 const pace = () => !remake() ? 1 : (aiTurn && setting('fastEnemy') ? 0.35 : 1) * (setting('shortAnim') ? 0.5 : 1)
@@ -130,7 +130,11 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.map = stage.map
   S.atlas = stage.atlas
   const ids = new Set([...S.allies, ...S.enemies].map(p => p.type))
-  await Promise.all([...ids].map(async id => S.sprites.set(id, await loadUnitSprite(id))))
+  await Promise.all([...ids].map(async id => {
+    const [img, fig] = await Promise.all([loadUnitSprite(id), loadFig(id)])
+    S.sprites.set(id, img)
+    if (fig) S.figs.set(id, fig)
+  }))
   S.floats = []
   setupScreen(ed, def)
   resize()
@@ -195,20 +199,39 @@ export async function walk(u: Unit, path: Pos[]) {
   u.px = u.x; u.py = u.y
 }
 
+/** 공격·시전 동작 프레임 (FIG). 8장 = 바라보는 방향의 (준비, 타격), 3장 = 차례로. 그림이 없으면 빈 목록 */
+function poseFrames(u: Unit): number[] {
+  const n = S.figs.get(u.type.id)?.meta.f.length ?? 0
+  if (n === 8) { const d = ['down', 'up', 'left', 'right'].indexOf(u.facing); return [d * 2, d * 2 + 1] }
+  return Array.from({ length: n }, (_, i) => i)
+}
+
+/** 동작을 마지막 프레임 앞까지 재생하고 마지막 (타격·시전) 프레임에 멈춘다. 그림이 없으면 false */
+async function playPose(u: Unit, ms: number) {
+  const fr = poseFrames(u)
+  if (!fr.length) return false
+  for (const f of fr.slice(0, -1)) { u.pose = f; await sleep(ms * pace()) }
+  u.pose = fr.at(-1)
+  return true
+}
+
 async function attack(a: Unit, d: Unit) {
   a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
-  // 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
-  const dx = Math.sign(d.x - a.x) * 0.25, dy = Math.sign(d.y - a.y) * 0.25
-  a.px += dx; a.py += dy
-  await sleep(120 * pace())
-  a.px = a.x; a.py = a.y
+  // 원작 공격 동작 (FIG 준비 → 타격). 그림이 없으면 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
+  if (!await playPose(a, 280)) {
+    a.px += Math.sign(d.x - a.x) * 0.25; a.py += Math.sign(d.y - a.y) * 0.25
+    await sleep(200 * pace())
+    a.px = a.x; a.py = a.y
+  }
   const dmg = S.ed.rules.rollDamage(S.map, a, d)
   d.hp = Math.max(0, d.hp - dmg)
   d.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
   wake(d)
   d.flash = performance.now() + 160
   S.floats.push({ x: d.x, y: d.y, text: `-${dmg}`, t0: performance.now(), color: d.side === 'ally' ? '#ff8080' : '#ffffff' })
-  await sleep(350 * pace())
+  await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
+  a.pose = undefined
+  await sleep(220 * pace())
   await fadeDead([d])
   await gainExp(a, [{ target: d, value: dmg }])
 }
@@ -237,16 +260,15 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   const { sx, sy } = toScreen(u.x, u.y)
   await levelUpMark(sx, sy, 1100 * pace())
   const STAT = ['생명', '역량', '방어', '정신', '민첩']
-  const name = (id?: number) => id === undefined ? '' : S.tables.items.get(id)?.name ?? ''
-  const lines = [
-    ...remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : [],
-    ...r.weapon ? [`무기 승급: <span class="blue">${esc(name(r.weapon))}</span>`] : [],
-    ...r.armor ? [`방어구 승급: <span class="blue">${esc(name(r.armor))}</span>`] : [],
-    ...r.magic !== undefined ? [`마법 습득: <span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span>`] : [],
-  ]
-  if (!lines.length) return
-  await new Promise<void>(ok => openWin({ title: '레벨 업', body: lines.join('<br>'), at: 'center', kind: 'levelup', dir: 'row',
-    width: Math.max(180, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
+  const lines = remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : []
+  // 새로 얻은 것: 장비 = 정비 화면과 같은 EQU 그림, 마법 = 마법 아이콘 (MAR)
+  const item = (label: string, id?: number) => id === undefined ? [] : [`<figure>${icon(id)}<figcaption>${label}<br><span class="blue">${esc(S.tables.items.get(id)?.name ?? '')}</span></figcaption></figure>`]
+  const got = [...item('무기 승급', r.weapon), ...item('방어구 승급', r.armor),
+    ...r.magic === undefined ? [] : [`<figure><i class="mg" style="background-position:-${r.magic * 32}px 0"></i><figcaption>마법 습득<br><span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span></figcaption></figure>`]]
+  if (!lines.length && !got.length) return
+  const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '')
+  await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
+    width: Math.max(180, got.length * 100 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
 }
 
@@ -269,7 +291,9 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   const now = performance.now()
   S.floats.push({ x: a.x, y: a.y, text: m.name, t0: now, color: '#ffe28a' })
   a.flash = now + 200
-  await sleep(260 * pace())
+  // 원작 시전 동작 (FIG: 마법 쓰는 인물은 3장 — 오브·마법진이 커진다). 마지막 프레임을 이펙트 동안 유지
+  if (await playPose(a, 240)) await sleep(200 * pace())
+  else await sleep(300 * pace())
   const step = 90 * pace(), t0 = performance.now(), cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) }))
   const span = (6 + Math.max(0, ...cells.map(p => p.ring))) * step
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
@@ -288,6 +312,7 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   }
   await sleep(step)
   S.fx = null
+  a.pose = undefined
   await sleep(300 * pace())
   await fadeDead(targets)
   await gainExp(a, hits, m, cured)

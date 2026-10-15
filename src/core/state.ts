@@ -1,5 +1,5 @@
 // 전투 상태 — 엔진 모듈들이 함께 읽고 쓴다
-import type { CondRule, Magic, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
+import type { CondRule, Fig, Magic, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
 import type { Edition } from './edition'
 import type { Moves } from './grid'
 import type { Placement, StageDef } from './stage'
@@ -34,6 +34,7 @@ export const S = {
   dialogue: [] as string[],
   scenes: null as unknown as Scenes,
   sprites: new Map<number, HTMLImageElement>(),
+  figs: new Map<number, Fig>(),   // 공격·시전 동작 (ECPnn.FIG)
   units: [] as Unit[],
   turn: 1,
   active: [] as Unit[],        // 지금 행동 단계에서 플레이어가 움직일 수 있는 일행 대원

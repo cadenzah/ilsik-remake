@@ -55,6 +55,40 @@ def export_units():
         strip.save(os.path.join(d, f'{i:03d}.png'))
 
 
+# FIG 시트 크기 → 칸 폭 목록, 칸 높이. 1px 격자 (팔레트 12) 로 나뉜 한 줄. 프레임마다 폭이 다를 수 있다 (좌우 휘두르기가 넓음)
+FIG_CELLS = {(521, 73): ([56] * 4 + [72] * 4, 72), (457, 73): ([56] * 8, 72), (457, 74): ([56] * 8, 72),
+             (172, 81): ([56] * 3, 80), (340, 97): ([112] * 3, 96), (350, 97): ([112, 112, 122], 96)}
+
+
+def shadow_x(im):
+    """발밑 그림자 (맨 아래 몇 줄의 불투명 픽셀) 가로 중심. 없으면 칸 가운데"""
+    w, h = im.size
+    a = im.getchannel('A').load()
+    xs = [x for y in range(h - 4, h) for x in range(w) if a[x, y]]
+    return round(sum(xs) / len(xs)) if xs else w // 2
+
+
+def export_figs():
+    """공격·시전 동작 ECPnn.FIG (유닛 i → 파일 i//10 항목 i%10, MOV 와 같은 색인). units/fig/NNN.png = 프레임을 가로로 이어 붙인 것,
+    data/fig.json[i] = {h, f: [[x, w, 그림자 중심 x]]}. 8장 = 아래·위·왼쪽·오른쪽 × (준비, 타격), 3장 = 방향 없는 시전·공격 (마법 쓰는 인물·보스)"""
+    d = mkdir('units', 'fig')
+    meta = []
+    for i in range(104):
+        im = rgba(os.path.join(IMG, f'ECP{i // 10:02d}.FIG', f'{i % 10:03d}.png'))
+        ws, h = FIG_CELLS[im.size]
+        strip = Image.new('RGBA', (sum(ws), h))
+        frames, x0, sx = [], 1, 0
+        for w in ws:
+            cell = im.crop((x0, 1, x0 + w, 1 + h))
+            strip.paste(cell, (sx, 0))
+            frames.append([sx, w, shadow_x(cell)])
+            x0 += w + 1
+            sx += w
+        strip.save(os.path.join(d, f'{i:03d}.png'))
+        meta.append({'h': h, 'f': frames})
+    json.dump(meta, open(os.path.join(mkdir('data'), 'fig.json'), 'w'), separators=(',', ':'))
+
+
 def export_portraits():
     d = mkdir('portraits')
     for f in sorted(os.listdir(os.path.join(IMG, 'ECLIPSE.POR'))):
@@ -329,9 +363,11 @@ if __name__ == '__main__':
         export_magic_fx()
     elif sys.argv[1:] == ['battle-ui']:
         export_battle_ui()
+    elif sys.argv[1:] == ['figs']:
+        export_figs()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_data(); font.export()
+        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_data(); font.export()
     print('ok')

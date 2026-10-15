@@ -18,7 +18,18 @@ const loadEdition = (id: string | null): Promise<Edition> =>
 /** 브라우저 기본 동작 막기: 오른쪽 클릭 메뉴 (글 입력 칸 제외), 페이지 확대 (핀치·Ctrl+휠·Safari 제스처).
  *  전투 맵의 확대는 캔버스가 직접 처리하므로 (input.ts) 페이지 자체는 늘 1배 */
 function lockPage() {
-  addEventListener('contextmenu', e => { if (!(e.target as Element).closest?.('textarea, input')) e.preventDefault() })
+  // 끌기·글자 선택·길게 누르기: 그림 끌기, 글자 선택 (길게 누르면 선택 막대·돋보기), 터치 길게 누르기의 contextmenu 를 막는다.
+  // 안드로이드는 길게 누르면 contextmenu 가 와 창·버튼의 '뒤로' (오른쪽 클릭) 가 불리므로 터치면 요소까지 보내지 않는다. 글 입력 칸만 그대로
+  const editable = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('textarea, input, select')
+  let touch = false
+  addEventListener('pointerdown', e => { touch = e.pointerType === 'touch' }, true)
+  addEventListener('dragstart', e => { if (!editable(e.target)) e.preventDefault() }, true)
+  addEventListener('selectstart', e => { if (!editable(e.target)) e.preventDefault() }, true)
+  addEventListener('contextmenu', e => {
+    if (editable(e.target)) return
+    e.preventDefault()
+    if (touch) e.stopPropagation()
+  }, true)
   addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
   addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
   for (const g of ['gesturestart', 'gesturechange', 'gestureend']) addEventListener(g, e => e.preventDefault())

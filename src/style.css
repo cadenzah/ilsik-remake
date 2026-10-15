@@ -30,6 +30,10 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   font-family: var(--font); overflow: hidden; }
 /* 브라우저 확대(핀치·두 번 누르기) 막기 — 확대는 전투 맵 캔버스의 게임 확대만 (main.ts lockPage) */
 html, body { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
+/* 글자 선택·그림 끌기 막기 (길게 누르기). 글 입력 칸만 선택 가능 */
+html, body { -webkit-user-select: none; user-select: none; }
+img { -webkit-user-drag: none; user-drag: none; }
+textarea, input { -webkit-user-select: text; user-select: text; }
 canvas#view { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: default; }
 button { font: inherit; color: var(--text); background: #262c3d; border: 1px solid var(--line);
   border-radius: 6px; padding: 6px 12px; cursor: pointer; }
@@ -90,6 +94,12 @@ html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
 .bigstat .b { font-weight: 700; }
 .bigstat .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
 .bigstat .mg { background-image: url(/assets/ui/magic-icons.png); }
+/* 레벨업 창: 승급 장비 (EQU 48×56)·배운 마법 (MAR 32×40) */
+.owin .lvup { display: flex; justify-content: center; gap: 8px; margin-top: 4px; }
+.owin .lvup figure { margin: 0; width: 92px; text-align: center; }
+.owin .lvup figcaption { line-height: 16px; white-space: nowrap; }
+.owin .lvup .icon { display: block; width: 48px; height: 56px; margin: 0 auto 2px; background-image: url(/assets/ui/equip.png); }
+.owin .lvup .mg { display: block; width: 32px; height: 40px; margin: 8px auto 10px; background: url(/assets/ui/magic-icons.png) no-repeat; }
 .bigstat button { all: unset; position: absolute; }
 /* GO!! GO!! (OTH 4) */
 #hud .gogo { pointer-events: none; }

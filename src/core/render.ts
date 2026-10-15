@@ -220,17 +220,21 @@ export function frame(now: number) {
     }
     const seq = FRAMES[u.facing]
     const moving = u.px !== u.x || u.py !== u.y
-    const f = u.acted && u.side === 'ally' ? seq[0] : seq[Math.floor(now / (moving ? 120 : 380)) % seq.length]
+    const f = u.acted && u.side === 'ally' ? seq[0] : seq[Math.floor(now / (moving ? 140 : 380)) % seq.length]
     const img = S.sprites.get(u.type.id)
-    if (img) {
-      if (u.acted && u.side === 'ally') ctx.filter = 'grayscale(0.8) brightness(0.8)'
-      ctx.drawImage(img, f * TW, 0, TW, TH, x, y - 4, TW, TH)
-      ctx.filter = 'none'
-    }
-    if (u.flash > now && img) {
+    // 공격·시전 동작 (FIG): 프레임마다 폭이 달라 발밑 그림자 중심을 칸 가운데에, 아래를 걷기 그림 아래에 맞춘다
+    const fig = u.pose !== undefined ? S.figs.get(u.type.id) : undefined
+    const fr = fig?.meta.f[u.pose!]
+    const draw = () => fig && fr
+      ? ctx.drawImage(fig.img, fr[0], 0, fr[1], fig.meta.h, x + TW / 2 - fr[2], y - 4 + TH - fig.meta.h, fr[1], fig.meta.h)
+      : img && ctx.drawImage(img, f * TW, 0, TW, TH, x, y - 4, TW, TH)
+    if (u.acted && u.side === 'ally') ctx.filter = 'grayscale(0.8) brightness(0.8)'
+    draw()
+    ctx.filter = 'none'
+    if (u.flash > now) {
       ctx.globalCompositeOperation = 'lighter'
       ctx.globalAlpha = 0.6
-      ctx.drawImage(img, f * TW, 0, TW, TH, x, y - 4, TW, TH)
+      draw()
       ctx.globalCompositeOperation = 'source-over'
     }
     ctx.globalAlpha = u.alpha

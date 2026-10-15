@@ -17,6 +17,7 @@ export interface Unit {
   acted: boolean
   moved: boolean                 // 이번 차례에 움직였다 (휴식 판정, 이동 취소 때 되돌린다)
   facing: 'down' | 'up' | 'left' | 'right'
+  pose?: number                  // 공격·시전 동작 (FIG) 프레임. 없으면 걷기 그림 (MOV)
   // 마법 상태 [확정, rules.md "원작 전투 공식"]. atk·def·spi·agi 는 현재치 = base + mods (강화 +, 약화 −, 남은량 = |mods|)
   base: Record<BuffStat, number> // 최대치 (장비 보정 뒤)
   mods: Record<BuffStat, number>
