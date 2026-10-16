@@ -21,6 +21,24 @@ function audio() {
   return ctx
 }
 
+/** 모바일 (특히 iOS Safari) 은 사용자 입력 처리 안에서만 AudioContext 를 풀어 준다. play() 는 타이머·await 뒤에 불려
+ *  풀 수 없으니, 누르기·키 입력마다 (아직 안 풀렸으면) 여기서 풀고 빈 소리를 한 번 낸다. 화면이 꺼졌다 켜지면 다시 막히므로 늘 듣는다.
+ *  audioSession 'playback' = iOS 무음 스위치를 켜 둬도 소리를 낸다 (Safari 17+, 없으면 무시) */
+let unlocked = false
+function unlock() {
+  if (!setting('sound')) return
+  const c = audio()
+  if (!c || unlocked && c.state === 'running') return
+  unlocked = true
+  try { (navigator as Navigator & { audioSession?: { type: string } }).audioSession!.type = 'playback' } catch { /* 지원 안 함 */ }
+  void c.resume().catch(() => {})
+  const s = c.createBufferSource()
+  s.buffer = c.createBuffer(1, 1, c.sampleRate)
+  s.connect(c.destination)
+  s.start()
+}
+for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, unlock, { capture: true, passive: true })
+
 function load(bank: Bank, n: number) {
   const k = `${bank}/${n}`
   let p = bufs.get(k)
