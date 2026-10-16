@@ -1,5 +1,5 @@
 // 진입점: 타이틀 화면 (판 선택·새로 시작·이어하기·장 선택·크레딧) → 판 dynamic import → 전투
-// 개발·자동 테스트: ?ed=original|remake&stage=N&route=R 이면 타이틀을 건너뛰고 그 장을 바로 시작한다
+// 개발·자동 테스트 (pnpm dev 에서만 — 배포판은 주소 파라미터를 읽지 않는다): ?ed=original|remake&stage=N&route=R 이면 타이틀을 건너뛰고 그 장을 바로 시작한다
 // &party=0,18,27&items=1,2 를 붙이면 그 일행·소지품으로 캠페인처럼 시작 (정비 화면이 뜬다, &nocamp 면 정비 화면 없이 앞에서부터)
 import { boot, checkEnd, chooseRoute, skipDeploy } from './core/battle'
 import { snapshot } from './core/campaign'
@@ -64,7 +64,7 @@ function lockPage() {
 async function main() {
   lockPage()
   applyFont()
-  const q = new URLSearchParams(location.search)
+  const q = new URLSearchParams(import.meta.env.DEV ? location.search : '')   // 배포판은 늘 타이틀부터
   const n = Number(q.get('stage'))
   const ids = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean).map(Number)
   const go: Launch = n
