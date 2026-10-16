@@ -290,7 +290,7 @@ async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Mag
 async function showLevelUp(u: Unit, r: LevelUp) {
   const { sx, sy } = toScreen(u.x, u.y)
   play('e1', SFX.levelUp)   // 원작 20ec:9eb6
-  await Promise.all([levelUpMark(sx, sy, 1300 * pace()), blink(u, 3, 260 * pace())])
+  await levelUpMark(sx, sy, TICK * 2 * pace())
   const STAT = ['생명', '역량', '방어', '정신', '민첩']
   const lines = remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : []
   // 새로 얻은 것: 장비 = 정비 화면과 같은 EQU 그림, 마법 = 마법 아이콘 (MAR)
@@ -310,18 +310,26 @@ function wake(d: Unit) {
   if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }
 }
 
+/** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
+const TICK = 1000 / 18.2
+
+/** 사망 연출 (원작 20ec:09d8, 적 감소 20ec:9aa5 앞·중독 20ec:b155 에서 회전 3 으로 부름):
+ *  ① 걷기 그림 MOV 프레임 1·3·5·7 (아래·위·왼쪽·오른쪽) 을 3 바퀴 — 기다림 없이 그리기 속도대로라 웹은 한 장 한 틱 [근사]
+ *  ② 유닛을 지우고 그 칸에 ECLIPSE.MAR 5 구멍 6장, 한 장 2틱. 둘째 장에서 사망음 111 ③ 5틱 쉼 */
 async function fadeDead(units: Unit[]) {
   const dying = units.filter(u => u.hp <= 0 && u.alpha > 0)
   if (!dying.length) return
-  play('e1', SFX.death)   // 원작 사망 연출 20ec:09d8 (적 감소 20ec:9ad8 앞, 중독 20ec:b155)
-  // 하얗게 세 번 깜박인 뒤 흐려지며 사라진다 [웹: 원작 09d8 의 그림 동작 미대조]
-  await Promise.all(dying.map(d => blink(d, 3, 160 * pace())))
-  for (let i = 12; i >= 0; i--) { for (const d of dying) d.alpha = i / 12; await sleep(45 * pace()) }
-}
-
-/** 유닛을 하얗게 n 번 깜박인다 (gap 마다 반쯤 켬) */
-async function blink(u: Unit, n: number, gap: number) {
-  for (let i = 0; i < n; i++) { u.flash = performance.now() + gap / 2; await sleep(gap) }
+  for (let i = 0; i < 12; i++) { for (const d of dying) d.frame = 1 + 2 * (i % 4); await sleep(TICK * pace()) }
+  for (const d of dying) { d.alpha = 0; d.frame = undefined }
+  const holes = dying.map(d => ({ x: d.x, y: d.y, f: 0 }))
+  S.holes.push(...holes)
+  for (let f = 0; f < 6; f++) {
+    for (const h of holes) h.f = f
+    if (f === 1) play('e1', SFX.death)
+    await sleep(TICK * 2 * pace())
+  }
+  S.holes = S.holes.filter(h => !holes.includes(h))
+  await sleep(TICK * 5 * pace())
 }
 
 /** 마법 (행동 실행 20ec:6e92 마법 분기): 범위 안 대상편마다 판 규칙의 결과. c = 중심 칸.

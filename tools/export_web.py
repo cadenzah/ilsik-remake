@@ -261,7 +261,8 @@ def export_battle_ui():
     FRTWND 9조각 = 이름.0 바탕 .1 위 .2 왼위 .3 오른위 .4 왼아래 .5 오른아래 .6 아래 .7 왼쪽 .8 오른쪽:
     mw = ECPMAI "mapwin" 전투 창틀, comma = 명령·확인창, speak = 대화창, basic = 인물기본자료, level, magic.
     btn.0~5 = ECPBUT 0005 글자 버튼 (0 왼 1 오른 2 가운데 = 보통, 3·4·5 = 눌림), icon.N.S = ECPBUT 000N 아이콘 (상태 0 1 3 4),
-    sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지)"""
+    sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지),
+    die.0~5 = ECLIPSE.MAR 5번 시트 56×48 × 6칸 (간격 57, 테두리 1) — 사망 연출 구멍 (124e:0de0 적재, 20ec:09d8 재생)"""
     import frtwnd
     pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECLIPSE.WIN'), 2)
     parts = []
@@ -277,6 +278,9 @@ def export_battle_ui():
         parts.append((f'sta.{i}', rgba(os.path.join(IMG, 'ECLIPSE.STA', f'{i:03d}.png'))))
     for i in (3, 4, 5):
         parts.append((f'oth.{i}', rgba(os.path.join(IMG, 'ECLIPSE.OTH', f'{i:03d}.png'))))
+    die = rgba(os.path.join(IMG, 'ECLIPSE.MAR', '005.png'))
+    for c in range(6):
+        parts.append((f'die.{c}', die.crop((1 + c * 57, 1, 1 + c * 57 + 56, 1 + 48))))
     # 선반 배치 (높이 순), 너비 1024
     parts.sort(key=lambda p: -p[1].height)
     rects, x, y, row, W = {}, 0, 0, 0, 1024

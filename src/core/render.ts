@@ -220,6 +220,9 @@ export function frame(now: number) {
     for (const c of S.fx.cells) ctx.fillRect(c.x * TW, c.y * TH, TW, TH)
   }
 
+  // 사망 연출 구멍 (원작 20ec:09d8 둘째 단계): 쓰러진 유닛 칸에 ECLIPSE.MAR 5 를 칸 왼위에 맞춰
+  for (const h of S.holes) piece(ctx, `die.${h.f}`, h.x * TW, h.y * TH)
+
   // 유닛 (y 순으로 그려 겹침 자연스럽게)
   const sorted = S.units.filter(u => u.alpha > 0).sort((a, b) => a.py - b.py)
   const turnUnit = current()
@@ -234,7 +237,7 @@ export function frame(now: number) {
     }
     const seq = FRAMES[u.facing]
     const moving = u.px !== u.x || u.py !== u.y
-    const f = u.acted && u.side === 'ally' ? seq[0] : seq[Math.floor(now / (moving ? 140 : 380)) % seq.length]
+    const f = u.frame ?? (u.acted && u.side === 'ally' ? seq[0] : seq[Math.floor(now / (moving ? 140 : 380)) % seq.length])
     const img = S.sprites.get(u.type.id)
     // 공격·시전 동작 (FIG): 프레임마다 폭이 달라 발밑 그림자 중심을 칸 가운데에, 아래를 걷기 그림 아래에 맞춘다
     const fig = u.pose !== undefined ? S.figs.get(u.type.id) : undefined
