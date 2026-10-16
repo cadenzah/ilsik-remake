@@ -42,6 +42,12 @@ export function preload(bank: Bank, ns: Iterable<number>) {
   for (const n of ns) if (n >= 0) void load(bank, n)
 }
 
+/** 소리 길이 (ms). 소리를 끄면·불러오기 실패면 0 */
+export async function soundMs(bank: Bank, n: number) {
+  if (!setting('sound') || n < 0) return 0
+  return ((await load(bank, n))?.duration ?? 0) * 1000
+}
+
 /** 재생. 앞 소리는 끊는다 */
 export function play(bank: Bank, n: number) {
   if (!setting('sound') || n < 0) return

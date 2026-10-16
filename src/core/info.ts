@@ -116,10 +116,19 @@ export function goGo(ms?: number): Promise<void> {
 
 /** 레벨업 그림 (원작 20ec:0f92 모드 5 가 ECLIPSE.OTH 3 「Level Up」 을 그린다). 유닛 머리 위에 ms 동안 */
 export function levelUpMark(sx: number, sy: number, ms: number): Promise<void> {
-  const img = document.createElement('img'), w = 47 * 2
+  const img = document.createElement('img'), w = 47 * 2, m = mapRect()
   img.className = 'gogo'
   img.src = pieceUrl('oth.3')
-  Object.assign(img.style, { left: `${sx + TW * S.cam.scale / 2 - w / 2}px`, top: `${sy - 28 * S.cam.scale}px`, width: `${w}px` })
+  const top = sy - 28 * S.cam.scale >= m.y + 4 ? sy - 28 * S.cam.scale : sy + 48 * S.cam.scale + 4   // 맨 윗줄이면 위 띠에 가리지 않게 발밑으로
+  Object.assign(img.style, { left: `${sx + TW * S.cam.scale / 2 - w / 2}px`, top: `${top}px`, width: `${w}px` })
   hud.append(img)
+  // 튀어나와 잠시 머문 뒤 떠오르며 사라진다 [웹: 원작은 그림만 (20ec:0f92 모드 5), 움직임 미관찰]
+  img.animate([
+    { transform: 'translateY(10px) scale(0.3)', opacity: 0 },
+    { transform: 'translateY(-4px) scale(1.25)', opacity: 1, offset: 0.15 },
+    { transform: 'translateY(0) scale(1)', opacity: 1, offset: 0.25 },
+    { transform: 'translateY(0) scale(1)', opacity: 1, offset: 0.75 },
+    { transform: 'translateY(-14px) scale(1)', opacity: 0 },
+  ], { duration: ms, easing: 'ease-out', fill: 'forwards' })
   return new Promise(ok => setTimeout(() => { img.remove(); ok() }, ms))
 }

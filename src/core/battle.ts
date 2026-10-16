@@ -6,7 +6,7 @@ import { dist, key, pathTo, reachable, terrainName } from './grid'
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
-import { SFX, play, preload, setSoundOn } from './sfx'
+import { SFX, play, preload, setSoundOn, soundMs } from './sfx'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
@@ -290,7 +290,7 @@ async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Mag
 async function showLevelUp(u: Unit, r: LevelUp) {
   const { sx, sy } = toScreen(u.x, u.y)
   play('e1', SFX.levelUp)   // 원작 20ec:9eb6
-  await levelUpMark(sx, sy, 1100 * pace())
+  await Promise.all([levelUpMark(sx, sy, 1300 * pace()), blink(u, 3, 260 * pace())])
   const STAT = ['생명', '역량', '방어', '정신', '민첩']
   const lines = remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : []
   // 새로 얻은 것: 장비 = 정비 화면과 같은 EQU 그림, 마법 = 마법 아이콘 (MAR)
@@ -314,7 +314,14 @@ async function fadeDead(units: Unit[]) {
   const dying = units.filter(u => u.hp <= 0 && u.alpha > 0)
   if (!dying.length) return
   play('e1', SFX.death)   // 원작 사망 연출 20ec:09d8 (적 감소 20ec:9ad8 앞, 중독 20ec:b155)
-  for (let i = 10; i >= 0; i--) { for (const d of dying) d.alpha = i / 10; await sleep(30 * pace()) }
+  // 하얗게 세 번 깜박인 뒤 흐려지며 사라진다 [웹: 원작 09d8 의 그림 동작 미대조]
+  await Promise.all(dying.map(d => blink(d, 3, 160 * pace())))
+  for (let i = 12; i >= 0; i--) { for (const d of dying) d.alpha = i / 12; await sleep(45 * pace()) }
+}
+
+/** 유닛을 하얗게 n 번 깜박인다 (gap 마다 반쯤 켬) */
+async function blink(u: Unit, n: number, gap: number) {
+  for (let i = 0; i < n; i++) { u.flash = performance.now() + gap / 2; await sleep(gap) }
 }
 
 /** 마법 (행동 실행 20ec:6e92 마법 분기): 범위 안 대상편마다 판 규칙의 결과. c = 중심 칸.
@@ -322,15 +329,16 @@ async function fadeDead(units: Unit[]) {
 async function castSpell(a: Unit, m: Magic, c: Pos) {
   if (c.x !== a.x || c.y !== a.y) a.facing = c.x > a.x ? 'right' : c.x < a.x ? 'left' : c.y > a.y ? 'down' : 'up'
   const targets = spellTargets(S.ed.rules, a, m, c)
-  const now = performance.now()
-  S.floats.push({ x: a.x, y: a.y, text: m.name, t0: now, color: '#ffe28a' })
-  a.flash = now + 200
+  a.flash = performance.now() + 200
   // 원작 시전 동작 (FIG: 마법 쓰는 인물은 3장 — 오브·마법진이 커진다). 마지막 프레임을 이펙트 동안 유지
   // 효과음: 시전자 초상 번호 소리 → 이펙트 때 마법 소리 ECLIPSE2.FVT[마법 id] (원작 20ec:5d5c → 6348, 6924 → 69eb [근사 시점])
-  if (await playPose(a, 240)) { play('e1', a.type.por); await sleep(200 * pace()) }
-  else { play('e1', a.type.por); await sleep(300 * pace()) }
-  const step = 90 * pace(), t0 = performance.now(), cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) }))
-  const span = (6 + Math.max(0, ...cells.map(p => p.ring))) * step
+  // 소리는 한 번에 하나라 (sfx.ts) 시전음이 끝난 뒤 마법 소리를, 이펙트 박자는 마법 소리 길이에 맞춰 늘린다 [웹: 원작 MAG 박자 미대조]
+  const posed = await playPose(a, 240)
+  play('e1', a.type.por)
+  const [voice, sound] = await Promise.all([soundMs('e1', a.type.por), soundMs('e2', m.id)])
+  await sleep(Math.max(posed ? 200 : 300, voice) * pace())
+  const cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) })), beats = 6 + Math.max(0, ...cells.map(p => p.ring))
+  const step = Math.max(90, sound / beats) * pace(), t0 = performance.now(), span = beats * step
   play('e2', m.id)
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
@@ -663,6 +671,13 @@ function firstToMove(units: Unit[]): Unit | null {
   return live.map(u => ({ u, s: score(u) })).sort((a, b) => b.s - a.s)[0]?.u ?? null
 }
 
+/** 메뉴의 턴 종료는 한 번 묻는다 (개선판 띠·시스템 창). E 키는 바로 */
+function confirmEnd() {
+  if (S.mode.kind === 'busy' || !stepDone) return
+  const left = S.active.filter(u => !u.acted && u.hp > 0).length
+  confirmWin('턴 종료', 'center', endPlayerStep, () => {}, left ? `행동하지 않은 대원 ${left}명` : undefined, left ? 230 : undefined)
+}
+
 export function endPlayerStep() {
   if (S.mode.kind === 'busy' || !stepDone) return
   cancel()
@@ -762,7 +777,7 @@ function setupScreen(ed: Edition, def: StageDef) {
   S.threat = false
   initBand(ed.id === 'remake', [
     { id: 'goal', label: '목표', desc: '승리·실패 조건과 보조 목표', side: 'left', prio: 2, on: () => showGoalsWin() },
-    { id: 'end', label: '턴 종료', desc: '아군 차례를 마친다 (E)', side: 'right', prio: 0, on: endPlayerStep },
+    { id: 'end', label: '턴 종료', desc: '아군 차례를 마친다 (E)', side: 'right', prio: 0, on: confirmEnd },
     { id: 'menu', label: '메뉴', desc: '시스템 메뉴 (설정·정비 화면·타이틀)', side: 'right', prio: 0, on: () => isOpen('system') ? closeWin('system') : systemMenu() },
     { id: 'threat', label: '위험', desc: '적이 닿을 수 있는 범위 표시 (T)', side: 'right', prio: 1, on: toggleThreat },
     { id: 'map', label: '지도', desc: '미니맵 켜고 끄기 (M)', side: 'right', prio: 3, on: toggleMinimap },
@@ -853,7 +868,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
     [view.modern ? '원작 UI' : '개선된 UI', toggleScreenStyle, { title: view.modern ? '원작 창틀을 복각한 화면으로' : '창틀 없이 맵을 화면 가득, 다듬은 창' }],
-    ['턴 종료', endPlayerStep, { disabled: !stepDone || S.mode.kind === 'busy' }],
+    ['턴 종료', confirmEnd, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
     ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로.<br>지난흔적에서 이어 합니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
