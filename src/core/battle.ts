@@ -341,10 +341,11 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   // 원작 시전 동작 (FIG: 마법 쓰는 인물은 3장 — 오브·마법진이 커진다). 마지막 프레임을 이펙트 동안 유지
   // 효과음: 시전자 초상 번호 소리 → 이펙트 때 마법 소리 ECLIPSE2.FVT[마법 id] (원작 20ec:5d5c → 6348, 6924 → 69eb [근사 시점])
   // 소리는 한 번에 하나라 (sfx.ts) 시전음이 끝난 뒤 마법 소리를, 이펙트 박자는 마법 소리 길이에 맞춰 늘린다 [웹: 원작 MAG 박자 미대조]
-  const posed = await playPose(a, 240)
+  // 시전음은 동작과 함께 시작한다 [웹: 원작은 동작을 다 그린 뒤 재생 — 그동안 무음이 길어 두 판 모두 앞당김 (2026-10-16)]
   play('e1', a.type.por)
-  const [voice, sound] = await Promise.all([soundMs('e1', a.type.por), soundMs('e2', m.id)])
-  await sleep(Math.max(posed ? 200 : 300, voice) * pace())
+  const began = performance.now()
+  const [posed, voice, sound] = await Promise.all([playPose(a, 240), soundMs('e1', a.type.por), soundMs('e2', m.id)])
+  await sleep(Math.max((posed ? 200 : 300) * pace(), voice * pace() - (performance.now() - began)))
   const cells = areaCells(m, c).map(p => ({ ...p, ring: dist(p, c) })), beats = 6 + Math.max(0, ...cells.map(p => p.ring))
   const step = Math.max(90, sound / beats) * pace(), t0 = performance.now(), span = beats * step
   play('e2', m.id)
