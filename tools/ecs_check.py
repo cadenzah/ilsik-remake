@@ -41,7 +41,7 @@ for path in sorted(glob.glob(os.path.join(R, 'content', 'remake', 'chapters', '*
             for nm in names:
                 if not who_ok(nm): print(f'{n:02}.ecs:{i}: 모르는 인물 {nm}'); bad += 1
             continue
-        if not line or line.startswith(('card ', 'goal ', '? ', '> ', 'do ')) or line == 'keep': continue
+        if not line or line.startswith(('card ', 'goal ', '? ', '> ', 'do ')) or line == 'keep' or re.fullmatch(r'anim \d+', line): continue
         m = re.match(r'^([^:]+):\s*(.*)$', line)
         if not m: print(f'{n:02}.ecs:{i}: 형식'); bad += 1; continue
         for w in m[1].rstrip('?').split('|'):

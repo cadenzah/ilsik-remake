@@ -376,6 +376,19 @@ def export_promote():
     print('promote', len(imgs), w, h)
 
 
+def export_cuts():
+    """장 사이 컷신 (ECLIPSE1.FAT 묶음 0~12, 11 = 애슬 전직은 export_promote) 을 원본 바이트 그대로 cut/NN.bin 으로.
+    웹 src/core/cutscene.ts 가 팔레트·바탕 RLE·SS2 프레임을 풀어 그린다 (프레임 차이만 있어 PNG 띠보다 훨씬 작다). 재생 순서는 formats.md 「컷신 재생」"""
+    import fat
+    d = mkdir('cut')
+    b = open(os.path.join(ROOT, 'original', 'ECLIPSE1.FAT'), 'rb').read()
+    n = 0
+    for k, raw in fat.raw(b):
+        if k == 11: continue
+        open(os.path.join(d, f'{k:02}.bin'), 'wb').write(raw); n += len(raw)
+    print('cuts', n)
+
+
 def export_sfx():
     """효과음 WAV (tools/voc.py 추출물) 를 sfx/ 로. e1 = ECLIPSE1.FVT (0~110 유닛 초상 번호별 공격·시전음, 104 기본 타격, 105~107 포수 폭발,
     108 레벨업, 109 아이템 획득, 110 승급·습득, 111 사망), e2 = ECLIPSE2.FVT (마법 id 별), ani = ECPANI.FVT (컷신·전직). formats.md "효과음 호출부"."""
@@ -402,11 +415,13 @@ if __name__ == '__main__':
         export_figs()
     elif sys.argv[1:] == ['promote']:
         export_promote()
+    elif sys.argv[1:] == ['cuts']:
+        export_cuts()
     elif sys.argv[1:] == ['sfx']:
         export_sfx()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_sfx(); export_data(); font.export()
+        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_cuts(); export_sfx(); export_data(); font.export()
     print('ok')

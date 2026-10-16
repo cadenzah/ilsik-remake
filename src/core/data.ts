@@ -119,7 +119,8 @@ export type SceneLine = [who: number, line: number, branch: number]  // who -1 =
 // flag = 그 캠페인 플래그가 켜져야 실행, routes = 그 루트(0~2)에서만 (없으면 모든 루트), item/noItem = 그 도구를 가졌을 때/없을 때
 // leave = 그 종류 대원 이탈, swap = [종류, 새 종류] 교체, learn = [종류, 마법] 그 대원이 마법을 배움 (ifMagic = 마법 수가 그 값일 때만, 원작 +0x62)
 // take/give = 소지품 빼기/넣기, setFlag = alive 대원 [부대, 번호] 이 살아 있으면 그 플래그 켜기. 실행 = campaign.ts finishStage
-export type PostStep = ({ join: number } | { count: number } | { set: [number, number] } | { scene: string }
+// anim = 컷신 (ECLIPSE1.FAT 묶음, cutscene.ts), talk = 컷신 도중 (첫 프레임 위) 재생할 원작 장면
+export type PostStep = ({ join: number } | { count: number } | { set: [number, number] } | { scene: string } | { anim: number; talk?: string[] }
   | { leave: number } | { swap: [number, number] } | { learn: [number, number]; ifMagic?: number }
   | { take: number } | { give: number } | { setFlag: string; alive: [number, number] }) & { routes?: number[]; flag?: string; item?: number; noItem?: number }
 export interface Scenes {

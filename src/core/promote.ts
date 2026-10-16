@@ -3,9 +3,10 @@
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { play } from './sfx'
+import { biosMs } from './cutscene'
 
 const W = 112, H = 85, COLS = 10, FRAMES = 38
-const FRAME_MS = 0xa0, HOLD_MS = 0x5dc
+const FRAME_MS = biosMs(0xa0), HOLD_MS = biosMs(0x5dc)   // 원작 기다림은 BIOS 틱 단위 (cutscene.ts)
 const SOUND_AT = 16   // 효과음 ECPANI.FVT 12 를 이 프레임 앞에서 (2ff8:0860 불러 두고 08a6 di == 0x10 에서 0f17)
 
 /** 화면이 어두운 상태에서 불러 장면을 밝혔다가 다시 어둡게 한다. 클릭·키로 넘긴다. caption = 끝 프레임에서 보일 아래 글 (개선판, 그만큼 더 멈춘다) */

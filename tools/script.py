@@ -151,6 +151,7 @@ def postbattle():
     캠페인 플래그 블록 'cmp [bp-0x13c|0x13a], 1; jne' 안의 join·scene 은 POST_FLAG[(장, 순번)] 에 플래그 이름."""
     seg, lo, hi = 0x2ff8, 0x1925, 0x3b91
     out, cur, prev = {}, None, []
+    cut = None                # 컷신 (48e1:7a1e 불러오기 ~ aab0 풀기) 사이의 장면 = 컷신 첫 프레임 위 대화 (tools/anim.py)
     blocks, pend = [], set()  # 루트 블록 [(루트 집합, 끝 주소)], je 로 모으는 중인 루트
     flags = []                # 플래그 블록 [(이름, 끝 주소)]
     ins = list(md.disasm(bytes(img[seg*16 + lo: seg*16 + hi]), lo))
@@ -186,8 +187,18 @@ def postbattle():
             # 일행 배열 직접 대입: [bp-0x1c3] = 수, [bp-0x1c1-2k] = k번째 유닛 (2ff8:1681 이 초기값)
             k = (0x1c1 - int(m.group(1), 16)) // 2
             out[cur].append(('count', int(m.group(2), 0)) if k < 0 else ('set', k, int(m.group(2), 0)))
+        elif i.mnemonic == 'lcall' and i.op_str == '0x48e1, 0x7a1e':
+            # 컷신 ECLIPSE1.FAT 묶음 (push 묶음; push ds; push 파일 — 마지막 push 다섯 개 중 첫째). 21장은 불러 둔 뒤 장면 2:21·고대은화 검사 다음에 재생
+            k = int([p for p in prev if p.mnemonic == 'push'][-5].op_str, 0)
+            cut = ['anim', k, routes(i.address), []]
+            if cur != 21: out[cur].append(cut)
+        elif i.mnemonic == 'lcall' and i.op_str == '0x48e1, 0xaab0' and cut:
+            if cur == 21: out[cur].append(cut)
+            cut = None
         elif i.mnemonic == 'lcall' and i.op_str == '0xaa2, 0x4138':
-            out[cur].append(('scene',) + (_scene_call(prev) or ('?', '?')) + (routes(i.address),))
+            sc = ('scene',) + (_scene_call(prev) or ('?', '?')) + (routes(i.address),)
+            if cut and cur != 21: cut[3].append(sc)
+            else: out[cur].append(sc)
         elif i.mnemonic == 'cmp':
             out[cur].append(('cond', i.op_str, hex(i.address)))
         prev = (prev + [i])[-6:]
@@ -219,11 +230,13 @@ POST_EXTRA = {
 def _post(e, key):
     """postbattle 사건 → scenes.json post 항목. routes 가 있으면 그 루트(0~2)에서만."""
     d = ({'join': e[1]} if e[0] == 'join' else {'count': e[1]} if e[0] == 'count'
-         else {'set': list(e[1:])} if e[0] == 'set' else {'scene': f'{e[2]}:{e[1]}'})
-    r = e[2] if e[0] == 'join' else e[3] if e[0] == 'scene' else None
+         else {'set': list(e[1:])} if e[0] == 'set' else {'anim': e[1]} if e[0] == 'anim' else {'scene': f'{e[2]}:{e[1]}'})
+    if e[0] == 'anim' and e[3]: d['talk'] = [f'{t[2]}:{t[1]}' for t in e[3]]   # 컷신 도중 (첫 프레임 위) 대화
+    r = e[2] if e[0] in ('join', 'anim') else e[3] if e[0] == 'scene' else None
     if r is not None: d['routes'] = r
     if f := POST_FLAG.get(key): d['flag'] = f
-    if key[0] == 13 and e[0] in ('join', 'scene'):
+    if key[0] == 21 and e[0] == 'anim': d['item'] = 179   # 2ff8:2b66 고대은화가 있을 때만 (수호자 강화와 함께)
+    if key[0] == 13 and e[0] in ('join', 'scene', 'anim'):
         # 2ff8:23fb 소지품·장비에 요정피리(168, 9장 금괴 선택 '예') → 수호자(19) 합류·장면 131·132, 없으면 장면 13
         d['noItem' if e[0] == 'scene' and e[1] == 13 else 'item'] = 168
     return d
@@ -237,7 +250,7 @@ def export():
         'pre': {st: [f'{ph}:{n}' for n, ph in v if (ph, n) in sc] for st, v in prebattle().items()},
         'party': INITIAL_PARTY,
         'post': {st: [_post(e, (st, k)) for k, e in enumerate(v)
-                      if e[0] in ('join', 'count', 'set') or (e[0] == 'scene' and (e[2], e[1]) in sc)]
+                      if e[0] in ('join', 'count', 'set', 'anim') or (e[0] == 'scene' and (e[2], e[1]) in sc)]
                  for st, v in postbattle().items()},
         'routeSelectAfter': 9,  # 9장 후 '진로선택' 메뉴 (0aa2:0b0d) 결과 = 루트 0~2
         'trigger': sorted({f'1:{n}' for n, _ in triggers() if (1, n) in sc}),

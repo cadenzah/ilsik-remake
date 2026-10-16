@@ -1,7 +1,8 @@
 // 개선판 대본 (.ecs) 해석·실행 — 형식은 .claude/docs/script-format.md (2026-10-13 사용자 확정).
 // 장 파일 하나 = 장 카드·보조 목표·장면 블록. 블록은 원작 장면을 통째로 대신하고, keep 자리에 원작 장면을 재생한다.
 // 블록에 do 가 하나라도 있는 장은 원작 전투 후 캠페인 단계(합류·이탈·소지품) 전체를 대신한다.
-import { FLAGS, PARTY, applyStep, hasItem, sceneLines, type Alive, type Note } from './campaign'
+import { FLAGS, PARTY, applyStep, cutTalk, hasItem, sceneLines, type Alive, type Note } from './campaign'
+import { CUTS, CUT_AFTER, playCut } from './cutscene'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
 import { playDialogue } from './dialogue'
@@ -18,6 +19,7 @@ export interface Cond {
 export type Entry =
   | { line: number; who: string[]; opt?: boolean; text?: string; ref?: number }   // who = 화자 후보 ('-' 초상 없음, '출전' 출전 동료). opt = "이름?" (없으면 생략). ref = 원작 줄
   | { line: number; keep: true }
+  | { line: number; anim: number }   // 원작 컷신 (ECLIPSE1.FAT 묶음 번호, cutscene.ts CUTS)
   | { line: number; do: PostStep[] }
   | { line: number; choose: string[]; branches: Entry[][] }
 export interface Block { when: When; arg?: string; cond: Cond; body: Entry[] }
@@ -108,6 +110,11 @@ export function parseChapter(file: string, n: number, src: string, name: (s: str
         if (k < 1 || k > choice.choose.length) err(`선택지는 1~${choice.choose.length}`)
         branch = choice.branches[k - 1] = []
       } else if (line === 'keep') into.push({ line: no, keep: true })
+      else if (/^anim \d+$/.test(line)) {
+        const n = Number(line.slice(5))
+        if (!(n in CUTS)) err(`없는 컷신: ${n}`)
+        into.push({ line: no, anim: n })
+      }
       else if (line.startsWith('do ')) into.push({ line: no, do: parseDo(line.slice(3), id, err) })
       else {
         const m = /^([^:]+):\s*(.*)$/.exec(line) ?? err('"화자: 대사" 꼴이 아님')
@@ -178,7 +185,8 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
   }
   const run = async (body: Entry[]) => {
     for (const e of body) {
-      if ('keep' in e) { const ls = sceneLines(keep); ls.forEach(l => l.who && spoke.add(l.who.id)); buf.push(...ls) }
+      if ('keep' in e) { await flush(); await playKeys(keep) }
+      else if ('anim' in e) { await flush(); await playCut(e.anim) }
       else if ('do' in e) {
         const notes: Note[] = []
         e.do.forEach(s => applyStep(s, notes, alive))
@@ -248,15 +256,30 @@ export interface ScriptSource { files: Record<string, string>; aliases?: Record<
 
 export const chapter = (n = S.def.n) => chapters.get(n)
 
+/** 원작 장면 키들을 차례로 대화로. "anim:N>딸린 장면" = 컷신 (딸린 장면은 컷신 도중에), CUT_AFTER 장면 뒤엔 그 컷신. extra = 끝 대화에 붙임 */
+async function playKeys(keys: string[], extra: Line[] = []) {
+  let buf: Line[] = []
+  const flush = async () => { if (buf.length) { const b = buf; buf = []; await playDialogue(b) } }
+  const lines = (ks: string[]) => { const ls = sceneLines(ks); ls.forEach(l => l.who && spoke.add(l.who.id)); return ls }
+  for (const k of keys) {
+    const talk = cutTalk(k)
+    if (talk) {
+      await flush()
+      const ls = lines(talk)
+      await playCut(Number(k.slice(5).split('>')[0]), ls.length ? () => playDialogue(ls) : undefined)
+      continue
+    }
+    buf.push(...lines([k]))
+    if (k in CUT_AFTER) { await flush(); await playCut(CUT_AFTER[k]) }
+  }
+  buf.push(...extra)
+  await flush()
+}
+
 /** 그 시점의 이야기를 재생: 대본 블록이 있으면 그것 (keep = 원작 장면), 없으면 원작 장면 그대로. extra = 끝에 붙일 줄 (합류 알림 등) */
 export async function story(when: When, keep: string[], alive: Alive, arg?: string, extra: Note[] = []) {
   const blocks = blocksAt(chapter(), when, arg)
-  if (!blocks.length) {
-    const ls = sceneLines(keep)
-    ls.forEach(l => l.who && spoke.add(l.who.id))
-    if (ls.length || extra.length) await playDialogue([...ls, ...extra])
-    return
-  }
+  if (!blocks.length) return playKeys(keep, extra)
   await runBlocks(blocks, keep, alive, names)
   if (extra.length) await playDialogue(extra)
 }

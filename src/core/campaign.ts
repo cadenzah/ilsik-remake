@@ -52,9 +52,13 @@ export const joinLine = (type: number) => ({ text: `${josa(S.types[type].name, '
 
 // 선택지 분기는 아직 UI 가 없어 '예'(1) 쪽을 재생한다
 export function sceneLines(keys: string[]) {
-  return keys.flatMap(k => S.scenes.scenes[k] ?? []).filter(([, , br]) => br !== 2)
+  return keys.flatMap(k => cutTalk(k) ?? [k]).flatMap(k => S.scenes.scenes[k] ?? []).filter(([, , br]) => br !== 2)
     .map(([who, line]) => ({ who: who >= 0 ? S.types[who] : undefined, text: S.dialogue[line] }))
 }
+
+/** 장면 키 목록 안의 컷신: "anim:묶음>딸린 장면,…" (재생 = script.ts playKeys). 대화만 뽑을 때는 딸린 장면 */
+export const cutKey = (s: { anim: number; talk?: string[] }) => `anim:${s.anim}${s.talk?.length ? `>${s.talk.join(',')}` : ''}`
+export const cutTalk = (k: string) => k.startsWith('anim:') ? k.split('>')[1]?.split(',') ?? [] : undefined
 
 const applies = (s: PostStep) => (!s.routes || s.routes.includes(S.def.route)) && (!s.flag || FLAGS.has(s.flag))
   && (s.item === undefined || hasItem(s.item)) && (s.noItem === undefined || !hasItem(s.noItem))
@@ -111,6 +115,7 @@ export function finishStage(joined: number[], reward: number[], alive: Alive, ow
   for (const s of ownSteps ? [] : S.scenes.post[S.def.n] ?? []) {
     if (!applies(s)) continue
     if ('scene' in s) scenes.push(s.scene)
+    else if ('anim' in s) scenes.push(cutKey(s))
     else applyStep(s, notes, alive)
   }
   return { scenes, notes }

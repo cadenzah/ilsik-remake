@@ -6,6 +6,7 @@ import { DIRS, dist, inside, key, moveCost, pathTo, reachable, terrainName } fro
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
+import { clearCut } from './cutscene'
 import { SFX, play, preload, setSoundOn, soundMs } from './sfx'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
@@ -94,6 +95,7 @@ export const skipDeploy = () => { askDeploy = false }
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
 export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null, resume?: Suspended) {
   await fadeOut()   // 결과 화면·타이틀에서 넘어올 때 (이미 어두우면 바로)
+  clearCut()        // 전투 후 컷신의 끝 프레임 (다음 화면까지 남겨 둔다)
   S.ed = ed
   S.def = def
   const extra = ed.extraBattles?.[def.n]   // 개선판 숨은 장: 원작 맵 재사용 + 새 배치·고정 일행
@@ -176,6 +178,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
 
 async function start(resume?: Suspended) {
   await fadeOut()   // 다시 하기 (boot 에서 오면 이미 어둡다)
+  clearCut()
   uidSeq = 0
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로

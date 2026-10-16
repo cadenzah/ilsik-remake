@@ -85,6 +85,20 @@ def blocks(b):
         yield k, w, h, pal, px, frames
 
 
+def raw(b):
+    """(묶음 번호, 묶음 바이트 = 팔레트 768 + 폭·높이 + 바탕 RLE + FLC 프레임 묶음) — 웹 재생기 src/core/cutscene.ts 가 그대로 푼다"""
+    for k, H in enumerate(heads(b)):
+        w, h = struct.unpack_from('<II', b, H)
+        _, i = rle(b, H + 8, w * h)
+        nf = struct.unpack_from('<H', b, i + 4)[0]
+        p = i + 6
+        for _ in range(nf):
+            fs, magic = struct.unpack_from('<IH', b, p)
+            if magic != 0xF1FA: break
+            p += fs
+        yield k, b[H - 768:p]
+
+
 def play(w, h, pal, px, frames):
     """프레임마다 (px, pal) 를 낸다 (0 = 바탕)"""
     px = bytearray(px); pal = list(pal)

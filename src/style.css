@@ -566,3 +566,9 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #camp .dlg .obtn.opt { display: flex; justify-content: space-between; padding: 0 2px; text-align: left; }
 #camp .dlg .obtn.opt b { font-weight: 400; color: #7a6a58; }
 #camp .dlg .obtn.opt[aria-checked=true] b { color: #a00000; text-shadow: -1px 0 #ffb080; }
+
+/* 장 사이 컷신 (cutscene.ts): #hud 안 맵 창 자리 (원작 (68,57) 504×384). 대화창은 그 위. 흰 막 = 원작 팔레트 효과 1·2 */
+#hud > .cutscene { overflow: visible; cursor: pointer; }
+.cutscene canvas { position: absolute; image-rendering: pixelated; }
+.cut-white { position: fixed; inset: 0; z-index: 999; background: #fff; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
+.cut-white.on { opacity: 1; }
