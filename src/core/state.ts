@@ -1,5 +1,5 @@
 // 전투 상태 — 엔진 모듈들이 함께 읽고 쓴다
-import type { CondRule, Fig, Magic, Member, Scenes, StageMap, Tables, TurnEvent, UnitType } from './data'
+import type { CondRule, Fig, Magic, Member, Scenes, StageMap, StartStep, Tables, TurnEvent, UnitType } from './data'
 import type { Edition } from './edition'
 import type { Moves } from './grid'
 import type { Placement, StageDef } from './stage'
@@ -22,6 +22,7 @@ export const S = {
   routeTable: [] as number[][],  // 전투 순서표 route[i][루트] = i번째 전투의 장 번호
   cond: [] as CondRule[],
   turnEv: [] as TurnEvent[],
+  startEv: [] as StartStep[],  // 전투 시작 처리 (전투 전 장면 뒤)
   fired: new Set<number>(),    // 이미 발동한 규칙 번호
   reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다
   deploy: [] as number[],      // 출전 대원 = 일행(PARTY) 인덱스, 순서 = 출전 칸 순서

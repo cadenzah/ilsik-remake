@@ -25,6 +25,7 @@ export interface Unit {
   poison: number; coma: number   // 남은 차례 (걸리면 3)
   ticked: boolean                // 이번 라운드 차례 처리 (중독·혼수·강화 되돌림) 를 했다
   again?: boolean                // 이번 라운드 두 번째 행동을 받았다 (Rules.actsTwice)
+  absent?: boolean               // 전투 시작 처리로 자리를 비웠다 (HP 0, 쓰러진 동료로 치지 않음 — 17장 페니·22장 아티스)
   // 렌더용 보간 위치
   px: number; py: number
   alpha: number

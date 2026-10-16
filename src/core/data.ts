@@ -101,11 +101,15 @@ export interface CondRule { if: CondIf; do: CondDo[] }
  *  party = 고정 일행 (장 사이 상태와 따로), next = 이긴 뒤 이어지는 장, 마지막 장은 cond 에 "ending" */
 export interface ExtraBattle {
   title: string; map: number; party: number[]; items?: number[]
-  record: BattleRecord; cond: CondRule[]; turn?: TurnEvent[]; next?: number
+  record: BattleRecord; cond: CondRule[]; turn?: TurnEvent[]; start?: StartStep[]; next?: number
 }
 export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
+/** 전투 시작 처리 (tools/cond.py START, 원작 124e:c3da): 전투 전 장면 뒤 순서대로. hpScale = [부대, 비율] HP × 비율 (버림),
+ *  absent = 일행 중 그 초상 대원 HP 0 (맵에서 지움), state = 부대 상태 */
+export type StartStep = { hpScale: [number, number] } | { absent: number } | { state: [number[], number] }
 export interface Battles {
   route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]>; turn: Record<string, TurnEvent[]>
+  start?: Record<string, StartStep[]>
 }
 export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
 

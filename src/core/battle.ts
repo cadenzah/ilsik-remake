@@ -1,8 +1,8 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member } from './data'
+import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
-import { dist, key, pathTo, reachable, terrainName } from './grid'
+import { DIRS, dist, inside, key, moveCost, pathTo, reachable, terrainName } from './grid'
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
@@ -50,7 +50,7 @@ function spawn(p: Placement, side: Unit['side']): Unit {
 }
 
 // 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
-function placements(rec: BattleRecord) {
+function placements(rec: BattleRecord, map?: StageMap) {
   // 출전 대원 = 고른 일행 인덱스 순서대로 출전 칸에
   const allies: Placement[] = S.deploy.map((k, i) => ({ type: PARTY[k], x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
   const troopInit = [0]
@@ -60,13 +60,35 @@ function placements(rec: BattleRecord) {
   const enemies: Placement[] = rec.groups.flatMap((g, k) =>
     g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i })))
   troopInit.push(...rec.groups.map(g => g.active))
+  if (map) unstack([...allies, ...enemies], map)
   return { allies, enemies, troopInit }
+}
+
+/** 원작 배치가 한 칸에 둘을 놓은 곳 (12장 루트 B 흑비·흑박쥐 (7,14), tools/verify.py) — 개선판만, 뒤의 대원을 가장 가까운 빈 칸으로 */
+function unstack(ps: Placement[], map: StageMap) {
+  const used = new Set<number>()
+  for (const p of ps) {
+    if (used.has(key(p.x, p.y))) {
+      const kind = S.types[p.type].moveKind, seen = new Set([key(p.x, p.y)]), todo = [{ x: p.x, y: p.y }]
+      while (todo.length) {
+        const c = todo.shift()!
+        if (!used.has(key(c.x, c.y)) && moveCost(map, c.x, c.y, kind) < Infinity) { p.x = c.x; p.y = c.y; break }
+        for (const [dx, dy] of DIRS) {
+          const n = { x: c.x + dx, y: c.y + dy }
+          if (inside(map, n.x, n.y) && !seen.has(key(n.x, n.y))) { seen.add(key(n.x, n.y)); todo.push(n) }
+        }
+      }
+    }
+    used.add(key(p.x, p.y))
+  }
 }
 
 let looping = false
 
 let atStart: Camp   // 이 장을 시작할 때 장 사이 상태. 다시 하기는 여기로 되돌린다
 let askDeploy = true   // ?stage=N 로 바로 연 판은 출전 선택 없이 앞에서부터
+/** 개발·자동 검증 (?nocamp): 일행을 주고도 정비 화면 없이 앞에서부터 출전 */
+export const skipDeploy = () => { askDeploy = false }
 
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
@@ -131,10 +153,11 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     atStart = snapshot()
   }
   if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
-  Object.assign(S, placements(rec))
+  Object.assign(S, placements(rec, ed.id === 'remake' ? stage.map : undefined))
   S.reward = rec.reward
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
   S.turnEv = extra?.turn ?? battles.turn[def.n] ?? []
+  S.startEv = extra?.start ?? battles.start?.[def.n] ?? []
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas
@@ -179,6 +202,7 @@ async function start(resume?: Suspended) {
   centerOn(S.units[0])
   await fadeIn()
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
+  startEvents()
   await banter('start')
   if (!remake()) await goGo()   // 원작: 첫 대화 뒤 「GO!! GO!!」, 첫 클릭에 사라짐
   // 개선판: 장 카드 + 목표 (S2 제안 4, ux-proposal 16) 는 장 앞 대화·1턴 장면을 다 본 뒤, 첫 아군 차례 직전에
@@ -555,7 +579,7 @@ function cleared(ending: boolean) {
     showResult(ending ? '엔 딩' : '승 리', ending ? '' : `${def.title}`, [['다시 하기', () => void start()], ['타이틀로', toTitle]])
     return
   }
-  const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0).map(u => u.type.name)
+  const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name)
   const goals = goalStates(aliveMember)
   const lines = [`${S.turn}턴 만에 클리어${ending ? ' — 엔딩' : ''}`, fallen.length ? `쓰러진 동료: ${fallen.join(', ')}` : '쓰러진 동료 없음',
     ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
@@ -596,6 +620,17 @@ function updatePhase(side = phase.side, who = phase.who) {
 }
 
 // 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후)
+/** 전투 시작 처리 (원작 124e:c3da, 전투 전 장면 뒤): 17장 폭탄 (페니 사라짐·일행 HP 70%·매복 출현), 3장 다친 호위, 22장 아티스 자리 비움 */
+function startEvents() {
+  for (const d of S.startEv) {
+    if ('hpScale' in d) {
+      for (const u of S.units) if (u.troop === d.hpScale[0] && u.hp > 0) u.hp = Math.trunc(u.hp * d.hpScale[1])
+    } else if ('absent' in d) {
+      for (const u of S.units) if (u.troop === 0 && u.type.por === d.absent) { u.hp = 0; u.alpha = 0; u.absent = true }
+    } else d.state[0].forEach(t => setTroop(t, d.state[1]))
+  }
+}
+
 async function turnEvents() {
   const scenes: string[] = []
   for (const e of S.turnEv) {
