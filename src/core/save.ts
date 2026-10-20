@@ -121,6 +121,7 @@ export interface Suspended {
   def: StageDef; title: string; at: Camp; deploy: number[]
   turn: number; units: UnitSave[]; troopState: number[]; fired: number[]; told: string[]; joined: number[]; flags: string[]; saved: number
   grown?: Camp['grown']; equip?: Camp['equip']   // 이 전투에서 레벨업한 일행 값·승급한 장비 (at 은 장 시작 때라 따로)
+  items?: number[]; taken?: number[]               // 지금 소지품 (주운 보물 포함)·주운 보물 칸 번호
 }
 const susKey = (ed: EditionId) => `eclipse.suspend.${ed}`
 export function loadSuspended(ed: EditionId): Suspended | null {

@@ -389,6 +389,20 @@ def export_cuts():
     print('cuts', n)
 
 
+def export_movies():
+    """창세 프롤로그 (ECPTIT.FAT 10묶음 640×480) 와 엔딩 (ECLIPSE2.FAT 사바카 부활 504×384, ECLIPSE3.FAT 16묶음 640×480) 을 원본 묶음 바이트 그대로
+    movie/tit/NN.bin · movie/e2.bin · movie/e3/NN.bin 으로. 웹 src/core/movie.ts 가 cutscene.ts 의 풀기로 그린다 (순서는 formats.md 「프롤로그·엔딩」)"""
+    import fat
+    n = 0
+    for src, dst in (('ECPTIT.FAT', 'tit'), ('ECLIPSE3.FAT', 'e3')):
+        d = mkdir('movie', dst)
+        for k, raw in fat.raw(open(os.path.join(ROOT, 'original', src), 'rb').read()):
+            open(os.path.join(d, f'{k:02}.bin'), 'wb').write(raw); n += len(raw)
+    for k, raw in fat.raw(open(os.path.join(ROOT, 'original', 'ECLIPSE2.FAT'), 'rb').read()):
+        open(os.path.join(mkdir('movie'), 'e2.bin'), 'wb').write(raw); n += len(raw)
+    print('movies', n)
+
+
 def export_sfx():
     """효과음 WAV (tools/voc.py 추출물) 를 sfx/ 로. e1 = ECLIPSE1.FVT (0~110 유닛 초상 번호별 공격·시전음, 104 기본 타격, 105~107 포수 폭발,
     108 레벨업, 109 아이템 획득, 110 승급·습득, 111 사망), e2 = ECLIPSE2.FVT (마법 id 별), ani = ECPANI.FVT (컷신·전직). formats.md "효과음 호출부"."""
@@ -398,6 +412,16 @@ def export_sfx():
         fs = sorted(f for f in os.listdir(os.path.join(ROOT, 'build', 'snd', src)) if f.endswith('.wav'))
         for f in fs: shutil.copy(os.path.join(ROOT, 'build', 'snd', src, f), os.path.join(d, f))
         print('sfx', dst, len(fs))
+
+
+def export_music():
+    """배경음악 ECLIPSE.FMT 50곡을 CMF 그대로 music/NN.cmf 로 (tools/fmt.py). 웹 src/core/music.ts 가 브라우저에서 OPL2 를 흉내 내 튼다.
+    곡 번호 = 원작 3716:0325(파일, 번호): 0~42 = 1~43장 전투, 44 = 정비 화면, 45 = 제작진 소개, 46 = 엔딩 (formats.md "배경음악")"""
+    import fmt
+    d = mkdir('music')
+    ss = fmt.songs()
+    for k, c in enumerate(ss): open(os.path.join(d, f'{k:02}.cmf'), 'wb').write(c)
+    print('music', len(ss), sum(map(len, ss)))
 
 
 if __name__ == '__main__':
@@ -419,9 +443,13 @@ if __name__ == '__main__':
         export_cuts()
     elif sys.argv[1:] == ['sfx']:
         export_sfx()
+    elif sys.argv[1:] == ['movies']:
+        export_movies()
+    elif sys.argv[1:] == ['music']:
+        export_music()
     elif sys.argv[1:] == ['font']:
         import font; font.export()
     else:
         import font
-        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_cuts(); export_sfx(); export_data(); font.export()
+        export_stages(); export_units(); export_figs(); export_portraits(); export_ui(); export_status_icons(); export_magic_fx(); export_battle_ui(); export_promote(); export_cuts(); export_movies(); export_sfx(); export_music(); export_data(); font.export()
     print('ok')

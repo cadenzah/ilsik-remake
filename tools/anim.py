@@ -42,7 +42,7 @@ def trace(seg, off, n=0x200):
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'list'
     if cmd == 'list':
-        for s, a, k, f in sites(): print(f'{s:04x}:{a:04x}  {f:14} 묶음 {int(k, 0)}')
+        for s, a, k, f in sites(): print(f'{s:04x}:{a:04x}  {f:14} 묶음 {k}')
     elif cmd == 'trace':
         s, o = (int(x, 16) for x in sys.argv[2].split(':'))
         trace(s, o, int(sys.argv[3], 0) if len(sys.argv) > 3 else 0x200)

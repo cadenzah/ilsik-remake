@@ -28,6 +28,7 @@ export const S = {
   deploy: [] as number[],      // 출전 대원 = 일행(PARTY) 인덱스, 순서 = 출전 칸 순서
   joined: [] as number[],      // 이번 전투 중 합류한 유닛 종류 (38장 소피아). 승리하면 일행에 넣는다
   reward: [] as number[],      // 클리어 보상 도구 (BAD, 추정)
+  treasure: [] as { item: number; at: [number, number] }[],   // 숨은 보물 (BAD w111~, 줍기 = 행동을 마친 칸, 20ec:c963)
   map: null as unknown as StageMap,
   atlas: null as unknown as HTMLImageElement,
   types: [] as UnitType[],

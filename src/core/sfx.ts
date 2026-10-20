@@ -14,7 +14,8 @@ const LATE_MS = 400  // 불러오기가 이만큼 늦으면 그 소리는 버린
 let ctx: AudioContext | null = null, out: GainNode | null = null, cur: AudioBufferSourceNode | null = null, seq = 0
 const bufs = new Map<string, Promise<AudioBuffer | null>>()
 
-function audio() {
+/** 효과음·배경음악 (music.ts) 이 같이 쓰는 AudioContext */
+export function audio() {
   if (!ctx) {
     try { ctx = new AudioContext(); out = ctx.createGain(); out.gain.value = VOLUME; out.connect(ctx.destination) } catch { return null }
   }
@@ -25,8 +26,8 @@ function audio() {
  *  풀 수 없으니, 누르기·키 입력마다 (아직 안 풀렸으면) 여기서 풀고 빈 소리를 한 번 낸다. 화면이 꺼졌다 켜지면 다시 막히므로 늘 듣는다.
  *  audioSession 'playback' = iOS 무음 스위치를 켜 둬도 소리를 낸다 (Safari 17+, 없으면 무시) */
 let unlocked = false
-function unlock() {
-  if (!setting('sound')) return
+export function unlock() {
+  if (!setting('sound') && !setting('music')) return
   const c = audio()
   if (!c || unlocked && c.state === 'running') return
   unlocked = true

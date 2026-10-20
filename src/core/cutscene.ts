@@ -12,7 +12,7 @@ import { dialogueOpen } from './dialogue'
 /** 원작 기다림 aaea(ms)·ab16: ms/55 틱 (버림) 이 지날 때까지 → 시작 시점이 틱 안 어디냐에 따라 (틱−1)~틱 × 55ms. 평균을 쓴다 */
 export const biosMs = (ms: number) => Math.max(0.5, Math.floor(ms / 55) - 0.5) * 55
 /** 팔레트 효과 48e1:0e92 = 64단계 × 수직동기 (70Hz) */
-const PAL_MS = Math.round(64 * 1000 / 70)
+export const PAL_MS = Math.round(64 * 1000 / 70)
 
 type Act = { sound: number } | { talk: true } | { timer: number } | { wait: true } | { pal: 1 | 2 | -1 | -2 } | { clear: true } | { draw0: true }
 interface CutDef {
@@ -54,18 +54,22 @@ export const CUT_AFTER: Record<string, number> = { '0:171': 4, '1:43': 9 }
 
 // ---------- 풀기 ----------
 
-interface Clip { w: number; h: number; pal: Uint32Array; px: Uint8Array; frames: Uint8Array[] }
+export interface Clip { w: number; h: number; pal: Uint32Array; px: Uint8Array; frames: Uint8Array[] }
 
-const clips = new Map<number, Promise<Clip | null>>()
-export function loadCut(n: number) {
-  let p = clips.get(n)
+const clips = new Map<string, Promise<Clip | null>>()
+/** 묶음 하나 (path = assets 아래, 확장자 없이). 프롤로그·엔딩 (movie.ts) 도 쓴다 */
+export function loadClip(path: string) {
+  let p = clips.get(path)
   if (!p) {
-    p = fetch(`${A}/cut/${String(n).padStart(2, '0')}.bin`).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+    p = fetch(`${A}/${path}.bin`).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
       .then(b => parse(new Uint8Array(b))).catch(() => null)
-    clips.set(n, p)
+    clips.set(path, p)
   }
   return p
 }
+export const loadCut = (n: number) => loadClip(`cut/${String(n).padStart(2, '0')}`)
+/** 다 쓴 큰 묶음 (프롤로그 1MB 남짓) 을 기억에서 버린다 */
+export const dropClip = (path: string) => { clips.delete(path) }
 
 function parse(b: Uint8Array): Clip {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength)
@@ -90,7 +94,7 @@ function parse(b: Uint8Array): Clip {
 }
 
 /** 프레임 하나 (덩어리 7 = SS2) 를 px 에 적용 */
-function apply(c: Clip, fr: Uint8Array) {
+export function apply(c: Clip, fr: Uint8Array) {
   const v = new DataView(fr.buffer, fr.byteOffset, fr.byteLength), { w, px } = c
   for (let p = 0; p + 6 <= fr.length;) {
     const size = v.getUint32(p, true), type = v.getUint16(p + 4, true)
@@ -130,10 +134,16 @@ export function clearCut() {
   whiteVeil = null
 }
 
+/** 흰 막을 바로 걷는다 (검은 막이 덮은 뒤에) */
+export function dropWhite() {
+  whiteVeil?.remove()
+  whiteVeil = null
+}
+
 const sleep = (ms: number) => new Promise<void>(ok => setTimeout(ok, ms))
 
 /** 흰 막 (팔레트를 흰색 쪽으로, 모드 1·2). 검정 (−1·−2) 은 fade.ts 의 막 */
-async function palette(mode: 1 | 2 | -1 | -2) {
+export async function palette(mode: 1 | 2 | -1 | -2) {
   if (mode === -1) return fadeOut(PAL_MS)
   if (mode === -2) return fadeIn(PAL_MS)
   if (!whiteVeil) {

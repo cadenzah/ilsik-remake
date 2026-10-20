@@ -10,6 +10,7 @@ import { bindInput } from './core/input'
 import { resize, toScreen } from './core/render'
 import { stageDef } from './core/stage'
 import { S } from './core/state'
+import { prologue } from './core/movie'
 import { showTitle, type Launch } from './core/title'
 
 const loadEdition = (id: string | null): Promise<Edition> =>
@@ -79,6 +80,7 @@ async function main() {
   // 개발 중 브라우저에서 상태 확인·자동 테스트용
   if (import.meta.env.DEV && q.has('nocamp')) skipDeploy()
   if (import.meta.env.DEV) Object.assign(window, { __game: { S, camp: snapshot, toScreen, reachable, planFor: ed.planFor, checkEnd, chooseRoute } })
+  if (go.prologue) await prologue()
   await boot(ed, go.def, go.camp ?? null, go.resume)
 }
 

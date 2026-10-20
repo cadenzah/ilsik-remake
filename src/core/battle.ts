@@ -8,6 +8,8 @@ import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
 import { clearCut } from './cutscene'
 import { SFX, play, preload, setSoundOn, soundMs } from './sfx'
+import { SONG, playMusic, setMusicOn, stageSong, stopMusic } from './music'
+import { endingMovie } from './movie'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
@@ -93,6 +95,8 @@ export const skipDeploy = () => { askDeploy = false }
 
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
+let song = -1   // 이 장의 전투 곡 (music.ts)
+
 export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | null, resume?: Suspended) {
   await fadeOut()   // 결과 화면·타이틀에서 넘어올 때 (이미 어두우면 바로)
   clearCut()        // 전투 후 컷신의 끝 프레임 (다음 화면까지 남겨 둔다)
@@ -100,6 +104,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.def = def
   const extra = ed.extraBattles?.[def.n]   // 개선판 숨은 장: 원작 맵 재사용 + 새 배치·고정 일행
   if (extra) S.def = def = { ...def, title: `숨은 장 · ${extra.title}` }
+  song = stageSong(extra?.map ?? def.n)   // 숨은 장은 빌려 쓰는 맵의 장 곡
   const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes(), loadSkin()])
   initSkinCss()
   S.tables = tables
@@ -127,6 +132,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
       r.equip.forEach((e, i) => { if (e.join() !== partyType(PARTY[i]).equip.join()) EQUIP.set(PARTY[i], e) })
     }
     let initial = first, r: CampResult
+    playMusic(SONG.camp)   // 124e:8994: 정비 화면 곡, 나갈 때 멈춤 (대륙 지도는 무음)
     for (;;) {   // restyle = 현대식 정비 화면 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시
       r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
         preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
@@ -139,6 +145,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
       keep(r)
       initial = r.deploy
     }
+    stopMusic()
     if (r.go === 'title') { toTitle(); return }
     if (r.go === 'load') {   // 기록한 칸의 정비 화면부터
       const s = loadSlots(ed.id)[r.slot]
@@ -157,6 +164,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
   Object.assign(S, placements(rec, ed.id === 'remake' ? stage.map : undefined))
   S.reward = rec.reward
+  S.treasure = rec.treasure ?? []
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
   S.turnEv = extra?.turn ?? battles.turn[def.n] ?? []
   S.startEv = extra?.start ?? battles.start?.[def.n] ?? []
@@ -184,11 +192,13 @@ async function start(resume?: Suspended) {
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
   S.joined = []
   leveled.clear()
+  taken.clear()
   const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
   S.reserve = all.filter(u => S.troopState[u.troop] === 4)
   preloadSounds(all)
+  playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 장 뒤 장면·컷신까지. 다시 하기는 처음부터
   S.fired.clear()
   told.clear()
   woke.length = 0
@@ -406,6 +416,23 @@ function rest(u: Unit) {
   S.floats.push({ x: u.x, y: u.y, text: heal ? `+${heal}` : '휴식', t0: performance.now(), color: '#7dff9a' })
 }
 
+// ---------- 숨은 보물 (원작 20ec:c963: 일행 대원이 행동을 마쳤을 때 선 칸, 이동만 하고 취소하면 줍지 않는다) ----------
+
+const taken = new Set<number>()   // 이번 전투에서 주운 보물 (S.treasure 칸 번호). 다시 하기는 처음부터
+
+/** 그 칸의 보물을 줍는다: 알림 창 (원작 0aa2:12f2 모드 0, 효과음 109) 뒤 소지품 끝에 (원작 +0x1cd3 수, 넘침 검사 없음) */
+async function pickUp(u: Unit) {
+  for (const [i, t] of S.treasure.entries()) {
+    if (taken.has(i) || t.at[0] !== u.x || t.at[1] !== u.y) continue
+    taken.add(i)
+    ITEMS.push(t.item)
+    play('e1', SFX.gotItem)
+    const name = esc(S.tables.items.get(t.item)?.name ?? '')
+    await new Promise<void>(ok => openWin({ title: '보 물', body: `<div class="lvup"><figure>${icon(t.item)}<figcaption>${esc(u.type.name)}<br><span class="blue">${name}</span></figcaption></figure></div>`,
+      bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
+  }
+}
+
 /** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
 function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   if (S.ed.features.autoRest && !attacked && !magic && !u.moved) rest(u)
@@ -416,7 +443,9 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   hideMenu()
   hideBasic()
   S.aim = null
-  void checkEnd().then(over => {
+  const found = u.troop === 0 && u.hp > 0 && S.treasure.some((t, i) => !taken.has(i) && t.at[0] === u.x && t.at[1] === u.y)
+  if (found) S.mode = { kind: 'busy' }
+  void (found ? pickUp(u).then(() => { S.mode = { kind: 'idle' } }) : Promise.resolve()).then(checkEnd).then(over => {
     if (over) stepDone?.(true)
     else if (S.active.every(a => a.acted || a.hp <= 0)) stepDone?.(false)
     else if (twice && remake() && S.mode.kind === 'idle') select(u)   // 개선판: 두 번째 행동할 대원을 골라 둔다
@@ -508,8 +537,17 @@ export async function checkEnd(): Promise<boolean> {
   if (!result) return false
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, done.notes)
-  if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) await epilogue(aliveMember)   // 숨은 장의 엔딩(진엔딩)은 그 장 대본이 맡는다
-  else await banter('win')   // 전투 후 장면 뒤 (보스의 마지막 말 다음). 마지막 전투는 에필로그만
+  if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {
+    // 원작 엔딩 영상 (0aa2:3982): 마지막 전투 일행 (쓰러진 대원 포함) 에 채스 (초상 6) +1, 소피아 (초상 28) +2, 루트별 장면. 엔딩 곡은 영상이 튼다
+    const party = S.units.filter(u => u.side === 'ally' && u.troop === 0).map(u => u.type.por)
+    await fadeOut()
+    await endingMovie(S.def.route, (party.includes(6) ? 1 : 0) + (party.includes(28) ? 2 : 0))
+    await fadeIn()
+    await epilogue(aliveMember)   // 개선판 후일담 (원작판은 대본이 없어 바로 끝)
+  } else {
+    if (result === 'ending') playMusic(SONG.ending)   // 숨은 장의 엔딩(진엔딩)은 그 장 대본이 맡는다
+    await banter('win')   // 전투 후 장면 뒤 (보스의 마지막 말 다음). 마지막 전투는 에필로그만
+  }
   cleared(result === 'ending')
   return true
 }
@@ -552,6 +590,7 @@ function showGoalsWin(onClose?: () => void) {
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
+  stopMusic()
   try { sessionStorage.setItem(SKIP_INTRO, '1') } catch { /* 무시 */ }
   void fadeOut().then(() => { location.href = location.pathname })
 }
@@ -872,7 +911,7 @@ function suspend() {
     units: all.map(u => ({ x: u.x, y: u.y, hp: u.hp, fatigue: u.fatigue, acted: u.acted, moved: u.moved, steps: u.steps, facing: u.facing, alpha: u.alpha, onMap: S.units.includes(u),
       mods: { ...u.mods }, poison: u.poison, coma: u.coma, ticked: u.ticked, again: u.again })),
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
-    grown: snapshot().grown, equip: snapshot().equip,
+    grown: snapshot().grown, equip: snapshot().equip, items: [...ITEMS], taken: [...taken],
   })
   toTitle()
 }
@@ -888,6 +927,8 @@ async function resumeAt(r: Suspended, all: Unit[]) {
   r.told.forEach(t => told.add(t))
   S.joined = [...r.joined]
   FLAGS.clear(); r.flags.forEach(f => FLAGS.add(f))
+  if (r.items) ITEMS.splice(0, ITEMS.length, ...r.items)
+  r.taken?.forEach(i => taken.add(i))
   S.turn = r.turn
   closeAll()
   hideBasic()
@@ -922,7 +963,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   ] : [
     ['알림', onOff('알림전환', on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
     ['표기', () => { S.marks = !S.marks; closeWin('system') }],
-    ['음악', onOff('음악전환')],
+    ['음악', onOff('음악전환', setMusicOn)],   // 원작 +0x1cb3: 닫기 = 멈춤, 열기 = 그 곡 처음부터 (20ec:e969)
     ['음향', onOff('음향전환', setSoundOn)],   // 원작 +0x1cb4 (효과음 전부). 웹은 설정 sound 로 기억
     ['조건', () => showGoalsWin()],
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],

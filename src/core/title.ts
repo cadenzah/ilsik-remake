@@ -11,10 +11,11 @@ import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, l
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
+import { SONG, playMusic, stopMusic } from './music'
 import { SETTINGS, setSetting, setting } from './settings'
 import { stageDef, type StageDef } from './stage'
 
-export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
+export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended; prologue?: boolean }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투, prologue = 새 게임 (창세 프롤로그부터)
 
 const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'original', name: '원작판', desc: '원작 규칙·조작 그대로' },
@@ -82,14 +83,14 @@ export function showTitle(): Promise<Launch> {
   let ed = lastEdition()
 
   return new Promise(done => {
-    const launch = (def: StageDef, camp?: Camp, resume?: Suspended) => {
+    const launch = (def: StageDef, camp?: Camp, resume?: Suspended, prologue = false) => {
       setLastEdition(ed)
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey)
       void fadeOut().then(() => {   // 원작처럼 어두워진 뒤 다음 화면 (boot·정비 화면이 밝힌다)
         root.hidden = true
         root.innerHTML = ''
-        done({ ed, def, camp, resume })
+        done({ ed, def, camp, resume, prologue })
       })
     }
 
@@ -127,7 +128,7 @@ export function showTitle(): Promise<Launch> {
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) } },
+        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }, undefined, true) } },   // 원작 2ff8:04dc: 새 게임은 창세 프롤로그부터
         { label: '지난흔적', title: '이어하기·기록 불러오기·기록 옮기기', on: () => loadMenu() },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
@@ -259,6 +260,7 @@ export function showTitle(): Promise<Launch> {
     let pageAt = -1
     const credits = (i: number) => {
       pageAt = i
+      playMusic(SONG.credits)   // 원작 제작진 소개 (0aa2:3384) 곡
       win.hidden = true
       page.hidden = false
       page.innerHTML = `${PAGES[i]}<nav>
@@ -276,6 +278,7 @@ export function showTitle(): Promise<Launch> {
     }
     const closeCredits = (then = menu) => {
       pageAt = -1
+      stopMusic()   // 메인 메뉴는 무음
       page.hidden = true
       win.hidden = false
       then()

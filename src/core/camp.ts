@@ -4,7 +4,7 @@
 //   출전 j 번 클릭 = j 번부터 뒤가 모두 빠짐, 오른쪽 클릭·Esc = 편성 취소, 행동 = '여행계속' 확인 뒤 전투.
 // 개선판: 같은 화면에서 바로 편성 (앞에서부터 채워 둠), 대원 하나씩 넣고 빼기, 마우스 올리면 능력치, 남은 칸 표시,
 //   행동·Enter = '여행계속' 확인 뒤 전투 (확인창에서 Enter = 결정), ⟺ = 앞에서부터 다시 채우기, 장비 아이콘·버튼에 설명.
-// 읽기·기록·음악은 웹판에 없어 도구설명 칸에 안내만, 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
+// 음악 = 원작처럼 창 없이 켜기↔끄기 (124e:9290, +0x1cb3 → 0f8e 멈춤 / 0f17 처음부터), 종료 = '주화면' 확인 뒤 타이틀로 (두 판 같음)
 // 개선판만: 음악 다음에 「설정」 (원작 버튼을 본뜬 camp-setting.png 를 종료 자리에, 종료는 한 칸 아래 camp-quit.png, export_web.py) → 원작 창틀 설정 창. '개선된 UI' 를 켜고 닫으면 현대식으로 다시 연다 (restyle)
 // 현대식 (개선판 설정 modernUi): 다른 화면 (campModern.ts, ux-proposal.md 36). 여기 statusFrame 은 전투 중 큰 인물기본자료의 현대식 바탕
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
@@ -13,6 +13,7 @@ import { winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 import { applyFont } from './font'
+import { musicOn, setMusicOn } from './music'
 import { SETTINGS, setSetting, setting } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
@@ -46,7 +47,7 @@ const PAGE_HELP = {
   intro: '대기인물 클릭: 출전\n출전인물 클릭: 빼기\n행동·Enter: 출발',
   read: '기록한 정비 화면을 불러온다.',
   write: '지금 정비 화면을 기록한다 (3칸).',
-  music: '음악은 아직 없습니다.',
+  music: '배경음악을 켜고 끈다.',
   swap: '출전 편성: 대기인물을 눌러 출전에 넣는다.',
   swapRemake: '앞에서부터 다시 채운다.',
   act: '출전인물로 전투를 시작한다.',
@@ -402,7 +403,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         o.slots?.save(i, [...items], party.map(t => t.equip))
         say('기록했습니다.')
       })),
-      music: () => say(PAGE_HELP.music),
+      music: () => { setMusicOn(!musicOn()); say(musicOn() ? '음악을 켰습니다.' : '음악을 껐습니다.') },
       quit: () => confirm('주화면', 155, () => finish({ go: 'title' })),
       settings: () => {
         const modern0 = setting('modernUi')

@@ -43,4 +43,6 @@
 - `data/items.json` 장비·도구 182종 {id,cat,sub,name,f1~f3,stat,stat2}, `data/magic.json` 마법 74종 (필드는 formats.md)
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`
 - 효과음: `sfx/e1` (ECLIPSE1.FVT 112) · `sfx/e2` (ECLIPSE2.FVT 74, 마법 id) · `sfx/ani` (ECPANI.FVT 15) — `export_web.py sfx`. 번호 뜻은 formats.md "효과음 호출부"
+- 배경음악: `music/NN.cmf` (ECLIPSE.FMT 50곡, CMF 그대로) — `export_web.py music`. 곡 번호 뜻은 formats.md "배경음악"
+- 프롤로그·엔딩: `movie/tit/NN.bin` (ECPTIT.FAT 10), `movie/e2.bin` (ECLIPSE2.FAT), `movie/e3/NN.bin` (ECLIPSE3.FAT 16) — 원본 묶음 바이트, `export_web.py movies`
 - `FULLSOFT.FNT` — 한글 16×15 · 영문 8×15 비트맵 글꼴, KS 완성형 (formats.md). 웹 글꼴 `ui/eclipse-font.woff`, 설정 '원작 글꼴'

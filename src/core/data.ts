@@ -83,7 +83,7 @@ export interface BattleRecord {
   npc: BattleUnit[]                          // 함께 싸우는 동료·NPC
   npcState: number                           // NPC 부대 초기 상태 (4 = 숨김)
   groups: { active: number; units: BattleUnit[] }[]  // 적 무리, active = 부대 초기 상태 (0 행동, 1 경계, 2 대기, 3 고정, 4 숨김 — ai.ts)
-  treasure: { item: number; at: [number, number] }[] // 숨은 보물 (추정)
+  treasure: { item: number; at: [number, number] }[] // 숨은 보물 (BAD w111~, 원작 20ec:c963 에서 줍는다)
   reward: number[]                           // 클리어 보상 도구 (추정)
 }
 /** 장별 승패 규칙 (tools/cond.py). 대원 = [부대, 번호], 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 groups */

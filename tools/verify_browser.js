@@ -24,7 +24,7 @@ window.__verify = async function (ed, list, opt = {}) {
     ;(async () => {
       while (pumping) {
         const d = doc()
-        const busyUi = d.querySelector('.speak, .gogo') || d.querySelector('.owin:not(.basic):not(.minimap):not(.result):not(.passive)')
+        const busyUi = d.querySelector('.speak, .gogo, #movie') || d.querySelector('.owin:not(.basic):not(.minimap):not(.result):not(.passive)')   // #movie = 엔딩 영상 (키 = 건너뛰기)
         const choice = [...d.querySelectorAll('.owin.result')].find(x => /^\s*선택/.test(x.textContent))
         if (choice) { choice.querySelector('button')?.click(); r.steps.push('choice') }
         else if (busyUi) { w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); escs++ }
