@@ -264,7 +264,7 @@ async function playPose(u: Unit, ms: number) {
 
 /** 이번 전투에서 낼 효과음을 미리 불러 둔다 (원작 124e:18a5: 유닛 초상 번호별 공격음 + 기본 104) */
 function preloadSounds(units: Unit[]) {
-  preload('e1', [...new Set(units.map(u => u.type.por)), SFX.cannon, SFX.cannon + 1, SFX.cannon + 2, SFX.levelUp, SFX.upgrade, SFX.death])
+  preload('e1', [...new Set(units.map(u => u.type.por)), SFX.cannon, SFX.cannon + 1, SFX.cannon + 2, SFX.levelUp, SFX.gotItem, SFX.upgrade, SFX.death])
   preload('e2', new Set(units.flatMap(u => u.type.magic)))
 }
 
@@ -484,17 +484,23 @@ function rest(u: Unit) {
 
 const taken = new Set<number>()   // 이번 전투에서 주운 보물 (S.treasure 칸 번호). 다시 하기는 처음부터
 
-/** 그 칸의 보물을 줍는다: 알림 창 (원작 0aa2:12f2 모드 0, 효과음 109) 뒤 소지품 끝에 (원작 +0x1cd3 수, 넘침 검사 없음) */
+/** 그 칸의 보물을 줍는다: 알림 창 (원작 0aa2:12f2 모드 0) 뒤 소지품 끝에 (원작 +0x1cd3 수, 넘침 검사 없음) */
 async function pickUp(u: Unit) {
   for (const [i, t] of S.treasure.entries()) {
     if (taken.has(i) || t.at[0] !== u.x || t.at[1] !== u.y) continue
     taken.add(i)
     ITEMS.push(t.item)
-    play('e1', SFX.gotItem)
-    const name = esc(S.tables.items.get(t.item)?.name ?? '')
-    await new Promise<void>(ok => openWin({ title: '보 물', body: `<div class="lvup"><figure>${icon(t.item)}<figcaption>${esc(u.type.name)}<br><span class="blue">${name}</span></figcaption></figure></div>`,
-      bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
+    await gotItem('보 물', t.item, u.type.name)
   }
+}
+
+/** 도구를 얻은 알림 창 (원작 0aa2:12f2 모드 0 보물 줍기·모드 5 전투 보상: ECPLEV "level" 창 + EQU 아이콘 + 파란 이름, 효과음 ECLIPSE1 109).
+ *  원작 창은 제목 글자가 빈 문자열 (DS:0xa9e) — 제목·주운 대원 이름은 웹 보탬. 자리 = 가운데 [근사] */
+function gotItem(title: string, item: number, who?: string) {
+  play('e1', SFX.gotItem)
+  const name = esc(S.tables.items.get(item)?.name ?? '')
+  return new Promise<void>(ok => openWin({ title, body: `<div class="lvup"><figure>${icon(item)}<figcaption>${who ? `${esc(who)}<br>` : ''}<span class="blue">${name}</span></figcaption></figure></div>`,
+    bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
 }
 
 /** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
@@ -599,6 +605,8 @@ export async function checkEnd(): Promise<boolean> {
     if (!result) S.mode = prev
   }
   if (!result) return false
+  // 원작 2ff8:1706: 전투 함수가 끝나면 (결과 3 이 아니면) 보상 품목 (BAD w121~) 마다 알림 창 (모드 5) → 소지품 끝에. 웹은 finishStage 가 넣는다
+  for (const item of S.reward) await gotItem('보 상', item)
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, done.notes)
   if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {
