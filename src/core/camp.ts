@@ -336,11 +336,13 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   }
 
   // ---- 확인창 (원작 0aa2:0c58, 화면 좌표) ----
-  const confirm = (title: string, y: number, ok: () => void, x = 500, no?: () => void) => {
+  // labels = [왼쪽, 오른쪽] 버튼 글자 (원작 모드 0 결정·취소 / 그 밖 열기·닫기). soft = Esc·오른쪽 클릭은 아무것도 고르지 않고 닫기 (원작 창은 버튼 클릭만 받는다)
+  const confirm = (title: string, y: number, ok: () => void, x = 500, no?: () => void, labels = ['결정', '취소'], soft = false) => {
     dialog = document.createElement('div')
     dialog.className = 'dlg owin'
+    if (soft) dialog.dataset.soft = '1'
     dialog.style.cssText = px(x, y, 136, 66) + `;background-image:url(${winUrl('comma', 136, 66)})`
-    dialog.innerHTML = `<div class="t">${title}</div><button class="ok obtn">결정</button><button class="no obtn">취소</button>`
+    dialog.innerHTML = `<div class="t">${title}</div><button class="ok obtn">${labels[0]}</button><button class="no obtn">${labels[1]}</button>`
     stage.append(dialog)
     const close = () => { dialog?.remove(); dialog = null }
     dialog.querySelector<HTMLButtonElement>('.ok')!.onclick = () => { close(); ok() }
@@ -426,7 +428,9 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         o.slots?.save(i, [...items], party.map(t => t.equip))
         say('기록했습니다.')
       })),
-      music: () => { setMusicOn(!musicOn()); say(musicOn() ? '음악을 켰습니다.' : '음악을 껐습니다.') },
+      // 원작 124e:9267: 「음악」 (500,120) [열기][닫기] → 지금과 다를 때만 켜고 끔. 개선판은 누를 때마다 바꾸고 알림
+      music: () => o.remake ? (setMusicOn(!musicOn()), say(musicOn() ? '음악을 켰습니다.' : '음악을 껐습니다.'))
+        : confirm('음악', 120, () => { if (!musicOn()) setMusicOn(true) }, 500, () => { if (musicOn()) setMusicOn(false) }, ['열기', '닫기'], true),
       quit: () => confirm('주화면', 155, () => finish({ go: 'title' })),
       settings: () => {
         const modern0 = setting('modernUi')
@@ -449,9 +453,15 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         if (help) b.onmouseenter = () => { if (!dialog) say(help) }
       }
     })
-    stage.oncontextmenu = e => { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else if (picked !== null) pick(null); else cancelEdit() }
+    stage.oncontextmenu = e => { e.preventDefault(); back() }
+    const back = () => {   // 오른쪽 클릭·Esc: 창 (soft 면 그냥 닫기, 아니면 오른쪽 버튼) → 도구 선택 풀기 → 편성 취소
+      if (dialog?.dataset.soft) { dialog.remove(); dialog = null }
+      else if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click()
+      else if (picked !== null) pick(null)
+      else cancelEdit()
+    }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); if (dialog) dialog.querySelector<HTMLButtonElement>('.no')!.click(); else if (picked !== null) pick(null); else cancelEdit() }
+      if (e.key === 'Escape') { e.preventDefault(); back() }
       else if (e.key === 'Enter' && o.remake && !dialog) { e.preventDefault(); act() }
     }
     addEventListener('keydown', onKey, true)
