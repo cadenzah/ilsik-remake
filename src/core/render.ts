@@ -270,6 +270,8 @@ export function frame(now: number) {
     const { w, h } = size(S.shot.name)
     piece(ctx, S.shot.name, Math.round(S.shot.x * TW + (TW - w) / 2), Math.round(S.shot.y * TH + (TH - h) / 2))
   }
+  // 포탄 폭발 (원작 20ec:330f): 범위 칸마다 칸 왼위 − 48 (y − 0x30) 에
+  if (S.boom) for (const c of S.boom.cells) piece(ctx, `boom.${S.boom.f}`, c.x * TW, c.y * TH - TH)
   if (modern) {   // 고른 유닛 = 금빛 테두리, 공격 대상 = 빨간 테두리
     if (turnUnit) { ctx.strokeStyle = `rgba(252,180,44,${0.6 + 0.4 * Math.sin(now / 180)})`; ctx.lineWidth = 3; ctx.strokeRect(turnUnit.px * TW + 2, turnUnit.py * TH + 2, TW - 4, TH - 4) }
     if (S.aim) { ctx.strokeStyle = '#e04020'; ctx.lineWidth = 3; ctx.strokeRect(S.aim.x * TW + 2, S.aim.y * TH + 2, TW - 4, TH - 4) }

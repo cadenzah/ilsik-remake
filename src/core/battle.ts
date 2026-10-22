@@ -290,6 +290,18 @@ async function flyShot(a: Unit, c: Unit) {
   S.shot = null
 }
 
+/** 포탄 폭발 (원작 20ec:330f): 포 k (0x1e30 = 무기 id − 87, 20ec:e507) 의 MAR 10 프레임 k·4 + 0~3 을 범위 칸 (0x1e3a) 모두에 1틱씩,
+ *  둘째 프레임에 폭발음 105 + k (33f2 불러오기 → 3413 재생). 16색 모드면 k = 0 (331d) — 웹은 늘 256색 */
+async function explode(k: number, cells: Pos[]) {
+  if (k < 0 || k > 2 || !cells.length) return
+  for (let i = 0; i < 4; i++) {
+    if (i === 1) play('e1', SFX.cannon + k)
+    S.boom = { cells, f: k * 4 + i }
+    await sleep(TICK * pace())
+  }
+  S.boom = null
+}
+
 /** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
 async function attack(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
@@ -303,11 +315,10 @@ async function attack(a: Unit, c: Unit) {
     await sleep(200 * pace())
     a.px = a.x; a.py = a.y
   } else play('e1', a.type.por)
-  // 궁수·추전수·포수: 공격자 칸에서 중심 칸까지 투사체가 날아간다. 포수는 떨어질 때 폭발음 105 + (무기 − 87) (원작 20ec:33f2, 0x1e30 = 무기 id − 87, 20ec:e507)
+  // 궁수·추전수·포수: 공격자 칸에서 중심 칸까지 투사체가 날아간다. 포수는 떨어진 범위 칸마다 폭발
   if (attackKind(a) >= 3) await flyShot(a, c)
-  const shell = attackKind(a) === 3 ? a.type.equip[0] - 87 : -1
-  if (shell >= 0 && shell <= 2) play('e1', SFX.cannon + shell)
   const area = strikeArea(a) ? strikeCells(a, c) : []
+  if (attackKind(a) === 3) await explode(a.type.equip[0] - 87, area)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const hits: { target: Unit; value: number }[] = []
   for (const t of targets) {
