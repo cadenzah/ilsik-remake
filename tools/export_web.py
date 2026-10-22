@@ -261,7 +261,7 @@ def export_battle_ui():
     FRTWND 9조각 = 이름.0 바탕 .1 위 .2 왼위 .3 오른위 .4 왼아래 .5 오른아래 .6 아래 .7 왼쪽 .8 오른쪽:
     mw = ECPMAI "mapwin" 전투 창틀, comma = 명령·확인창, speak = 대화창, basic = 인물기본자료, level, magic.
     btn.0~5 = ECPBUT 0005 글자 버튼 (0 왼 1 오른 2 가운데 = 보통, 3·4·5 = 눌림), icon.N.S = ECPBUT 000N 아이콘 (상태 0 1 3 4),
-    sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지),
+    sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지 8 17장 폭발 뒤 그림 262×164),
     die.0~5 = ECLIPSE.MAR 5번 시트 56×48 × 6칸 (간격 57, 테두리 1) — 사망 연출 구멍 (124e:0de0 적재, 20ec:09d8 재생),
     shot.v.0~63 / shot.h.0~63 = ECLIPSE.MAR 4·3번 시트 투사체 (세로 10×20 · 가로 20×10), boom.0~11 = MAR 10 포탄 폭발 56×96,
     mark.0~7 = MAR 6 타격 표시 55×47, arrow.0~11 = MAR 0 꽂힌 화살 15×15"""
@@ -278,7 +278,7 @@ def export_battle_ui():
         parts.append((f'btn.{k >> 8}' if n == '0005' else f'icon.{int(n)}.{k >> 8}', im))
     for i in (0, 1, 2, 3, 5, 12, 13, 14, 15):
         parts.append((f'sta.{i}', rgba(os.path.join(IMG, 'ECLIPSE.STA', f'{i:03d}.png'))))
-    for i in (3, 4, 5):
+    for i in (3, 4, 5, 8):
         parts.append((f'oth.{i}', rgba(os.path.join(IMG, 'ECLIPSE.OTH', f'{i:03d}.png'))))
     die = rgba(os.path.join(IMG, 'ECLIPSE.MAR', '005.png'))
     for c in range(6):

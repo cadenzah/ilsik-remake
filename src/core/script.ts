@@ -2,7 +2,7 @@
 // 장 파일 하나 = 장 카드·보조 목표·장면 블록. 블록은 원작 장면을 통째로 대신하고, keep 자리에 원작 장면을 재생한다.
 // 블록에 do 가 하나라도 있는 장은 원작 전투 후 캠페인 단계(합류·이탈·소지품) 전체를 대신한다.
 import { FLAGS, GOLD, PARTY, applyStep, cutTalk, giveGold, hasItem, sceneLines, type Alive, type Note } from './campaign'
-import { CUTS, CUT_AFTER, playCut } from './cutscene'
+import { CUTS, CUT_AFTER, STILL_AFTER, playCut, showStill } from './cutscene'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
 import { playDialogue } from './dialogue'
@@ -280,6 +280,7 @@ async function playKeys(keys: string[], extra: Line[] = []) {
     }
     buf.push(...lines([k]))
     if (k in CUT_AFTER) { await flush(); await playCut(CUT_AFTER[k]) }
+    if (k in STILL_AFTER) { await flush(); await showStill(STILL_AFTER[k]) }
   }
   buf.push(...extra)
   await flush()

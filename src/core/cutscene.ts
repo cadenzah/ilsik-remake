@@ -6,6 +6,7 @@
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { mapRect, hud, view } from './screen'
+import { pieceUrl } from './skin'
 import { play, stop } from './sfx'
 import { dialogueOpen } from './dialogue'
 
@@ -51,6 +52,20 @@ export const CUTS: Record<number, CutDef> = {
 
 /** 장면 키 뒤에 바로 이어지는 컷신 (전투 중 — 전투 후 컷신은 scenes.json post 의 anim 단계) */
 export const CUT_AFTER: Record<string, number> = { '0:171': 4, '1:43': 9 }
+
+/** 장면 뒤 정지 그림 (battle-ui 조각, 원작 화면 좌표 = 맵 창 기준으로 옮김, ms 동안).
+ *  17장 0:172 「폭탄이 있습니다!」 뒤: ECLIPSE.OTH 8 을 맵을 다시 그린 위 (197,180) 에 2000ms (124e:c82e~c8e4, 48e1:2bcf → aaea(0x7d0)) → 0:173 */
+export const STILL_AFTER: Record<string, { piece: string; x: number; y: number; ms: number }> = { '0:172': { piece: 'oth.8', x: 197, y: 180, ms: 2000 } }
+export async function showStill(s: { piece: string; x: number; y: number; ms: number }) {
+  const m = mapRect(), img = document.createElement('img')
+  img.className = 'cutscene still'
+  img.alt = ''
+  img.src = pieceUrl(s.piece)
+  Object.assign(img.style, { left: `${m.x + s.x + Math.round((m.w - 504) / 2) - 68}px`, top: `${m.y + s.y + Math.round((m.h - 384) / 2) - 57}px` })
+  hud.append(img)
+  await sleep(s.ms)
+  img.remove()
+}
 
 // ---------- 풀기 ----------
 
