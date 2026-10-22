@@ -1,12 +1,12 @@
 // 개선판 대본 (.ecs) 해석·실행 — 형식은 .claude/docs/script-format.md (2026-10-13 사용자 확정).
 // 장 파일 하나 = 장 카드·보조 목표·장면 블록. 블록은 원작 장면을 통째로 대신하고, keep 자리에 원작 장면을 재생한다.
 // 블록에 do 가 하나라도 있는 장은 원작 전투 후 캠페인 단계(합류·이탈·소지품) 전체를 대신한다.
-import { FLAGS, PARTY, applyStep, cutTalk, hasItem, sceneLines, type Alive, type Note } from './campaign'
+import { FLAGS, GOLD, PARTY, applyStep, cutTalk, giveGold, hasItem, sceneLines, type Alive, type Note } from './campaign'
 import { CUTS, CUT_AFTER, playCut } from './cutscene'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
 import { playDialogue } from './dialogue'
-import { showResult } from './ui'
+import { confirmWin, showResult } from './ui'
 
 // ---------- 형식 ----------
 
@@ -267,6 +267,15 @@ async function playKeys(keys: string[], extra: Line[] = []) {
       await flush()
       const ls = lines(talk)
       await playCut(Number(k.slice(5).split('>')[0]), ls.length ? () => playDialogue(ls) : undefined)
+      continue
+    }
+    if (k === GOLD.scene && S.ed.id === 'original') {   // 원작판 9장 「금괴조각주기」 (campaign.ts GOLD)
+      buf.push(...lines([k]).slice(0, sceneLines([k], 0).length))
+      await flush()
+      const yes = await new Promise<boolean>(ok => confirmWin(GOLD.title, GOLD.at, () => ok(true), () => ok(false)))
+      buf.push(...sceneLines([k], yes ? 1 : 2))
+      await flush()
+      if (yes) giveGold()
       continue
     }
     buf.push(...lines([k]))

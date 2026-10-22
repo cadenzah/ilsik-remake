@@ -720,15 +720,16 @@ function cleared(ending: boolean) {
   showResult(ending ? '엔 딩' : '승 리', lines.join('\n'), buttons)
 }
 
-/** 진로선택 (원작 comma 창, 0aa2:0b0d: 암흑동굴·혼탁한호수·옛 신전 순). 개선판은 버튼마다 그 길의 목적을 설명 칸에 보이고 결정·취소로 확인 */
+/** 진로선택 (원작 0aa2:0b0d [확정]: 화면 (280,220) 에 125×122 "comma" 창 「진로선택」 (DS:0x233d), 글자 버튼 암흑동굴·혼탁한호수·옛 신전 순 → 루트 B·A·C,
+ *  왼쪽 클릭만 받고 취소 없음). 개선판은 버튼마다 그 길의 목적을 설명 칸에 보이고 결정·취소로 확인 */
 export function chooseRoute(): Promise<number> {
   const order = S.ed.routeOrder ?? [0, 1, 2]
   const places = S.ed.routePlaces ?? S.ed.routeLabels
   return new Promise(ok => {
     const open = () => {
       const hint = '어느 길로 갈까?'
-      const el = openWin({ title: '진로선택', kind: 'route', at: 'center', btnW: 112,
-        body: remake() ? `<span class="hint">${hint}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? Math.min(view.w - 160, 300) : undefined,
+      const el = openWin({ title: '진로선택', kind: 'route', at: remake() ? 'center' : { x: 280, y: 220 }, btnW: remake() ? 112 : 101,
+        body: remake() ? `<span class="hint">${hint}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? Math.min(view.w - 160, 300) : 125,
         buttons: order.map((r): Btn => [places[r], () => remake() ? confirmWin('진로선택', 'center', () => ok(r), open, esc(S.ed.routeLabels[r]), 260) : ok(r)]) })
       if (!remake()) return
       const box = el.querySelector<HTMLElement>('.hint')!

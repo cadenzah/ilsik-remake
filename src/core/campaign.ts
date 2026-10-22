@@ -51,10 +51,22 @@ export const hasItem = (id: number) => ITEMS.includes(id) || PARTY.some(t => S.t
 export const joinLine = (type: number) => ({ text: `${josa(S.types[type].name, '이/가')} 일행에 합류했다.` })
 
 // 선택지 분기는 아직 UI 가 없어 '예'(1) 쪽을 재생한다
-export function sceneLines(keys: string[]) {
-  return keys.flatMap(k => cutTalk(k) ?? [k]).flatMap(k => S.scenes.scenes[k] ?? []).filter(([, , br]) => br !== 2)
+export function sceneLines(keys: string[], branch?: number) {
+  return keys.flatMap(k => cutTalk(k) ?? [k]).flatMap(k => S.scenes.scenes[k] ?? []).filter(([, , br]) => branch === undefined ? br !== 2 : br === branch)
     .map(([who, line]) => ({ who: who >= 0 ? S.types[who] : undefined, text: S.dialogue[line] }))
 }
+
+/** 9장 후 「금괴조각주기」 [확정 2026-10-23]: 장면 4138(9,2) 안 줄 98 (소요정) 뒤 0aa2:0c58 (250,250) [결정][취소] (0aa2:6531).
+ *  결정 = 장면 2:9 분기 1 줄 (99~104), 장면 뒤 (2ff8:1e26~1f08) 소지품·일행 장착 도구 (+0x5e) 의 깨진금괴 (180) 를 모두 없애고 요정피리 (168) 를 소지품 끝에.
+ *  취소 = 분기 2 줄 (105~107), 도구 그대로. scenes.json post 9 의 take 180·give 168 은 결정 쪽이라 원작판은 finishStage 가 건너뛰고 giveGold 로 (script.ts playKeys).
+ *  개선판은 대본 (09.ecs 선택지) 이 맡는다 */
+export const GOLD = { scene: '2:9', title: '금괴조각주기', at: { x: 250, y: 250 }, gold: 180, flute: 168 }
+export function giveGold() {
+  ITEMS.splice(0, ITEMS.length, ...ITEMS.filter(i => i !== GOLD.gold))
+  for (const t of PARTY) { const e = partyType(t).equip; if (e[2] === GOLD.gold) EQUIP.set(t, [e[0], e[1], 0]) }
+  ITEMS.push(GOLD.flute)
+}
+const goldAsked = (steps: PostStep[]) => S.ed.id === 'original' && steps.some(s => 'scene' in s && s.scene === GOLD.scene)
 
 /** 장면 키 목록 안의 컷신: "anim:묶음>딸린 장면,…" (재생 = script.ts playKeys). 대화만 뽑을 때는 딸린 장면 */
 export const cutKey = (s: { anim: number; talk?: string[] }) => `anim:${s.anim}${s.talk?.length ? `>${s.talk.join(',')}` : ''}`
@@ -112,8 +124,10 @@ export function finishStage(joined: number[], reward: number[], alive: Alive, ow
   PARTY.push(...joined)
   ITEMS.push(...reward)
   const scenes: string[] = [], notes: Note[] = []
-  for (const s of ownSteps ? [] : S.scenes.post[S.def.n] ?? []) {
+  const steps = ownSteps ? [] : S.scenes.post[S.def.n] ?? [], gold = goldAsked(steps)
+  for (const s of steps) {
     if (!applies(s)) continue
+    if (gold && ('take' in s && s.take === GOLD.gold || 'give' in s && s.give === GOLD.flute)) continue   // 「금괴조각주기」 결정 때 giveGold
     if ('scene' in s) scenes.push(s.scene)
     else if ('anim' in s) scenes.push(cutKey(s))
     else applyStep(s, notes, alive)
