@@ -19,7 +19,7 @@
 - `ECLIPSE.SCR` 87 — 0~42 장소 이름표, **43 대륙 지도 640×480**, 44~86 장 제목 띠 (확인, formats.md "대륙 지도")
 - `ECLIPSE.STA` 17 — 전투 UI 부품 (확인, ux.md): 0 커서 날개 지팡이, 1 차례 유닛 모서리 괄호, 2 공격 대상 틀, 3 십자 범위 틀, 5 범위 밖 디더, 6·7 상태 아이콘, 8 ⟺ 커서, 11 빨간 X, 12 Level Up, 13·14·15 진영 표시 (일행·NPC·적)
 - `ECLIPSE.OTH` 9 — 0·1 상태 아이콘, 3 Level Up, 4 「GO!! GO!!」 전투 시작 그림, 5 양피지 지도 아이콘, 7·8 전투 장면 스크린샷 (설명 화면 추정)
-- `ECLIPSE.MAR` 11 — 5 사망 연출 구멍 (56×48 × 6, 웹 battle-ui `die.0~5`), 7·8 도구 아이콘, 9 마법 아이콘 (formats.md, rules.md "사망")
+- `ECLIPSE.MAR` 11 — 3·4 투사체 가로·세로 (64칸씩, 웹 battle-ui `shot.h/v.N`), 5 사망 연출 구멍 (56×48 × 6, 웹 battle-ui `die.0~5`), 6 타격 표시 8종 (55×47), 7·8 도구 아이콘, 9 마법 아이콘 (formats.md, rules.md "사망")
 - `ECLIPSE.WIN` 3, `ECLIPSE.BS` 3, `ECLIPSE.780` 14 × 640×480 — WIN·BS 는 정비 화면 (formats.md), 780 = 「SKC 구락부」 제작진 캐리커처 소개 (여는 곳 미확인)
 - `ECPnn.MOV/FIG/MAG` (00~10) — 유닛 종류별 이동/공격/마법 애니메이션 (확인, formats.md)
 - `ECLIPSE1/2.SLI` 5 × 568×99 — 슬라이드/컷인 추정

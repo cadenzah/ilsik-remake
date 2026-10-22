@@ -268,6 +268,28 @@ function preloadSounds(units: Unit[]) {
   preload('e2', new Set(units.flatMap(u => u.type.magic)))
 }
 
+/** 투사체 무리 첫 칸 (원작 20ec:dd19, 0x1e2e): 무기 15~19 (화살) → (id − 15)·4, 79~89 (활·포) → (id − 74)·4. 그 밖은 그림 없음 */
+function shotBase(weapon: number) {
+  return weapon >= 15 && weapon <= 19 ? (weapon - 15) * 4 : weapon >= 79 && weapon <= 89 ? (weapon - 74) * 4 : -1
+}
+
+/** 투사체 비행 (원작 20ec:1750 → 24dc~2a68): 직선 경로 칸마다 (공격자 칸부터 중심 칸까지) 4걸음, 걸음마다 1틱, 두 장을 번갈아.
+ *  위·아래 = 세로 그림 (0·1 위, 2·3 아래), 왼쪽·오른쪽 = 가로 그림 (0·1 왼쪽, 2·3 오른쪽) (20ec:2008 → 201b~2066).
+ *  [근사] 걸음 위치 = 칸 사이를 1/4 씩 (원작 칸 안 오프셋 = 칸 크기/4 × 걸음), 마지막 칸에서 멈춤 */
+async function flyShot(a: Unit, c: Unit) {
+  const base = shotBase(a.type.equip[0])
+  const n = Math.abs(c.x - a.x) + Math.abs(c.y - a.y)
+  if (base < 0 || !n) return
+  const vert = a.facing === 'up' || a.facing === 'down'
+  const back = a.facing === 'down' || a.facing === 'right' ? 2 : 0
+  const dx = Math.sign(c.x - a.x), dy = Math.sign(c.y - a.y)
+  for (let j = 0; j <= n * 4; j++) {
+    S.shot = { name: `shot.${vert ? 'v' : 'h'}.${base + back + (j & 1)}`, x: a.x + dx * j / 4, y: a.y + dy * j / 4 }
+    await sleep(TICK * pace())
+  }
+  S.shot = null
+}
+
 /** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
 async function attack(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
@@ -281,9 +303,10 @@ async function attack(a: Unit, c: Unit) {
     await sleep(200 * pace())
     a.px = a.x; a.py = a.y
   } else play('e1', a.type.por)
-  // 포수: 포탄이 떨어질 때 폭발음 105 + (무기 − 87) (원작 20ec:33f2, 0x1e30 = 무기 id − 87, 20ec:e507). 투사체 그림이 아직 없어 공격음 뒤 잠시
+  // 궁수·추전수·포수: 공격자 칸에서 중심 칸까지 투사체가 날아간다. 포수는 떨어질 때 폭발음 105 + (무기 − 87) (원작 20ec:33f2, 0x1e30 = 무기 id − 87, 20ec:e507)
+  if (attackKind(a) >= 3) await flyShot(a, c)
   const shell = attackKind(a) === 3 ? a.type.equip[0] - 87 : -1
-  if (shell >= 0 && shell <= 2) { await sleep(240 * pace()); play('e1', SFX.cannon + shell) }
+  if (shell >= 0 && shell <= 2) play('e1', SFX.cannon + shell)
   const area = strikeArea(a) ? strikeCells(a, c) : []
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const hits: { target: Unit; value: number }[] = []

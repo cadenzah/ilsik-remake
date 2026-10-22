@@ -51,6 +51,7 @@ export const S = {
   // 마법 연출: 원작 ECLIPSE.MAG 프레임 (base = 마법 id×6) 을 칸마다 ring 박자 늦게 6장, 밑에 계열 색 칠하기. base < 0 = 칠하기만 (기사·포수 범위 공격)
   fx: null as { cells: (Pos & { ring: number })[]; base: number; step: number; color: string; t0: number; until: number } | null,
   holes: [] as (Pos & { f: number })[],   // 사망 연출 구멍 (ECLIPSE.MAR 5, 프레임 0~5)
+  shot: null as { name: string; x: number; y: number } | null,   // 날아가는 투사체 (battle-ui shot.v/h.N, x·y = 칸 단위 소수)
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }
 
