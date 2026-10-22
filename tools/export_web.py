@@ -263,7 +263,8 @@ def export_battle_ui():
     btn.0~5 = ECPBUT 0005 글자 버튼 (0 왼 1 오른 2 가운데 = 보통, 3·4·5 = 눌림), icon.N.S = ECPBUT 000N 아이콘 (상태 0 1 3 4),
     sta.N = ECLIPSE.STA (0 커서 1 차례 괄호 2 대상 틀 3 십자 5 디더 12 Level Up 13·14·15 진영), oth.N = ECLIPSE.OTH (3 Level Up 4 GO!! 5 양피지),
     die.0~5 = ECLIPSE.MAR 5번 시트 56×48 × 6칸 (간격 57, 테두리 1) — 사망 연출 구멍 (124e:0de0 적재, 20ec:09d8 재생),
-    shot.v.0~63 / shot.h.0~63 = ECLIPSE.MAR 4·3번 시트 투사체 (세로 10×20 · 가로 20×10), boom.0~11 = MAR 10 포탄 폭발 56×96"""
+    shot.v.0~63 / shot.h.0~63 = ECLIPSE.MAR 4·3번 시트 투사체 (세로 10×20 · 가로 20×10), boom.0~11 = MAR 10 포탄 폭발 56×96,
+    mark.0~7 = MAR 6 타격 표시 55×47, arrow.0~11 = MAR 0 꽂힌 화살 15×15"""
     import frtwnd
     pal = frtwnd.palette(os.path.join(ROOT, 'original', 'ECLIPSE.WIN'), 2)
     parts = []
@@ -294,6 +295,11 @@ def export_battle_ui():
     for k in range(12):
         x, y = 1 + k % 10 * 57, 1 + k // 10 * 97
         parts.append((f'boom.{k}', im.crop((x, y, x + 56, y + 96))))
+    # 화살 명중 (20ec:2a92): mark.0~7 = MAR 6 타격 표시 55×47 (+0xba4, 화살은 2·3), arrow.0~11 = MAR 0 꽂힌 화살 15×15 (+0x1171, 방향 3장씩)
+    for f, pre, w, h, n in ((6, 'mark', 55, 47, 8), (0, 'arrow', 15, 15, 12)):
+        im = rgba(os.path.join(IMG, 'ECLIPSE.MAR', f'{f:03d}.png'))
+        for k in range(n):
+            parts.append((f'{pre}.{k}', im.crop((1 + k * (w + 1), 1, 1 + k * (w + 1) + w, 1 + h))))
     # 선반 배치 (높이 순), 너비 1024
     parts.sort(key=lambda p: -p[1].height)
     rects, x, y, row, W = {}, 0, 0, 0, 1024

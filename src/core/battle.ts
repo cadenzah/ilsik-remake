@@ -1,5 +1,5 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
+import { TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable, terrainName } from './grid'
@@ -302,6 +302,35 @@ async function explode(k: number, cells: Pos[]) {
   S.boom = null
 }
 
+/** 화살 명중 (원작 20ec:2a92~330c). 날아온 쪽 = 공격자가 보는 쪽 (20ec:1990: 같은 행 3칸 안 = 왼쪽·오른쪽, 아니면 위·아래).
+ *  맞은 유닛이 공격자를 보는 걷기 칸 (아래 1·위 3·왼쪽 5·오른쪽 7) + MAR 6 프레임 2 → 무기 든 자세 (9·10·11·12) 로 날아온 쪽으로 1/4 칸 밀리며 프레임 3, 각 3틱 (게임 +0x1ca2 = 3).
+ *  궁수만 이어서 꽂힌 화살 MAR 0 (날아온 방향 아래 0·위 3·왼쪽 6·오른쪽 9 부터 3장) 을 1틱씩. 화살 자리 (bp−0x2f0·2f2) 는 원작 그대로 — 아래로 쏘면 (0, 0) 이라 칸 왼위 (버그 추정) */
+const FACE_WALK = { down: 1, up: 3, left: 5, right: 7 }
+const FACE_POSE = { down: 9, up: 10, left: 11, right: 12 }
+const OPPOSITE = { down: 'up', up: 'down', left: 'right', right: 'left' } as const
+async function arrowHit(a: Unit, t: Unit, archer: boolean) {
+  const dir = a.facing, face = OPPOSITE[dir]
+  const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0, dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0
+  t.frame = FACE_WALK[face]
+  S.spark = { name: 'mark.2', x: t.x, y: t.y, ox: 0, oy: 0 }
+  await sleep(TICK * 3 * pace())
+  t.px = t.x + dx / 4; t.py = t.y + dy / 4
+  t.frame = FACE_POSE[face]
+  S.spark = { name: 'mark.3', x: t.px, y: t.py, ox: 0, oy: 0 }
+  await sleep(TICK * 3 * pace())
+  if (archer) {
+    const base = { down: 0, up: 3, left: 6, right: 9 }[dir]
+    const [ox, oy] = { down: [0, 0], up: [20, TW / 2 - 5], right: [TW / 2 - 10, 17], left: [TW / 2 - 5, 17] }[dir]
+    for (let i = 0; i < 3; i++) {
+      S.spark = { name: `arrow.${base + i}`, x: t.px, y: t.py, ox, oy }
+      await sleep(TICK * pace())
+    }
+  }
+  S.spark = null
+  t.frame = undefined
+  t.px = t.x; t.py = t.y
+}
+
 /** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
 async function attack(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
@@ -319,6 +348,7 @@ async function attack(a: Unit, c: Unit) {
   if (attackKind(a) >= 3) await flyShot(a, c)
   const area = strikeArea(a) ? strikeCells(a, c) : []
   if (attackKind(a) === 3) await explode(a.type.equip[0] - 87, area)
+  else if (attackKind(a) >= 4 && c !== a) await arrowHit(a, c, attackKind(a) === 4)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const hits: { target: Unit; value: number }[] = []
   for (const t of targets) {

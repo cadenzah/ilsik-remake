@@ -53,6 +53,7 @@ export const S = {
   holes: [] as (Pos & { f: number })[],   // 사망 연출 구멍 (ECLIPSE.MAR 5, 프레임 0~5)
   shot: null as { name: string; x: number; y: number } | null,   // 날아가는 투사체 (battle-ui shot.v/h.N, x·y = 칸 단위 소수)
   boom: null as { cells: Pos[]; f: number } | null,               // 포탄 폭발 (battle-ui boom.f, 56×96 을 칸마다 한 칸 위로 걸쳐)
+  spark: null as { name: string; x: number; y: number; ox: number; oy: number } | null,   // 화살 명중 표시 (mark.N·arrow.N, 칸 x·y 왼위 + ox·oy px)
   floats: [] as { x: number; y: number; text: string; t0: number; color: string }[],
 }
 

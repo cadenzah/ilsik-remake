@@ -272,6 +272,8 @@ export function frame(now: number) {
   }
   // 포탄 폭발 (원작 20ec:330f): 범위 칸마다 칸 왼위 − 48 (y − 0x30) 에
   if (S.boom) for (const c of S.boom.cells) piece(ctx, `boom.${S.boom.f}`, c.x * TW, c.y * TH - TH)
+  // 화살 명중 (원작 20ec:2a92): 맞은 유닛 위에 타격 표시 · 꽂힌 화살
+  if (S.spark) piece(ctx, S.spark.name, Math.round(S.spark.x * TW + S.spark.ox), Math.round(S.spark.y * TH + S.spark.oy))
   if (modern) {   // 고른 유닛 = 금빛 테두리, 공격 대상 = 빨간 테두리
     if (turnUnit) { ctx.strokeStyle = `rgba(252,180,44,${0.6 + 0.4 * Math.sin(now / 180)})`; ctx.lineWidth = 3; ctx.strokeRect(turnUnit.px * TW + 2, turnUnit.py * TH + 2, TW - 4, TH - 4) }
     if (S.aim) { ctx.strokeStyle = '#e04020'; ctx.lineWidth = 3; ctx.strokeRect(S.aim.x * TW + 2, S.aim.y * TH + 2, TW - 4, TH - 4) }
