@@ -16,6 +16,7 @@ def chapter_lines(n):
     keys += [d['scene'] for r in BT['cond'].get(str(n), []) for d in r['do'] if isinstance(d, dict) and 'scene' in d]
     keys += [d['scene'] for e in BT['turn'].get(str(n), []) for d in e.get('do', []) if isinstance(d, dict) and 'scene' in d]
     keys += [e['scene'] for e in SC['post'].get(str(n), []) if 'scene' in e]
+    keys += [k for e in SC['post'].get(str(n), []) for k in e.get('talk', [])]   # 컷신 도중 대화 (anim talk)
     return {l: br for k in keys for _, l, br in SC['scenes'].get(k, [])}
 
 
