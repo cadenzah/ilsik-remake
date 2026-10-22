@@ -6,10 +6,11 @@
 //   두 번 클릭·E = 장착, Del = 버리기, 끌어서 도구 칸·명단 인물에 놓기 = 장착, 도구 칸을 소지품으로 끌기 = 해제.
 //   ↑↓←→ = 목록 안 이동, Tab = 다음 무리, Enter = 출전 확인, Esc = 고른 것 풀기·창 닫기.
 import { STAT_NAMES, type Item, type UnitType } from './data'
-import { canEquip, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
+import { TEMPLE_ASK, canEquip, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
+import { SFX, play } from './sfx'
 import { SETTINGS, setSetting, setting } from './settings'
 import { esc } from './ui'
 import { equippedStats, type Stats } from './unit'
@@ -348,7 +349,12 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     settings: () => openSettings(),
     quit: () => ask('타이틀로', '정비 화면을 닫고 타이틀로 돌아갑니다.', [['타이틀로', () => finish({ go: 'title' })], ['취소', () => {}]]),
   }
-  const go = () => ask('출전', `${sel.length}명으로 전투를 시작합니다.`, [['출전', () => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip) })], ['취소', () => {}]])
+  const fight = (temple?: boolean) => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip), temple })
+  const temple = () => {   // 「탐험계속?」 (camp.ts templeWin 과 같은 질문). 닫기 = 취소
+    play('e1', SFX.upgrade)
+    ask('탐험계속', TEMPLE_ASK.join(''), [['성전으로', () => fight(true)], ['지나간다', () => fight(false)]], () => fight(false))
+  }
+  const go = () => ask('출전', `${sel.length}명으로 전투를 시작합니다.`, [['출전', () => o.temple?.(items) ? temple() : fight()], ['취소', () => {}]])
 
   // 설정 (타이틀 '설정' 과 같은 스위치). 글꼴은 바로, '개선된 UI' 는 창을 닫을 때 정비 화면을 바꿔 다시 연다
   const modern0 = setting('modernUi')

@@ -337,6 +337,9 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #camp .desc .say { position: static; width: 152px; margin: 4px 6px; font-size: 12px; line-height: 16px; color: #000; text-shadow: -1px 0 #aaa; 
   white-space: pre-line; word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }   /* 칸 = 3줄 */
 #camp .icon { display: block; width: 48px; height: 56px; background-image: url(/assets/ui/equip.png); }
+/* 「탐험계속?」 알림 (camp.ts templeWin, 원작 level 창 안쪽 원점 (9,13)): 그림 (0,8), 글 (70,0) 다섯 줄 (원작 20 간격, 웹 17) */
+#camp .note .icon { position: absolute; left: 9px; top: 21px; }
+#camp .note p { position: absolute; left: 79px; top: 12px; margin: 0; line-height: 17px; white-space: nowrap; color: #000; }
 #camp .spr { display: block; }
 #camp .por { display: block; background: url(/assets/ui/camp-por.png); }
 #camp .mg, #camp .mgi { background-image: url(/assets/ui/magic-icons.png); }

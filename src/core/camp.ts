@@ -14,10 +14,11 @@ import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
+import { SFX, play } from './sfx'
 import { SETTINGS, setSetting, setting } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
-export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] } | { go: 'title' } | { go: 'load'; slot: number }
+export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][]; temple?: boolean } | { go: 'title' } | { go: 'load'; slot: number }
   | { go: 'restyle'; deploy: number[]; items: number[]; equip: UnitType['equip'][] }   // 현대식 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시 연다
 
 export interface CampOptions {
@@ -32,7 +33,12 @@ export interface CampOptions {
   preview?: string    // 개선판: 도구설명 칸에 처음 보일 다음 장 이름·목표 (ux-proposal.md 23)
   modern?: boolean    // 현대식 화면 (campModern.ts)
   header?: { title: string; goal?: string }   // 현대식 위 바: 장 이름·목표
+  /** 출발을 정한 뒤 그때 소지품으로 true 면 「탐험계속?」 을 묻고 답을 결과 temple 로 (battle.ts 환의 성전: 다음 장 40장 + 지도 넷) */
+  temple?: (items: number[]) => boolean
 }
+
+/** 원작 알림 창 0aa2:12f2 모드 4 의 글 (DS 0xaf5~0xb22, 다섯 조각 = 다섯 줄, 이으면 한 문장). 뒤이어 확인창 「선택하세요」 [결정][취소], 효과음 ECLIPSE1 110 */
+export const TEMPLE_ASK = ['성전으로 들', '어갈 수 있', '는 지도를 ', '완성했다. ', '탐험계속?']
 
 // 원작 좌표 (화면)
 const WAIT = { x: 26, y: 376, dx: 47, dy: 46, cols: 7, w: 46, h: 39 }   // 대기 격자 BS 2, 7열 × 2줄
@@ -330,7 +336,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   }
 
   // ---- 확인창 (원작 0aa2:0c58, 화면 좌표) ----
-  const confirm = (title: string, y: number, ok: () => void, x = 500) => {
+  const confirm = (title: string, y: number, ok: () => void, x = 500, no?: () => void) => {
     dialog = document.createElement('div')
     dialog.className = 'dlg owin'
     dialog.style.cssText = px(x, y, 136, 66) + `;background-image:url(${winUrl('comma', 136, 66)})`
@@ -338,8 +344,21 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     stage.append(dialog)
     const close = () => { dialog?.remove(); dialog = null }
     dialog.querySelector<HTMLButtonElement>('.ok')!.onclick = () => { close(); ok() }
-    dialog.querySelector<HTMLButtonElement>('.no')!.onclick = close
+    dialog.querySelector<HTMLButtonElement>('.no')!.onclick = () => { close(); no?.() }
     dialog.querySelector<HTMLButtonElement>('.ok')!.focus()
+  }
+
+  /** 「탐험계속?」 (원작 0aa2:12f2 모드 4 → 0aa2:0c58): ECPLEV "level" 창 (172,100) 185×110, 안쪽 (0,8) 에 그림 [근사: 동의지도 아이콘],
+   *  (70, 0·20·…·80) 에 글 다섯 조각 (웹은 줄 간격 17 — 20 이면 아래 테두리에 걸림), 효과음 110, 이어서 확인창 「선택하세요」 (245,238) [결정][취소]. 오른쪽 클릭·Esc = 취소 */
+  const templeWin = (answer: (go: boolean) => void) => {
+    play('e1', SFX.upgrade)
+    const note = document.createElement('div')
+    note.className = 'owin note'
+    note.style.cssText = px(172, 100, 185, 110) + `;background-image:url(${winUrl('level', 185, 110)})`
+    note.innerHTML = `${icon(175)}<p>${TEMPLE_ASK.map(esc).join('<br>')}</p>`
+    stage.append(note)
+    const end = (go: boolean) => { note.remove(); answer(go) }
+    confirm('선택하세요', 238, () => end(true), 245, () => end(false))
   }
 
   /** 원작 「불러오기」·「자료저장」 창 (DOSBox c13·c14): 칸 이름 버튼 3개 (빈 칸 = 무기록) + 종료. needFull = 빈 칸은 못 고름 */
@@ -386,7 +405,11 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       if (r.go === 'title') { done(r); return }   // 타이틀로는 toTitle 이 어둡게 한 뒤 새로 불러온다
       void fadeOut().then(() => { root.remove(); done(r) })
     }
-    const fight = () => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip) })
+    const fight = () => {
+      const go = (temple?: boolean) => finish({ go: 'battle', deploy: [...sel], items, equip: party.map(t => t.equip), temple })
+      if (o.temple?.(items)) templeWin(go)
+      else go()
+    }
     const act = () => {
       if (!sel.length) return   // 원작: 출전 수 0 이면 아무 반응 없음
       confirm('여행계속', 313, fight)   // 두 판 모두 확인 뒤 전투

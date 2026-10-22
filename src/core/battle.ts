@@ -92,6 +92,13 @@ let atStart: Camp   // 이 장을 시작할 때 장 사이 상태. 다시 하기
 let askDeploy = true   // ?stage=N 로 바로 연 판은 출전 선택 없이 앞에서부터
 /** 개발·자동 검증 (?nocamp): 일행을 주고도 정비 화면 없이 앞에서부터 출전 */
 export const skipDeploy = () => { askDeploy = false }
+let carryDeploy: number[] | null = null   // 40장을 건너뛸 때 40장 정비 화면에서 고른 출전을 41장에 그대로 (원작은 정비 화면 한 번)
+
+/** 환의 성전 (40장) 과 네 지도 (원작 124e:a2cf~a449, formats.md 정비 화면): '여행계속' 뒤 다음 장이 40장이면
+ *  동·남·서·북의지도 (175~178) 넷이 다 있을 때 「탐험계속?」 (정비 화면이 물음) [결정] = 40장 / [취소] = 건너뜀, 어느 쪽이든 지도 넷을 지운다. 넷이 아니면 묻지 않고 건너뜀.
+ *  원작은 B 루트를 0xf44 표 오기로 39장 자리에서 건너뛰지만 웹은 두 판 모두 A·C 규칙 (사용자 결정 2026-10-23) */
+const TEMPLE = 40, MAPS = [175, 176, 177, 178]
+const allMaps = (items: number[]) => items.filter(i => MAPS.includes(i)).length === 4
 
 /** 장을 불러와 시작한다. 결과 화면에서 다음 장으로 갈 때 다시 불린다.
  *  camp: 장 사이 상태 (null = 캠페인 밖 기본값). 없으면 지금 상태 그대로 (다음 장) */
@@ -125,6 +132,9 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     restore(resume.at)
     atStart = snapshot()
     S.deploy = resume.deploy
+  } else if (carryDeploy) {
+    S.deploy = carryDeploy.filter(i => i < PARTY.length).slice(0, max)
+    carryDeploy = null
   } else if (askDeploy) {   // 두 판 모두 전투마다 정비 화면
     const goal = chapter()?.card?.[1]
     const keep = (r: { items: number[]; equip: UnitType['equip'][] }) => {   // 정비 화면에서 고친 소지품·장비
@@ -135,6 +145,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     playMusic(SONG.camp)   // 124e:8994: 정비 화면 곡, 나갈 때 멈춤 (대륙 지도는 무음)
     for (;;) {   // restyle = 현대식 정비 화면 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시
       r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
+        temple: def.campaign && def.n === TEMPLE && !extra ? allMaps : undefined,
         preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
         slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
           const base = snapshot(), rec = { ...base.equip }
@@ -154,6 +165,12 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     if (r.go !== 'battle') return
     S.deploy = r.deploy
     keep(r)
+    if (def.campaign && def.n === TEMPLE && !extra) {
+      const enter = allMaps(ITEMS) && !!r.temple
+      if (allMaps(ITEMS)) ITEMS.splice(0, ITEMS.length, ...ITEMS.filter(i => !MAPS.includes(i)))
+      const next = nextStage(TEMPLE, def.route)
+      if (!enter && next && 'n' in next) { carryDeploy = S.deploy; void boot(ed, stageDef(next.n, next.route, true)); return }
+    }
     atStart = snapshot()   // 다시 하기는 정비 화면에서 고친 소지품·장비로
   }
   if (!resume) for (const i of promoteDeployed(S.deploy)) {   // 원작: 정비 화면 뒤 애슬 전직 장면 (도구 미지의책), 그 뒤 대륙 지도
