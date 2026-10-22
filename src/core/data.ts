@@ -28,6 +28,7 @@ export const STAT_NAMES = ['없음', '생명', '정신', '역량', '방어', '�
 export interface Magic {
   id: number; school: number; name: string
   range: number; area: number; effect: number; power: number; fatigue: number
+  echo?: boolean   // 원작판 마법 직업의 '전투' = 마지막으로 고른 마법을 무기 사거리·범위로 (battle.ts echoSpell). 중심 칸에 대상편 유닛이 있어야 한다
 }
 
 /** 마법 효과 번호 이름 (EXE DS:0x1266) */

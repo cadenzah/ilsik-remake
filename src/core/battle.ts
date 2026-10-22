@@ -1180,7 +1180,7 @@ export function commandMenu(u: Unit) {
   showMenu([
     ...spellsOf(u).length ? [['마법', () => magicMenu(u, here, () => commandMenu(u))] as Btn] : [],
     ['이동', () => select(u)],
-    ['전투', () => { S.mode = { kind: 'targeting', unit: u, from: here } }],   // 원작: 사거리에 적이 없어도 들어간다
+    ['전투', () => fightMode(u, here)],   // 원작: 사거리에 적이 없어도 들어간다
     ['상황', () => { const p = beside(u); showBasic(u, { x: p.x, y: p.y }, { onFace: () => bigStatus(u) }) }],
     ['시스템', () => systemMenu(beside(u), u)],
   ], beside(u).x, beside(u).y)
@@ -1228,7 +1228,7 @@ export function actionMenu(u: Unit, from: Pos) {
   const items: Btn[] = remake()
     ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ...magic, ['대기', () => finishUnit(u)],
       ['상태', () => bigStatus(u, () => actionMenu(u, from))], ['취소', undo]]   // 상태 = 터치 기기용 (마우스는 올리면 작은 창)
-    : [...magic, ['전투', () => { S.mode = { kind: 'targeting', unit: u, from } }], ['결정', () => finishUnit(u)], ['취소', undo]]
+    : [...magic, ['전투', () => fightMode(u, from)], ['결정', () => finishUnit(u)], ['취소', undo]]
   const p = beside(u)
   showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() })
 }
@@ -1243,9 +1243,31 @@ export async function doAttack(u: Unit, target: Unit) {
 
 // ---------- 마법 ----------
 
-/** 고를 수 있는 중심 칸: 사거리 안이고 범위에 대상편이 있다 */
+/** 고를 수 있는 중심 칸: 사거리 안이고 범위에 대상편이 있다. 원작판 '전투' 의 마법은 중심 칸 자체에 대상편이 서 있어야 (칸 표시 == 대상편, 20ec:0358) */
 function validCenter(u: Unit, m: Magic, c: Pos) {
+  if (m.echo) {
+    const o = unitAt(c.x, c.y), foe = S.ed.rules.spellSide(m) === 'foe'
+    if (m.id < 0 || !o || (foe ? o.side === u.side : o.side !== u.side)) return false
+  }
   return inSpellRange(S.ed.rules, m, u, c) && spellTargets(S.ed.rules, u, m, c).length > 0
+}
+
+/** 마지막으로 마법 창에서 고른 마법 (원작 전투 구조체 0x1e30·0x1e64·0x1e66 — 124e:c194·c1ac·2fb7 에서 고를 때만 바뀜, AI 는 안 건드림).
+ *  구조체는 프로그램을 켤 때 한 번 생겨 장·유닛을 넘어 남는다 → 웹은 페이지를 열어 둔 동안 (세이브에 없음) */
+let lastSpell: Magic | null = null
+
+/** 원작판 마법 직업 (공격 유형 1) 의 '전투' [확정 2026-10-22, 20ec:d900·ddd9·e3df → 6e92 종류 1 = 5c0f 마법]:
+ *  마지막으로 고른 마법을 사거리 = 무기 f2 (0 이면 자기 칸만), 범위 = 무기 f3 로 다시 건다. 시전 조건 (피로) 은 보지 않고 피로는 마법식.
+ *  마법 직업 무기 (장·책·부적·훈장·하프) 는 모두 f2 = 0 → 마지막 마법이 아군 대상이면 자기 칸 중심, 적 대상·처음 (0x1e64 = 0) 이면 고를 칸이 없다 */
+function echoSpell(u: Unit): Magic {
+  const w = S.tables.items.get(u.type.equip[0])
+  const base = lastSpell ?? { id: -1, school: 0, name: '', range: 0, area: 0, effect: 0, power: 0, fatigue: 0 }
+  return { ...base, range: w?.f2 ?? 1, area: w?.f3 ?? 0, echo: true }
+}
+
+/** 원작판 '전투' 칸 고르기. 마법 직업은 마지막 마법 (echoSpell) */
+function fightMode(u: Unit, from: Pos) {
+  S.mode = attackKind(u) === 1 && !remake() ? { kind: 'targeting', unit: u, from, magic: echoSpell(u) } : { kind: 'targeting', unit: u, from }
 }
 
 /** 마법 목록 「마법」. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다.
@@ -1254,7 +1276,7 @@ function validCenter(u: Unit, m: Magic, c: Pos) {
 function magicMenu(u: Unit, from: Pos, onBack: () => void) {
   const list = spellsOf(u)
   const usable = (m: Magic) => S.ed.rules.canCast(u, m) && (!remake() || spellCenters(S.ed.rules, u, m).length > 0)
-  const pick = (m: Magic) => { closeWin('menu'); S.mode = { kind: 'targeting', unit: u, from, magic: m } }
+  const pick = (m: Magic) => { closeWin('menu'); lastSpell = m; S.mode = { kind: 'targeting', unit: u, from, magic: m } }
   if (!remake()) {
     openWin({ title: '마법', kind: 'menu', at: beside(u), btnW: 112,
       buttons: list.map((m): Btn => [m.name, () => pick(m), { disabled: !usable(m), title: spellDesc(m) }]),
@@ -1303,7 +1325,7 @@ function askMagic(u: Unit, m: Magic, c: Pos) {
   const go = () => { S.aim = null; void doMagic(u, m, c) }
   if (remake() ? setting('quickAttack') : !S.notice) { go(); return }
   const { sx, sy } = toScreen(c.x + 1, c.y)
-  confirmWin('마 법', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, body ? 240 : undefined)
+  confirmWin(m.echo ? '전 투' : '마 법', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, body ? 240 : undefined)
 }
 
 async function doMagic(u: Unit, m: Magic, c: Pos) {
