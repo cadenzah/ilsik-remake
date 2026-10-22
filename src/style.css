@@ -527,6 +527,18 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #fade { position: fixed; inset: 0; z-index: 1000; background: #000; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 #fade.on { opacity: 1; pointer-events: auto; }
 
+/* 원작판 「마법일람표」 (battle.ts magicWinOriginal): 제목은 창틀 그림 안 글자. 글자 = 원작 색 (이름 회색 그림자 + 검정, 아군 효과 EGA 9 + 1, 그 밖 EGA 4 두 번) */
+.magicwin .mgi, .magicwin .mgbig { all: unset; position: absolute; width: 32px; height: 40px; background: url(/assets/ui/magic-icons.png) no-repeat; image-rendering: pixelated; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.magicwin .mgbig { box-shadow: 1px 1px 0 #000; }
+.magicwin .mgbig.down { transform: translate(1px, 1px); box-shadow: -1px -1px 0 #fff; }
+.magicwin .mgbig[aria-disabled] { cursor: default; opacity: .5; }
+.magicwin .mgsep { position: absolute; width: 139px; height: 1px; background: #000; }
+.magicwin .mgname, .magicwin .mgfx { position: absolute; white-space: nowrap; line-height: 16px; }
+.magicwin .mgname { text-shadow: -1px 0 #aaa; }
+.magicwin .mgfx.own { color: #0000aa; text-shadow: -1px 0 #5555ff; }
+.magicwin .mgfx.foe { color: #aa0000; text-shadow: -1px 0 #aa0000; }
+html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; position: absolute; left: 0; right: 0; top: 4px; text-align: center; font-size: 13px; line-height: 18px; color: var(--ec-text); }
+
 /* 개선판 마법 목록 (battle.ts magicMenu): 아이콘·이름·효과·사거리를 늘 보인다 (터치 기기엔 올리기가 없다). 원작 창틀·현대식 둘 다 양피지 위 */
 .owin .b:has(> .mglist) { left: 8px; right: 8px; text-align: left; text-shadow: none; overflow: visible; }
 .mglist { height: 100%; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 4px; padding-right: 2px; scrollbar-width: thin; }

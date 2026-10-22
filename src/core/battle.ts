@@ -1,5 +1,5 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
+import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable, terrainName } from './grid'
@@ -14,7 +14,7 @@ import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
-import { loadSkin, pieceUrl } from './skin'
+import { loadSkin, pieceUrl, winUrl } from './skin'
 import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
@@ -1270,19 +1270,14 @@ function fightMode(u: Unit, from: Pos) {
   S.mode = attackKind(u) === 1 && !remake() ? { kind: 'targeting', unit: u, from, magic: echoSpell(u) } : { kind: 'targeting', unit: u, from }
 }
 
-/** 마법 목록 「마법」. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다.
- *  원작판: comma 창 글자 버튼 [근사] (원작 마법 창 ECPMAG 모양은 미확인).
+/** 마법 목록. 피로가 모자라면 (피로 + 마법 피로 > 90) 못 고른다.
+ *  원작판: 「마법일람표」 창 (magicWinOriginal).
  *  개선판: 아이콘 (MAR 9) · 이름 · 효과 · 사거리·범위·피로를 늘 보이는 목록 (터치 기기는 올리기가 없어 설명을 숨기지 않는다). 못 쓰면 까닭을 붉게 */
 function magicMenu(u: Unit, from: Pos, onBack: () => void) {
   const list = spellsOf(u)
   const usable = (m: Magic) => S.ed.rules.canCast(u, m) && (!remake() || spellCenters(S.ed.rules, u, m).length > 0)
   const pick = (m: Magic) => { closeWin('menu'); lastSpell = m; S.mode = { kind: 'targeting', unit: u, from, magic: m } }
-  if (!remake()) {
-    openWin({ title: '마법', kind: 'menu', at: beside(u), btnW: 112,
-      buttons: list.map((m): Btn => [m.name, () => pick(m), { disabled: !usable(m), title: spellDesc(m) }]),
-      onBack: () => { closeWin('menu'); onBack() } })
-    return
-  }
+  if (!remake()) { magicWinOriginal(list, usable, pick, beside(u), () => { closeWin('menu'); onBack() }); return }
   const m0 = mapRect(), ROW = 50
   const rows = list.map((m, i) => {
     const inf = spellInfo(S.ed.rules, m), ok = usable(m)
@@ -1311,6 +1306,54 @@ function magicMenu(u: Unit, from: Pos, onBack: () => void) {
     }
   })
   ;(btns.find(b => !b.getAttribute('aria-disabled')) ?? btns[0])?.focus({ preventScroll: true })
+}
+
+/** 원작판 「마법일람표」 (ECPMAG "magic", 124e:b5c6) [확정]: 바깥 157×184 (3cd3:53de 인자 = 바깥 크기), 안쪽 원점 (9,24) = 옆 변 폭·위 띠 높이 + 1.
+ *  안쪽 좌표로: 아이콘 4열 (0,0)~ 33×41 간격 (0aa2:0435), y 90 검은 가름줄. 고른 마법 = 큰 아이콘 (10,100) + 검은 그림자 선 (x 42·y 140),
+ *  이름 (55,103), 효과 이름 (55,123) 아군 효과 (0~6·14) 파랑·그 밖 빨강. 처음 고른 것 = 0번, 표시는 아래 칸뿐.
+ *  아이콘 클릭 = 고르기, 큰 아이콘 클릭 = 흰 선 + 1px 밀림 200ms 뒤 시전, 오른쪽 클릭 = 취소.
+ *  웹 보탬: 피로가 모자란 마법은 큰 아이콘이 흐리고 눌리지 않는다 (원작 창은 막지 않음, 피로 검사는 시전 처리 124e:3481 쪽 [추정]), ←→↑↓·Enter */
+function magicWinOriginal(list: Magic[], usable: (m: Magic) => boolean, pick: (m: Magic) => void, at: Pos, onBack: () => void) {
+  const W = 157, H = 184, X = 9, Y = 24
+  const el = openWin({ kind: 'menu', at, width: W, body: ' ', bodyH: H - 44, onBack })
+  el.classList.add('magicwin')
+  el.style.backgroundImage = `url(${winUrl('magic', W, H)})`
+  el.querySelector('.b')?.remove()
+  const pos = (x: number, y: number) => `left:${X + x}px;top:${Y + y}px`
+  el.insertAdjacentHTML('beforeend', list.map((m, i) =>
+    `<button class="mgi" title="${esc(spellDesc(m))}" style="${pos(33 * (i % 4), 41 * Math.floor(i / 4))};background-position:-${m.id * 32}px 0"></button>`).join('')
+    + `<i class="mgsep" style="${pos(0, 90)}"></i><button class="mgbig" style="${pos(10, 100)}"></button>`
+    + `<span class="mgname" style="${pos(55, 103)}"></span><span class="mgfx" style="${pos(55, 123)}"></span>`)
+  const big = el.querySelector<HTMLButtonElement>('.mgbig')!
+  const name = el.querySelector<HTMLElement>('.mgname')!, fx = el.querySelector<HTMLElement>('.mgfx')!
+  let sel = 0, busy = false
+  const show = (i: number) => {
+    sel = i
+    const m = list[i]
+    big.style.backgroundPosition = `-${m.id * 32}px 0`
+    big.title = spellDesc(m)
+    big.setAttribute('aria-label', m.name)
+    big.toggleAttribute('aria-disabled', !usable(m))
+    name.textContent = m.name
+    fx.textContent = MAGIC_EFFECTS[m.effect] ?? ''
+    fx.className = `mgfx ${m.effect <= 6 || m.effect === 14 ? 'own' : 'foe'}`
+  }
+  el.querySelectorAll<HTMLButtonElement>('.mgi').forEach((b, i) => { b.onclick = e => { e.stopPropagation(); if (!busy) show(i); big.focus({ preventScroll: true }) } })
+  big.onclick = e => {
+    e.stopPropagation()
+    if (busy || big.hasAttribute('aria-disabled')) return
+    busy = true
+    big.classList.add('down')
+    setTimeout(() => pick(list[sel]), 200)
+  }
+  el.onkeydown = e => {
+    const d = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -4, ArrowDown: 4 }[e.key]
+    if (d === undefined || busy) return
+    e.preventDefault(); e.stopPropagation()
+    if (sel + d >= 0 && sel + d < list.length) show(sel + d)
+  }
+  show(0)
+  big.focus({ preventScroll: true })
 }
 
 /** 「마 법」 확인 (원작 DS:0x1f6a, 알림을 열었을 때만). 개선판은 대상마다 예측 줄 */

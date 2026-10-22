@@ -47,14 +47,28 @@ const SEGMENTS: Record<string, [number, number][]> = {
   'speak.1': [[63, 71], [269, 277]], 'speak.6': [[63, 71], [269, 277]],   // 대화창 위·아래 (8픽셀 주기, 가운데 장식 유지)
   'speak.7': [[20, 32]], 'speak.8': [[20, 32]],
   'basic.1': [[7, 15], [129, 137]], 'basic.6': [[7, 15]],   // 인물기본자료 제목 띠 양옆 (8픽셀 주기, 제목 글자 유지)
+  // 마법일람표 옆 변 96 → 152: 2픽셀 주기 줄무늬 7곳을 8씩 (이음매 없이)
+  'magic.7': [[12, 14], [22, 24], [32, 34], [42, 44], [52, 54], [62, 64], [72, 74]],
+  'magic.8': [[12, 14], [22, 24], [32, 34], [42, 44], [52, 54], [62, 64], [72, 74]],
+}
+
+/** 덜어 낼 구간: 줄일 길이가 구간 합과 같으면 이것만 뺀다 (마법일람표 위·아래 띠 143 → 139, 2픽셀 주기 자리) */
+const CUTS: Record<string, [number, number][]> = {
+  'magic.1': [[24, 26], [114, 116]], 'magic.6': [[24, 26], [114, 116]],
 }
 
 /** 긴 조각을 len 으로 늘리거나 줄인다. horizontal = 가로 변. 구간이 없으면 바둑판 */
 export function strip(ctx: CanvasRenderingContext2D, name: string, x: number, y: number, len: number, horizontal: boolean) {
   const { w, h } = size(name)
-  const full = horizontal ? w : h, segs = SEGMENTS[name]
+  const full = horizontal ? w : h, segs = SEGMENTS[name], cuts = CUTS[name]
   const put = (from: number, n: number, at: number) =>
     horizontal ? part(ctx, name, from, 0, n, h, x + at, y) : part(ctx, name, 0, from, w, n, x, y + at)
+  if (cuts && cuts.reduce((n, [a, b]) => n + b - a, 0) === full - len) {
+    let src = 0, at = 0
+    for (const [a, b] of cuts) { put(src, a - src, at); at += a - src; src = b }
+    put(src, full - src, at)
+    return
+  }
   if (!segs) { horizontal ? tile(ctx, name, x, y, len, h) : tile(ctx, name, x, y, w, len); return }
   if (len <= full) {   // 줄이기: 양끝을 남기고 가운데를 덜어 낸다
     const a = Math.ceil(len / 2)
