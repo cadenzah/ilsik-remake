@@ -1,6 +1,6 @@
 # 현재 상태 (덮어쓰기로 갱신)
 브랜치: **main** (2026-10-23 부터 원래 폴더 `/Users/cadenzah/eclipse-web` 에서 바로, 작업 트리 main-remaining 은 정리함). story-rework 는 미커밋분을 WIP 커밋 (8a5f8f3) 으로 남겨 둔 채 보류 — 나중에 다시. origin/main 보다 앞섬, push 는 요청 때만
-최근 (2026-10-23): 원작 마법 직업 AI (124e:284a) 해독·원작판 반영 — 물리 공격 없음, 16효과 우선순위·첫 마법·피로 90, 대상 조건·정렬, 못 닿으면 걸어가기 (editions/original/ai.ts casterPlan, 개선판은 예전 점수식). 그 전: 17장 OTH 8, 정비 화면 「음악」, 9장 선택지, 40장
-다음: 제작진 캐리커처 (ECLIPSE.780, 0aa2:3384) 를 어디서 여는지 → 물리 쪽 AI (124e:4d43) 대상 점수 → 전투 중 트리거 조건 상세. 사용자 결정: 원작 행동 순서 (민첩 키)·B1 제안·개선판 17장 그림. ecs_check 문제 12 (전부터)
+최근 (2026-10-23): 두 판 AI 분리 — 원작판 = 원작 AI 그대로 (editions/original/ai.ts: 마법 직업 124e:284a + 물리 124e:4d43 해독 반영), 개선판 = 점수식 (editions/remake/ai.ts). 부대 상태·휴식 aiGate 는 공통. 그 전: 17장 OTH 8, 정비 화면 「음악」, 9장 선택지, 40장
+다음: 제작진 캐리커처 (ECLIPSE.780, 0aa2:3384) 를 어디서 여는지 → 전투 중 트리거 조건 상세 → AI 피로 > 70 휴식 (20ec:abe1) 확정. 사용자 결정: 원작 행동 순서 (민첩 키)·B1 제안·개선판 17장 그림. ecs_check 문제 12 (전부터). 원작판 10장 등 적 먼저 움직이는 장은 verify readyMs 150000
 막힌 점: 음악·효과음 시점은 귀로 원작과 대조 못 함 (테스트 탭 소리 끔). 원작이 피로 부족 마법을 고르면 어떻게 되는지·모드 4 알림 그림이 무엇인지 DOSBox 미확인. 손으로 끝까지 깨 보기·실기기 미확인
 실행·테스트: preview_start {name: 'dev'} (포트 5173, .claude/launch.json) — 먼저 정적 파일 (/assets/data/labels.json) 을 열어 localStorage eclipse.sound·music·introSound = '0'. 캠페인 장 시험 = localStorage `eclipse.slots.<판>` 에 {n,route,title,at,camp:{flags,party,items}} 를 넣고 타이틀 이어하기 → 기록 칸 (판 고르기는 타이틀 원작판/개선판 버튼, 끝나면 지움). 브라우저 창이 숨겨지면 애니메이션이 멈추니 tabs_select 로 앞으로. 캠페인 전투는 선두 HP 를 올려 둘 것. 전투 = `?ed=original&stage=3&party=0,13,26&nocamp`. 검사 `./node_modules/.bin/tsc --noEmit`. 자동 검증 `tools/verify.py --plan` + `/tools/verify_browser.js`, 컷신 `/tools/verify_cuts.js`

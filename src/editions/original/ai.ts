@@ -1,17 +1,14 @@
-// 적 AI. 행동 여부는 원작 부대 상태(+0x235) [확정, 20ec:a419]:
-//   0 행동 · 1 경계 대기 (일행이 닿으면 또는 맞으면 0) · 2 대기 (장 이벤트로만 풀림) · 3 행동, 이동력 0 · 4 숨김
-// 행동할 때의 대상 고르기는 근사 [근사]: 공격 가능한 대상 중 가장 큰 피해(처치 우선), 없으면 가장 가까운 상대 쪽으로.
-//   범위 공격 (기사·포수, core/attack.ts) 은 맞는 유닛 점수 합, 같은 편이 맞으면 뺀다 (원작 AI 도 포수 중심 둘레의 같은 편 칸을 센다 124e:596e)
-// 마법은 공격 유형 1 (직업 8~14, 124e:22ab) 유닛만 [확정]. 원작판 = 원작 마법 직업 AI 그대로 (casterPlan, 물리 공격 없음 [확정]),
-//   개선판 = 마법 점수가 물리보다 크면 마법 [근사] (bestSpell). 물리 쪽 AI (124e:4d43) 의 대상 점수는 아직 근사
+// 원작판 적 AI — 원작 그대로 [확정 2026-10-23, 역어셈블]. 개선판은 remake/ai.ts (점수식).
+// 행동 여부는 원작 부대 상태(+0x235) [확정, 20ec:a419]:
+//   0 행동 · 1 경계 대기 (일행이 닿으면 또는 맞으면 0) · 2 대기 (장 이벤트로만 풀림) · 3 행동, 이동력 0 · 4 숨김 — aiGate (두 판 공통)
+// 행동: 공격 유형 1 (마법 직업, 직업 8~14) = casterPlan (124e:284a, 물리 공격 없음), 그 밖 = physicalPlan (124e:4d43). 세부는 rules.md "원작 AI"
 import type { StageMap } from '../../core/data'
 import type { AiPlan } from '../../core/edition'
 import { DIRS, dist, inside, key, moveCost, reachable } from '../../core/grid'
-import { aimsFrom, attackKind, strikeTargets } from '../../core/attack'
-import type { Magic } from '../../core/data'
+import { attackKind, canAim, inReach, strikeArea } from '../../core/attack'
 import type { Pos, Unit } from '../../core/unit'
-import { aiCaster, inSpellRange, spellCenters, spellTargets, spellsOf } from '../../core/magic'
-import { k4, rules } from './rules'
+import { inSpellRange, spellsOf } from '../../core/magic'
+import { k2, k4, rules } from './rules'
 
 /** 상태 1 깨어남: 이동력+1 걸음 안(통행 마스크)에 일행(부대 0) 대원이 있다. 다른 유닛에 막히는지는 근사로 무시 */
 function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
@@ -34,81 +31,68 @@ function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
   return false
 }
 
-/** 원작판 = 마법 직업은 원작 우선순위 AI (casterPlan), 개선판 = 마법도 물리와 점수로 견줌 [근사] */
-export const makePlanFor = (originalCasters: boolean) => (map: StageMap, units: Unit[], u: Unit, troopState: number[]) =>
-  planFor(map, units, u, troopState, originalCasters)
-
-export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[], originalCasters = true): AiPlan {
+/** 두 판 공통 앞부분 [확정]: 부대 상태 1 깨어남·1/2 대기, 피로 > 70 휴식 [추정]. 행동하면 null */
+export function aiGate(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan | null {
   const stay = { unit: u, dest: { x: u.x, y: u.y } }
   if (troopState[u.troop] === 1 && partyInReach(map, units, u)) troopState[u.troop] = 0
   if (troopState[u.troop] === 1 || troopState[u.troop] === 2) return stay
   if (u.fatigue > 70) return { ...stay, rest: true }   // [추정] 원작 20ec:abe1 피로 > 70 분기 = 휴식 (세부 미분석)
-  const foes = units.filter(o => o.hp > 0 && o.side !== u.side)
+  return null
+}
+
+/** 원작판 AI: 2ff8:1480 — 공격 유형 1 (마법 직업) 은 124e:284a (casterPlan), 그 밖은 124e:4d43 (physicalPlan) */
+export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan {
+  const gate = aiGate(map, units, u, troopState)
+  if (gate) return gate
   const moves = reachable(map, units, u)
-  if (originalCasters && attackKind(u) === 1) return casterPlan(units, u, moves) ?? stay   // 원작 2ff8:1480: 공격 유형 1 은 124e:284a (물리 공격 없음)
-  let best: AiPlan | null = null
-  let bestScore = -Infinity
-  for (const k of moves.keys()) {
-    const spot = { x: k % 1000, y: Math.floor(k / 1000) }
-    for (const c of aimsFrom(u, spot, units)) {
-      let score = -dist(spot, u) * 0.01, own = 0   // 같으면 이동이 적은 칸
-      for (const t of strikeTargets(u, c, spot, units)) {
-        const [lo, hi] = rules.damageRange(map, u, t, spot)
-        const v = (lo >= t.hp ? 1000 : 0) + (lo + hi) / 2 - t.def * 0.1
-        if (t.side === u.side) { own++; score -= 1.5 * Math.max(1, v) } else score += v
+  const plan = attackKind(u) === 1 ? casterPlan(units, u, moves) : physicalPlan(units, u, moves)
+  return plan ?? { unit: u, dest: { x: u.x, y: u.y } }
+}
+
+// ---------- 원작 물리 AI (124e:4d43) [확정 2026-10-23, 역어셈블] ----------
+// 대상 = 이동력 + 사거리 + 범위 범람 (35ae:1253) 안의 상대편, 키 오름차순 (0aa2:0327): 생명 div 최대생명 = 0 (조금이라도 다침) 이면 0,
+//   아니면 k2 물리 방어력 → 다친 대상 먼저, 다음은 방어 약한 순 (4ef9~4f8e, 284a 와 같은 정수 나눗셈).
+// 공격 유형별 (cs:67ab): 0 단일 = 대상 순서대로, 덜 움직이는 칸 (자기 이동 범람 순) 중 그 대상이 사거리에 드는 첫 칸 (564e).
+//   2 기사 (사거리 0·범위 1 로 둠, 4dba) = 대상 둘레 1 안의 이동 칸마다 둘레 적 수를 세어 가장 많은 칸 (576e), 중심 = 자기.
+//   3 포수 = 대상 둘레 1 의 (적 수 − 같은 편 수) 로 대상을 다시 내림차순 (596e) 뒤 궁수와 같게.
+//   4 궁수·5 추전수 = 대상 순서대로, 대상에서 먼 칸부터 (대상 범람 역순) 대상과 같은 행·열인 이동 칸 (5ac4) — 멀리서 쏜다.
+// 칠 대상이 없으면 이동력 2배 범람 안의 상대 → 없으면 상대 모두, 같은 키로 정렬해 첫 대상 쪽으로 이동력만큼 걷기 (625c~6708).
+// 웹 근사: 범람 = 맨해튼 거리, 자기 이동 범람 순 = 이동 칸까지 거리 순 (같으면 찾은 순), 대상 범람 역순 = 대상과 먼 순
+const k2Key = (t: Unit) => Math.floor(t.hp / Math.max(1, t.maxHp)) === 0 ? 0 : k2(t)
+const byKey = (list: Unit[]) => list.map(t => ({ t, k: k2Key(t) })).sort((a, b) => a.k - b.k).map(c => c.t)   // 안정 정렬
+
+function physicalPlan(units: Unit[], u: Unit, moves: Map<number, number>): AiPlan | null {
+  const kind = attackKind(u)
+  const spots = [...moves.keys()].map(k => ({ x: k % 1000, y: Math.floor(k / 1000) })).sort((a, b) => dist(a, u) - dist(b, u))
+  const foes = units.filter(o => o.hp > 0 && o.side !== u.side)
+  const reach = u.mov + (kind === 2 ? 0 : u.range[1]) + strikeArea(u)
+  let targets = byKey(foes.filter(t => dist(t, u) <= reach))
+  if (targets.length) {
+    if (kind === 2) {   // 기사: 둘레 적이 가장 많은 칸 (같으면 앞선 칸)
+      let best: { spot: Pos; n: number } | null = null
+      for (const spot of spots) {
+        if (!targets.some(t => dist(t, spot) <= 1)) continue
+        const n = foes.filter(t => dist(t, spot) <= 1).length
+        if (!best || n > best.n) best = { spot, n }
       }
-      if ((!own || score > 0) && score > bestScore) {   // 같은 편이 맞으면 남는 게 있을 때만
-        bestScore = score
-        best = { unit: u, dest: spot, target: c }
+      if (best) return { unit: u, dest: best.spot, target: u }
+    } else {
+      if (kind === 3) {   // 포수: 대상 둘레 (적 − 같은 편) 많은 순
+        const net = (t: Unit) => units.filter(o => o.hp > 0 && o !== u && dist(o, t) <= 1).reduce((n, o) => n + (o.side === u.side ? -1 : 1), 0)
+        targets = targets.map(t => ({ t, n: net(t) })).sort((a, b) => b.n - a.n).map(c => c.t)
+      }
+      for (const t of targets) {
+        const ok = spots.filter(p => inReach(u, p, t) && canAim(u, t, p, units))
+        const from = kind >= 3 ? ok.sort((a, b) => dist(b, t) - dist(a, t))[0] : ok[0]   // 궁수·추전수·포수 = 대상에서 먼 칸, 단일 = 덜 움직이는 칸
+        if (from) return { unit: u, dest: from, target: t }
       }
     }
   }
-  if (aiCaster(u)) {
-    const spell = bestSpell(units, u, moves)
-    if (spell && spell.score > bestScore) return spell.plan
-  }
-  if (best) return best
-
-  const nearest = foes.sort((a, b) => dist(a, u) - dist(b, u))[0]
-  if (!nearest) return stay
-  let dest: Pos = { x: u.x, y: u.y }
-  for (const k of moves.keys()) {
-    const p = { x: k % 1000, y: Math.floor(k / 1000) }
-    if (dist(p, nearest) < dist(dest, nearest)) dest = p
-  }
-  return { unit: u, dest }
-}
-
-/** 마법 점수 [근사]: 피해 합 (처치 +1000), 회복은 잃은 생명이 30% 넘는 대상만, 강화·약화·중독·혼수는 아직 안 걸린 대상만.
- *  같으면 덜 움직이는 자리. 점수 0 이하면 쓰지 않는다 */
-function spellScore(units: Unit[], u: Unit, m: Magic, c: Pos, from: Pos): number {
-  let score = 0
-  for (const t of spellTargets(rules, u, m, c, units, from)) {
-    const h = rules.spell(u, t, m)
-    if (h.kind === 'hp') score += h.value + (h.value >= t.hp ? 1000 : 0)
-    else if (h.kind === 'heal') score += t.hp < t.maxHp * 0.7 ? h.value * 1.2 : 0
-    else if (h.kind === 'stat') score += Math.sign(t.mods[h.stat]) === Math.sign(h.value) ? 0 : Math.abs(h.value) * 0.8
-    else if (h.kind === 'tire') score += h.value * 0.5
-    else if (h.kind === 'poison') score += t.poison ? 0 : 12 + t.hp * 0.2
-    else if (h.kind === 'coma') score += t.coma ? 0 : 25
-    else if (h.kind === 'cure') score += (h.what !== 'coma' && t.poison ? 15 : 0) + (h.what !== 'poison' && t.coma ? 25 : 0)
-  }
-  return score
-}
-
-function bestSpell(units: Unit[], u: Unit, moves: Map<number, number>): { plan: AiPlan; score: number } | null {
-  let best: { plan: AiPlan; score: number } | null = null
-  for (const m of spellsOf(u)) {
-    if (!rules.canCast(u, m)) continue
-    for (const k of moves.keys()) {
-      const from = { x: k % 1000, y: Math.floor(k / 1000) }
-      for (const c of spellCenters(rules, u, m, units, from)) {
-        const score = spellScore(units, u, m, c, from) - dist(from, u) * 0.01
-        if (score > 0.5 && score > (best?.score ?? -Infinity)) best = { plan: { unit: u, dest: from, magic: m, at: c }, score }
-      }
-    }
-  }
-  return best
+  const near = byKey(foes.filter(t => dist(t, u) <= u.mov * 2))   // 걸어가기 (625c): 이동력 2배 안 → 없으면 모두
+  const goal = near[0] ?? byKey(foes)[0]
+  if (!goal) return null
+  const dest = spots.slice().sort((a, b) => dist(a, goal) - dist(b, goal) || dist(a, u) - dist(b, u))[0]
+  return dest ? { unit: u, dest } : null
 }
 
 // ---------- 원작 마법 직업 AI (124e:284a) [확정 2026-10-23, 역어셈블] ----------

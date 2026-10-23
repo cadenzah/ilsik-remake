@@ -3,7 +3,7 @@ import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { makeRules } from '../original/rules'
-import { makePlanFor } from '../original/ai'
+import { planFor } from './ai'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
@@ -19,7 +19,7 @@ export const edition: Edition = {
   id: 'remake',
   name: '개선판',
   rules: makeRules(true),   // 원작 규칙에서 혼수 판정 버그만 고침 (정신이 훨씬 높은 대상에게 늘 걸리던 것)
-  planFor: makePlanFor(false),   // 마법 직업도 물리와 마법을 점수로 견준다 [근사] (원작판 = 원작 우선순위 AI)
+  planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {
     const party = units.filter(u => u.troop === 0)
