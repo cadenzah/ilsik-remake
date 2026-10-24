@@ -61,13 +61,15 @@ export function aboveUnit(sx: number, sy: number, h = 74) {
 // ---------- 승리·실패 조건 ----------
 
 /** 원작 조건 창 문구 (EXE DS:0xb55~: 적군전멸, ○○ 사망, 도착) [근사: 장별 원작 문구 대응 미추출, 지금 이름으로] */
-export function conditions(): { win: string[]; lose: string[] } {
+export function conditions(orig = false): { win: string[]; lose: string[] } {
   const win: string[] = [], lose: string[] = []
   const name = (r: [number, number]) => member(r)?.type.name ?? '?'
+  // 원작판: 원작 조건 창 (0aa2:225a) 문형 — 한 줄에 한 명 「X 사망」, 도착은 원작 장소 문구 (condText). 이름은 원작의 옛 번역 (에릭 등) 대신 지금 표기
+  const each = (rs: [number, number][], tail: string) => orig ? [...new Set(rs.map(name))].map(n => `${n} ${tail}`) : [`${rs.map(name).join('·')} ${tail}`]
   for (const r of S.cond) {
-    if (r.do.includes('lose') && 'dead' in r.if) lose.push(`${r.if.dead.map(name).join('·')} 사망`)
-    else if ((r.do.includes('win') || r.do.includes('ending')) && 'reach' in r.if) win.push('목표 지점 도착')
-    else if ((r.do.includes('win') || r.do.includes('ending')) && 'dead' in r.if) win.push(`${r.if.dead.map(name).join('·')} 쓰러뜨리기`)
+    if (r.do.includes('lose') && 'dead' in r.if) lose.push(...each(r.if.dead, '사망'))
+    else if ((r.do.includes('win') || r.do.includes('ending')) && 'reach' in r.if) win.push(orig ? S.condText?.win[0] ?? '목표 지점 도착' : '목표 지점 도착')
+    else if ((r.do.includes('win') || r.do.includes('ending')) && 'dead' in r.if) win.push(...each(r.if.dead, orig ? '사망' : '쓰러뜨리기'))
   }
   if (!win.length) win.push('적군전멸')
   const lead = member([0, 0])
@@ -75,9 +77,9 @@ export function conditions(): { win: string[]; lose: string[] } {
   return { win, lose }
 }
 
-/** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표, text = 원작판 조건 창 문구 (원작 0aa2:225a, 없으면 규칙에서 만든다) */
-export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; text?: { win: string[]; lose: string[] }; onClose?: () => void } = {}) {
-  const c = o.text ?? conditions()
+/** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표, orig = 원작판 문형 (원작 0aa2:225a) */
+export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; orig?: boolean; onClose?: () => void } = {}) {
+  const c = conditions(o.orig)
   const mark = { open: '◇', done: '✓', failed: '✗' }
   const body = [
     '<span class="h blue">승리조건</span>', ...(o.goal ? [esc(o.goal)] : c.win.map(esc)),

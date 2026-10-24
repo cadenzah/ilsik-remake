@@ -9,7 +9,7 @@
 // 현대식 (개선판 설정 modernUi): 다른 화면 (campModern.ts, ux-proposal.md 36). 여기 statusFrame 은 전투 중 큰 인물기본자료의 현대식 바탕
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
 import { hud, mapRect, view } from './screen'
-import { winUrl } from './skin'
+import { pieceUrl, winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
 import { equippedStats } from './unit'
 import { applyFont } from './font'
@@ -350,14 +350,14 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelector<HTMLButtonElement>('.ok')!.focus()
   }
 
-  /** 「탐험계속?」 (원작 0aa2:12f2 모드 4 → 0aa2:0c58): ECPLEV "level" 창 (172,100) 185×110, 안쪽 (0,8) 에 그림 [근사: 동의지도 아이콘],
+  /** 「탐험계속?」 (원작 0aa2:12f2 모드 4 → 0aa2:0c58): ECPLEV "level" 창 (172,100) 185×110, 안쪽 (0,8) 에 ECLIPSE.OTH 5 (양피지 지도 68×78, 0aa2:1369),
    *  (70, 0·20·…·80) 에 글 다섯 조각 (웹은 줄 간격 17 — 20 이면 아래 테두리에 걸림), 효과음 110, 이어서 확인창 「선택하세요」 (245,238) [결정][취소]. 오른쪽 클릭·Esc = 취소 */
   const templeWin = (answer: (go: boolean) => void) => {
     play('e1', SFX.upgrade)
     const note = document.createElement('div')
     note.className = 'owin note'
     note.style.cssText = px(172, 100, 185, 110) + `;background-image:url(${winUrl('level', 185, 110)})`
-    note.innerHTML = `${icon(175)}<p>${TEMPLE_ASK.map(esc).join('<br>')}</p>`
+    note.innerHTML = `<img class="icon" alt="" src="${pieceUrl('oth.5')}"><p>${TEMPLE_ASK.map(esc).join('<br>')}</p>`
     stage.append(note)
     const end = (go: boolean) => { note.remove(); answer(go) }
     confirm('선택하세요', 238, () => end(true), 245, () => end(false))

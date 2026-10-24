@@ -22,7 +22,7 @@ export const S = {
   routeTable: [] as number[][],  // 전투 순서표 route[i][루트] = i번째 전투의 장 번호
   cond: [] as CondRule[],
   turnEv: [] as TurnEvent[],
-  condText: undefined as { win: string[]; lose: string[] } | undefined,   // 원작 조건 창 문구 (원작 장만)
+  condText: undefined as { win: string[]; lose: string[] } | undefined,   // 원작 조건 창 문구 (원작 장만, 도착 장소 문구만 씀)
   startEv: [] as StartStep[],  // 전투 시작 처리 (전투 전 장면 뒤)
   fired: new Set<number>(),    // 이미 발동한 규칙 번호
   reserve: [] as Unit[],       // 상태 4 (숨김) 부대 대원. 상태가 바뀌면 맵에 나온다

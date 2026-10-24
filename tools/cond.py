@@ -9,7 +9,6 @@ TROOP = 0x242   # 부대 구조체 크기. 대원 i 의 능력치 far ptr = 부�
 
 # 장별 조건 (124e:d4a7 을 손으로 옮긴 것, formats.md "전투 승패 조건"). 행동이 끝날 때마다 위에서부터 검사, 규칙마다 한 번만 발동.
 # if: dead = 나열한 대원 모두 HP 0 / reach = U[0.0] 이 위치 p 도달 / hpBelow = [대원, 비율] / onlyLeft = 남은 적이 그 대원뿐
-# once: 'run' = 원작은 프로그램 실행 동안 한 번 (DS 깃발을 되돌리지 않아 다시 하는 전투에서는 발동 안 함, 원작판만)
 # do: win (+0x1d56=0) / lose / ending / state [[부대…], 값] (부대 +0x235) / scene "1:k" / join 유닛종류
 # expect: 검증용 — 해당 대원의 유닛 종류 (모든 루트에서 맞아야 한다)
 def _dead(*us, do): return {'if': {'dead': [list(u) for u in us]}, 'do': do}
@@ -24,7 +23,7 @@ COND = {
     29: [_dead((1, 0), do=['win'])],
     32: [_dead((1, 0), do=['win'])],
     33: [_dead((1, 0), do=['lose']), _dead((3, 1), do=['win'])],
-    35: [{**_dead((2, 0), do=[{'state': [[1, 2, 3, 4], 0]}, {'scene': '1:35'}]), 'once': 'run'},   # DS:12bc 를 1 로, 끄는 곳 없음
+    35: [_dead((2, 0), do=[{'state': [[1, 2, 3, 4], 0]}, {'scene': '1:35'}]),   # 원작 DS:12bc 는 끄는 곳이 없어 실행당 한 번 (원작 버그, 웹은 전투마다)
          _dead((1, 0), (2, 0), do=['win'])],
     36: [{'if': {'reach': 47}, 'do': ['win']}],
     37: [{'if': {'reach': 66}, 'do': ['win']}],
@@ -83,7 +82,7 @@ def troops(p):
 # 시스템 → 조건 창 0aa2:225a(stage) [확정 2026-10-24]: 문구 = far ptr 표 DS:066c (19칸, 18번 = 0) → DS:0b55~0c27 (옛 번역 이름 그대로).
 # switch(stage−3) 점프표 cs:2721 (41칸, 그 밖 = 기본 2527): si = 항목 수, [bp−0xf6+k] = 문구 번호. 첫 항목 = 승리조건 (y 30), 나머지 = 실패조건 (y 110 부터 20씩).
 # 35장 (23fd) 만 손으로 그림: 승리 1·2 (y 30·50), 실패 10. 창 = 3cd3:53de (220, 90, 200×210), 제목 없음, 머리글 「승리조건」 파랑·「실패조건」 빨강
-def cond_window():
+def cond_window():   # 웹은 도착 장소 문구만 쓴다 (원작 이름 표기는 옛 번역이라 규칙의 유닛 이름으로)
     import re
     seg, img, ds = 0xaa2, exe.img, exe.DS*16
     text = [exe.cstr(ds + struct.unpack_from('<H', img, ds + 0x66c + 4*i)[0], 30).decode('cp949') for i in range(18)]
@@ -98,7 +97,8 @@ def cond_window():
     for st in range(1, 44):
         at = struct.unpack_from('<H', img, seg*16 + 0x2721 + 2*(st-3))[0] if 3 <= st <= 43 else 0x2527
         win, lose = ([1, 2], [10]) if at == 0x23fd else (lambda l: (l[:1], l[1:]))(items(at))
-        out[st] = {'win': [text[i] for i in win], 'lose': [text[i] for i in lose]}
+        sp = lambda s: re.sub(r'(?<! )(사망|도착)$', r' \1', s)   # 원작 띄어쓰기 들쭉날쭉 (비왕사망·용자벽화도착) 을 고름
+        out[st] = {'win': [sp(text[i]) for i in win], 'lose': [sp(text[i]) for i in lose]}
     return out
 
 def table():
