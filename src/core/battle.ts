@@ -185,6 +185,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
   S.turnEv = extra?.turn ?? battles.turn[def.n] ?? []
   S.startEv = extra?.start ?? battles.start?.[def.n] ?? []
+  S.condText = extra ? undefined : battles.condText?.[def.n]
   S.dialogue = dialogue
   S.map = stage.map
   S.atlas = stage.atlas
@@ -678,7 +679,7 @@ function bossHit() {
 function showGoalsWin(onClose?: () => void) {
   const card = chapter()?.card
   showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined,
-    goals: remake() ? goalStates(aliveMember) : undefined, onClose })
+    goals: remake() ? goalStates(aliveMember) : undefined, text: remake() ? undefined : S.condText, onClose })
 }
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */

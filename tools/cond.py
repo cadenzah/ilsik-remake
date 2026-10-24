@@ -80,6 +80,27 @@ def troops(p):
     return t + [[g['types'], g['active']] for g in p['groups']]
 
 
+# 시스템 → 조건 창 0aa2:225a(stage) [확정 2026-10-24]: 문구 = far ptr 표 DS:066c (19칸, 18번 = 0) → DS:0b55~0c27 (옛 번역 이름 그대로).
+# switch(stage−3) 점프표 cs:2721 (41칸, 그 밖 = 기본 2527): si = 항목 수, [bp−0xf6+k] = 문구 번호. 첫 항목 = 승리조건 (y 30), 나머지 = 실패조건 (y 110 부터 20씩).
+# 35장 (23fd) 만 손으로 그림: 승리 1·2 (y 30·50), 실패 10. 창 = 3cd3:53de (220, 90, 200×210), 제목 없음, 머리글 「승리조건」 파랑·「실패조건」 빨강
+def cond_window():
+    import re
+    seg, img, ds = 0xaa2, exe.img, exe.DS*16
+    text = [exe.cstr(ds + struct.unpack_from('<H', img, ds + 0x66c + 4*i)[0], 30).decode('cp949') for i in range(18)]
+    def items(at):
+        n, got = 0, {}
+        for i in exe.md.disasm(bytes(img[seg*16+at: seg*16+at+200]), at):
+            if i.mnemonic == 'jmp': break
+            if i.mnemonic == 'mov' and (m := re.fullmatch(r'si, (\w+)', i.op_str)): n = int(m.group(1), 0)
+            if i.mnemonic == 'mov' and (m := re.fullmatch(r'byte ptr \[bp - (\w+)\], (\w+)', i.op_str)): got[0xf6 - int(m.group(1), 16)] = int(m.group(2), 0)
+        return [got[k] for k in range(n)]
+    out = {}
+    for st in range(1, 44):
+        at = struct.unpack_from('<H', img, seg*16 + 0x2721 + 2*(st-3))[0] if 3 <= st <= 43 else 0x2527
+        win, lose = ([1, 2], [10]) if at == 0x23fd else (lambda l: (l[:1], l[1:]))(items(at))
+        out[st] = {'win': [text[i] for i in win], 'lose': [text[i] for i in lose]}
+    return out
+
 def table():
     base = SEG*16
     return {i+3: struct.unpack_from('<H', exe.img, base + TABLE + 2*i)[0] for i in range(41)}

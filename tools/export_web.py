@@ -372,7 +372,8 @@ def export_battles(d):
     trn = {s: [{'area': [e['area'][0], [bad.to_xy(p, S[s - 1][0]) for p in e['area'][1]]]} if 'area' in e else e for e in evs]
            for s, evs in cond.TURN.items()}
     # start[stage] = 전투 시작 처리 (tools/cond.py START): 전투 전 장면 뒤 HP·자리 비움·부대 출현
-    json.dump({'route': RT, 'records': recs, 'cond': cnd, 'turn': trn, 'start': cond.START}, open(os.path.join(d, 'battles.json'), 'w'),
+    # condText[stage] = 원작 조건 창 문구 (tools/cond.py cond_window, 0aa2:225a)
+    json.dump({'route': RT, 'records': recs, 'cond': cnd, 'turn': trn, 'start': cond.START, 'condText': cond.cond_window()}, open(os.path.join(d, 'battles.json'), 'w'),
               ensure_ascii=False, separators=(',', ':'))
 
 

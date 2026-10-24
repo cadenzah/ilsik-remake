@@ -111,6 +111,7 @@ export type StartStep = { hpScale: [number, number] } | { absent: number } | { s
 export interface Battles {
   route: number[][]; records: Record<string, BattleRecord>; cond: Record<string, CondRule[]>; turn: Record<string, TurnEvent[]>
   start?: Record<string, StartStep[]>
+  condText?: Record<string, { win: string[]; lose: string[] }>   // 원작 조건 창 문구 (0aa2:225a, 옛 번역 이름 그대로)
 }
 export const loadBattles = () => json<Battles>(`${A}/data/battles.json`)
 

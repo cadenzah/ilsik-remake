@@ -75,9 +75,9 @@ export function conditions(): { win: string[]; lose: string[] } {
   return { win, lose }
 }
 
-/** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표 */
-export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; onClose?: () => void } = {}) {
-  const c = conditions()
+/** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표, text = 원작판 조건 창 문구 (원작 0aa2:225a, 없으면 규칙에서 만든다) */
+export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; text?: { win: string[]; lose: string[] }; onClose?: () => void } = {}) {
+  const c = o.text ?? conditions()
   const mark = { open: '◇', done: '✓', failed: '✗' }
   const body = [
     '<span class="h blue">승리조건</span>', ...(o.goal ? [esc(o.goal)] : c.win.map(esc)),
