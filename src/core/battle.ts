@@ -549,6 +549,8 @@ function tire(u: Unit, attacked: boolean, magic?: Magic) {
 
 // 대본의 전투 중 시점 (dead·troop·hp) 은 한 전투에 한 번씩 ("시점:값"). 43장: 사바카 1단·최종 모두 사망 조건
 const told = new Set<string>()
+// once 'run' 규칙 ("장:번호"): 원작은 DS 깃발을 끄지 않아 페이지를 새로 열 때까지 다시 발동하지 않는다 (35장 DS:12bc). 원작판만
+const firedRun = new Set<string>()
 const woke: number[] = []   // 움직이기 시작한(상태 0 으로 바뀐) 부대 — 대본 troop N
 const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
 // +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
@@ -581,8 +583,10 @@ export async function checkEnd(): Promise<boolean> {
   const lines: { text: string }[] = [], deadScenes: [string, string[]][] = [], scenes: string[] = []
   let fallen = lead
   for (const [i, rule] of S.cond.entries()) {
-    if (result || S.fired.has(i) || !test(rule.if)) continue
+    const runKey = rule.once && !remake() ? `${S.def.n}:${i}` : ''
+    if (result || S.fired.has(i) || firedRun.has(runKey) || !test(rule.if)) continue
     S.fired.add(i)
+    if (runKey) firedRun.add(runKey)
     const dname = 'dead' in rule.if ? member(rule.if.dead[0])!.type.name : ''
     const into = dname && !told.has(`dead:${dname}`) ? (told.add(`dead:${dname}`), deadScenes.push([dname, []]), deadScenes.at(-1)![1]) : scenes
     for (const d of rule.do as CondDo[]) {

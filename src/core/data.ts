@@ -95,7 +95,7 @@ export type CondIf =
   | { hpBelow: [Member, number] }    // HP < 최대HP × 비율
   | { onlyLeft: Member }             // 남은 적이 그 대원뿐
 export type CondDo = 'win' | 'lose' | 'ending' | { state: [number[], number] } | { scene: string } | { join: number } | { flag: string }
-export interface CondRule { if: CondIf; do: CondDo[] }
+export interface CondRule { if: CondIf; do: CondDo[]; once?: 'run' }
 /** 턴 시작 이벤트 (tools/cond.py TURN, 원작 124e:e0a5). turn·route·flag 가 맞으면 do 실행.
  *  area = [부대, 칸 목록]: 매 턴 일행 대원이 그 칸에 있으면 그 부대 상태 0 (37장 숨은 부대) */
 /** 개선판이 더하는 전투 (진엔딩 숨은 장, content/remake/battles/NN.json). 원작 맵을 다시 쓰고 배치·조건은 새로.
