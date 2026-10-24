@@ -119,7 +119,7 @@ const CASTER_ORDER: [number, boolean, boolean, Key][] = [
   [7, false, false, t => Math.floor(t.hp / Math.max(1, t.maxHp)) === 0 ? 0 : k4(t)],   // 생명상해: 다친 대상 먼저 (생명 div 최대 = 0 → 키 0, 원작 정수 나눗셈), 아니면 마법 방어력 낮은 쪽
   [8, false, false, notDown('atk')], [9, false, false, notDown('def')], [10, false, false, notDown('agi')], [11, false, false, notDown('spi')],
   [1, true, false, notUp('atk')],
-  [2, true, false, () => null],                                                // 방어증가: 조건 칸이 비어 대상이 생기지 않는다 (원작 버그, 39cd)
+  [2, true, false, notUp('def')],                                               // 방어증가: 원작은 조건 칸이 비어 대상이 생기지 않는다 (원작 버그, 39cd) — 다른 증가처럼 고침
   [3, true, false, notUp('agi')], [4, true, false, notUp('spi')],
 ]
 const FALLBACK = new Set([0, 6, 5, 7])   // cs:4cfb

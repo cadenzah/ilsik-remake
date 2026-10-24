@@ -2,7 +2,6 @@
 import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
-import { makeRules } from '../original/rules'
 import { planFor } from './ai'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
@@ -18,7 +17,6 @@ export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
-  rules: makeRules(true),   // 원작 규칙에서 혼수 판정 버그만 고침 (정신이 훨씬 높은 대상에게 늘 걸리던 것)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

@@ -103,6 +103,12 @@ def scenes():
                 elif e[1] == 'narr': lines.append((-1, e[2], t))
                 elif e[1] == 'range': lines += [x + (t,) for x in e[5]]
         out.setdefault(key, []).extend(lines)
+    # 원작 대본 누락 고침 (원작 버그는 되살리지 않는다, 2026-10-24): 42장 0x59ae 범위 대화가 end 422 라 아리크스 질문 421 뒤 음마도사(90) 답 422 가 빠짐,
+    # 38장 소피아 합류 1:382 (2ed2 한 쌍) 뒤 이어지는 소피아(28) 말 439 가 어디서도 안 불림
+    for key, after, add in (((0, 42), 421, (90, 422, 0)), ((1, 382), 438, (28, 439, 0))):
+        ls = out.get(key, [])
+        i = next((k for k, x in enumerate(ls) if x[1] == after), None)
+        if i is not None and not any(x[1] == add[1] for x in ls): ls.insert(i + 1, add)
     return out
 
 

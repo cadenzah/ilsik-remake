@@ -53,7 +53,7 @@ function spawn(p: Placement, side: Unit['side']): Unit {
 }
 
 // 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
-function placements(rec: BattleRecord, map?: StageMap) {
+function placements(rec: BattleRecord, map: StageMap) {
   // 출전 대원 = 고른 일행 인덱스 순서대로 출전 칸에
   const allies: Placement[] = S.deploy.map((k, i) => ({ type: PARTY[k], x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
   const troopInit = [0]
@@ -63,11 +63,11 @@ function placements(rec: BattleRecord, map?: StageMap) {
   const enemies: Placement[] = rec.groups.flatMap((g, k) =>
     g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i })))
   troopInit.push(...rec.groups.map(g => g.active))
-  if (map) unstack([...allies, ...enemies], map)
+  unstack([...allies, ...enemies], map)
   return { allies, enemies, troopInit }
 }
 
-/** 원작 배치가 한 칸에 둘을 놓은 곳 (12장 루트 B 흑비·흑박쥐 (7,14), tools/verify.py) — 개선판만, 뒤의 대원을 가장 가까운 빈 칸으로 */
+/** 원작 배치가 한 칸에 둘을 놓은 곳 (12장 루트 B 흑비·흑박쥐 (7,14), tools/verify.py — 원작 데이터 오류) — 두 판 모두 뒤의 대원을 가장 가까운 빈 칸으로 */
 function unstack(ps: Placement[], map: StageMap) {
   const used = new Set<number>()
   for (const p of ps) {
@@ -179,7 +179,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     atStart = snapshot()
   }
   if (def.campaign && !resume) await travelMap(def.n)   // 원작: 정비 화면 뒤 대륙 지도에 그 장 장소를 잠깐 (숨은 장은 장소 없음 → 건너뜀)
-  Object.assign(S, placements(rec, ed.id === 'remake' ? stage.map : undefined))
+  Object.assign(S, placements(rec, stage.map))
   S.reward = rec.reward
   S.treasure = rec.treasure ?? []
   S.cond = extra?.cond ?? battles.cond[def.n] ?? []
@@ -770,10 +770,10 @@ async function turnEvents() {
     if ((e.route ?? S.def.route) !== S.def.route || (e.flag && !FLAGS.has(e.flag))) continue
     if (e.area) {
       const [t, cells] = e.area
-      // 일행 대원을 순서대로 보다가 사망 대원을 만나면 그만둔다 (원작 그대로)
+      // 일행 대원을 순서대로 본다. 원작은 사망 대원을 만나면 그만두지만 (원작 버그) 살아 있는 대원을 모두 본다
       const party = [...S.units, ...S.reserve].filter(u => u.troop === 0).sort((a, b) => a.member - b.member)
       for (const u of party) {
-        if (u.hp <= 0) break
+        if (u.hp <= 0) continue
         if (cells.some(([x, y]) => x === u.x && y === u.y)) { if (S.troopState[t] !== 0) setTroop(t, 0); break }
       }
     } else if (e.turn === S.turn) {

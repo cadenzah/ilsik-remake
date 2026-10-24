@@ -12,7 +12,7 @@ import type { Pos, Unit } from '../../core/unit'
 import { aiGate } from '../original/ai'
 import { makeRules } from '../original/rules'
 
-const rules = makeRules(true)   // 개선판 규칙 (index.ts 와 같은 것)
+const rules = makeRules()   // 개선판 규칙 (index.ts 와 같은 것)
 
 export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan {
   const gate = aiGate(map, units, u, troopState)

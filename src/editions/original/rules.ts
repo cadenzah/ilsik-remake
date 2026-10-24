@@ -41,15 +41,15 @@ const BUFF: BuffStat[] = ['atk', 'def', 'agi', 'spi']
 const IMMUNE = new Set([19, 20])   // 수호자: 중독·혼수 안 걸림
 
 /** 혼수 성공 (124e:c1b6): (시전자 정신max·130 − 대상 정신max·(130 − 대상 피로)) div 시전자 정신max > 50.
- *  원작은 16비트 부호 없는 나눗셈이라 앞의 값이 음수면 (대상 정신이 훨씬 높으면) 성공한다 — fixBug 면 실패로 */
-function comaHits(a: Unit, d: Unit, fixBug: boolean) {
+ *  원작은 16비트 부호 없는 나눗셈이라 앞의 값이 음수면 (대상 정신이 훨씬 높으면) 성공한다 — 원작 버그, 두 판 모두 실패로 고침 */
+function comaHits(a: Unit, d: Unit) {
   const n = a.base.spi * 130 - d.base.spi * (130 - d.fatigue)
-  if (n < 0) return !fixBug
+  if (n < 0) return false
   return Math.floor(n / Math.max(1, a.base.spi)) > 50
 }
 
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
-function spell(a: Unit, d: Unit, m: Magic, fixBug: boolean): SpellHit {
+function spell(a: Unit, d: Unit, m: Magic): SpellHit {
   const P = m.power, e = m.effect
   if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d)), 1, 99), d.hp) }
   if (e === 0) {
@@ -60,7 +60,7 @@ function spell(a: Unit, d: Unit, m: Magic, fixBug: boolean): SpellHit {
   if (e >= 8 && e <= 11) return { kind: 'stat', stat: BUFF[e - 8], value: -clamp(k6(a, P) - k8(d), 1, 99) }
   if (e === 15) return { kind: 'tire', value: Math.min(clamp(tr((0.1 * P) ** 4 * 0.00125 * ratio(a, d) * 0.1), 1, 99), 100 - d.fatigue) }
   if (e === 12 || e === 13) {
-    if (IMMUNE.has(d.type.id) || (e === 13 && !comaHits(a, d, fixBug))) return { kind: 'miss' }
+    if (IMMUNE.has(d.type.id) || (e === 13 && !comaHits(a, d))) return { kind: 'miss' }
     return { kind: e === 12 ? 'poison' : 'coma' }
   }
   return { kind: 'cure', what: e === 5 ? 'poison' : e === 6 ? 'coma' : 'all' }
@@ -147,8 +147,8 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
 
 const HYEYU = 17, GALE_SHOES = 165   // 두 번 행동 특례 (초상·도구 Item id)
 
-/** 판 규칙. fixComaBug = 혼수 판정 원작 버그 고침 (개선판) */
-export function makeRules(fixComaBug = false): Rules { return {
+/** 판 규칙 (두 판 같은 원작 규칙) */
+export function makeRules(): Rules { return {
   damageRange(map, a, d, at) {
     const v = damage(map, a, d, at)
     return [v, v]
@@ -178,7 +178,7 @@ export function makeRules(fixComaBug = false): Rules { return {
   // MAD 사거리 = 중심 칸 거리, 0 = 자기 자리 (노래). 범위 = 중심에서 마름모 반경 [추정: 범람 35ae:1253 모양]. 자기 편 마법은 자기 자신도
   spellRange: m => m.range === 0 ? [0, 0] : [isFoeSpell(m) ? 1 : 0, m.range],
   spellSide: m => isFoeSpell(m) ? 'foe' : 'own',
-  spell: (a, d, m) => spell(a, d, m, fixComaBug),
+  spell,
   // 2ff8:1109 [확정]: 차례를 마칠 때 초상 17 (혜유) 이 도구 질풍화 (165) 를 차고 현재 민첩 > 60 이면 그 차례를 한 번 더 (휴식 포함, 세 번째는 없음)
   actsTwice: u => u.type.por === HYEYU && u.type.equip[2] === GALE_SHOES && u.agi > 60,
   // 매 차례 (20ec:a419): 중독 → 1 줄고 HP −= max(1, trunc(HP·0.33)) / 혼수 → 1 줄고 휴식하고 넘김 /
