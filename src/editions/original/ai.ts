@@ -31,12 +31,14 @@ function partyInReach(map: StageMap, units: Unit[], u: Unit): boolean {
   return false
 }
 
-/** 두 판 공통 앞부분 [확정]: 부대 상태 1 깨어남·1/2 대기, 피로 > 70 휴식 [추정]. 행동하면 null */
+/** 두 판 공통 앞부분 [확정]: 부대 상태 1 깨어남·1/2 대기, 피로 > 70 또는 HP ¼ 이하 휴식. 행동하면 null */
 export function aiGate(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan | null {
   const stay = { unit: u, dest: { x: u.x, y: u.y } }
-  if (troopState[u.troop] === 1 && partyInReach(map, units, u)) troopState[u.troop] = 0
+  // 깨어난 그 차례는 휴식 판정 없이 바로 행동 (a7b9)
+  if (troopState[u.troop] === 1 && partyInReach(map, units, u)) { troopState[u.troop] = 0; return null }
   if (troopState[u.troop] === 1 || troopState[u.troop] === 2) return stay
-  if (u.fatigue > 70) return { ...stay, rest: true }   // [추정] 원작 20ec:abe1 피로 > 70 분기 = 휴식 (세부 미분석)
+  // 20ec:abe1: 피로 > 70 이거나 HP ≤ 최대HP × 0.25 ([0x1f3f]) 면 휴식 (038e) 하고 차례 끝
+  if (u.fatigue > 70 || u.hp <= u.maxHp * 0.25) return { ...stay, rest: true }
   return null
 }
 
