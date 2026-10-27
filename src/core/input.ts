@@ -1,24 +1,27 @@
 // 마우스·키보드·터치 입력 (ux-proposal.md 7·8·19·28). 좌표는 모두 논리 좌표 (screen.toLogical)
-// 두 판: 왼쪽 = 고르기, 오른쪽·Esc = 한 단계 뒤로 (개선판은 창 바깥 누르기도), 끌기·방향키 = 화면 이동, 창틀(기둥·띠) 클릭 = 그쪽으로 몇 칸 이동 (원작)
+// 두 판: 왼쪽 = 고르기, 오른쪽·Esc = 한 단계 뒤로 (개선판은 창 바깥 누르기도), 끌기·방향키 = 화면 이동, 창틀(기둥·띠) 클릭 = 그쪽으로 한 칸 이동 (원작)
 // 개선판만: 휠·핀치·+/− = 확대 (맵 창 안), Enter = 결정, E 턴 종료, T 위험 범위, M 미니맵, 터치 길게 누르기 = 정보 창
 import { clickTile, endPlayerStep, goBack, hoverTile, restPrompt, toggleMinimap, toggleThreat } from './battle'
 import { TH, TW } from './data'
 import { dialogueOpen } from './dialogue'
 import { canvas, clampCam, toTile, zoomAt } from './render'
-import { FRAME, mapRect, toLogical, view } from './screen'
+import { mapRect, toLogical, view } from './screen'
 import { S } from './state'
 import { enter, modalOpen } from './ui'
 
 const remake = () => !S.ed.features.commandFirst
 
-/** 창틀 클릭 스크롤 (원작: 좌우 기둥·아래 띠, 위 띠는 맨 위라 미확인) */
+/** 창틀 클릭 스크롤 (원작 0aa2:0009 → 2773): 맵 창 밖 클릭 = 그쪽으로 한 칸. 위아래 판정이 좌우를 덮어써 모서리는 세로로 */
 function frameScroll(x: number, y: number) {
   const m = mapRect()
-  if (x < FRAME.l) S.cam.x -= TW * 3
-  else if (x >= m.x + m.w) S.cam.x += TW * 3
-  else if (y < FRAME.t) S.cam.y -= TH * 2
-  else if (y >= m.y + m.h) S.cam.y += TH * 2
-  else return
+  let dx = 0, dy = 0
+  if (x < m.x) dx = -1
+  else if (x >= m.x + m.w) dx = 1
+  if (y < m.y) dx = 0, dy = -1
+  else if (y >= m.y + m.h) dx = 0, dy = 1
+  if (!dx && !dy) return
+  S.cam.x += dx * TW
+  S.cam.y += dy * TH
   clampCam()
 }
 

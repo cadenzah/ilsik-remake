@@ -216,7 +216,7 @@ async function start(resume?: Suspended) {
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
   S.reserve = all.filter(u => S.troopState[u.troop] === 4)
   preloadSounds(all)
-  playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 장 뒤 장면·컷신까지. 다시 하기는 처음부터
+  playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
   S.fired.clear()
   told.clear()
   woke.length = 0
@@ -625,6 +625,8 @@ export async function checkEnd(): Promise<boolean> {
   if (!result) return false
   // 원작 2ff8:1706: 전투 함수가 끝나면 (결과 3 이 아니면) 보상 품목 (BAD w121~) 마다 알림 창 (모드 5) → 소지품 끝에. 웹은 finishStage 가 넣는다
   for (const item of S.reward) await gotItem('보 상', item)
+  // 원작 2ff8:1909: 보상 뒤 장 곡을 멈추고 풀어, 장 뒤 장면·컷신은 음악 없이 (컷신 효과음만). 개선판은 장 곡을 이어 간다
+  if (!remake()) stopMusic()
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, done.notes)
   if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {
