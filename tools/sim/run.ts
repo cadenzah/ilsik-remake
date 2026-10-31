@@ -28,7 +28,8 @@ let careful: Opts['careful'] = 'all'
 interface Row {
   n: number; route: number; result: Outcome | 'stall'; tries: number; turns: number
   pushed?: boolean                                           // 지고도 이어 감 (--push): 마지막 시도의 성장으로 다음 장
-  deployed: number; partyLv: number; partyMax: number; foes: number; foeLv: number; foeMax: number
+  deployed: number; partyLv: number; partyMax: number; allLv: number; minLv: number;   // allLv·minLv = 일행 전체 (대기 포함) 평균·최저 레벨
+  foes: number; foeLv: number; foeMax: number
   fallen: string[]; npcFallen: number; leadLow: number      // leadLow = 선두 HP 최저 (%)
   leadEarly: boolean                                         // 첫 아군 차례 전에 선두가 쓰러짐
   foeRests: number; foeActs: number; allyRests: number; levelUps: number; joined: string[]
@@ -328,6 +329,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
     const row: Row = {
       n, route: r, result: res.result, tries: Math.min(tries + 1, o.retry + 1), turns: Math.min(S.turn, o.turns),
       deployed: S.deploy.length, partyLv: avg(deployedTypes.map(t => t.lv)), partyMax: Math.max(...deployedTypes.map(t => t.lv)),
+      allLv: avg(PARTY.map(t => partyType(t).lv)), minLv: Math.min(...PARTY.map(t => partyType(t).lv)),
       foes: foes.length, foeLv: avg(foes.map(u => u.type.lv)), foeMax: Math.max(0, ...foes.map(u => u.type.lv)),
       fallen: S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name),
       npcFallen: S.units.filter(u => u.side === 'ally' && u.troop !== 0 && u.hp <= 0).length,
@@ -342,6 +344,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
     }
     // 승리 처리 (battle.ts checkEnd 뒤): 보상·합류·전투 후 단계. 개선판 대본이 단계를 가지면 대본이 대신 (선택지는 첫째)
     const had = new Set(PARTY)
+    S.ed.afterWin?.([])   // 개선판: 대기 동료 경험치 (battle.ts checkEnd 와 같은 자리)
     const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
     if (S.ed.id === 'remake') runSteps([...blocksAt(chapter(), 'win'), ...blocksAt(chapter(), 'post')], aliveMember)
     else if (done.scenes.includes(GOLD.scene)) giveGold()   // 원작판 9장 「금괴조각주기」 = 결정
@@ -379,7 +382,7 @@ export async function main(argv: string[]) {
     return { ...side(t0, ''), enemy: side(t0.enemy ?? t0, '-enemy') }
   }
   const o: Opts = {
-    ed: keys.length ? { ...base, rules: makeRules(tuned()) } : base,
+    ed: { ...base, ...keys.length ? { rules: makeRules(tuned()) } : {}, ...arg('growth', 'yes') === 'no' ? { afterWin: undefined, partyChange: undefined } : {} },
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
     turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'),
@@ -417,7 +420,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
       for (const w of await runRoute(q, r, { battles })) by.set(w.n, [...by.get(w.n) ?? [], w])
     }
     console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
-    console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐')
+    console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐 | 일행 전체 Lv (최저)')
     const tot = { ally: noHits(), foe: noHits() }, mag = { ally: noHits(), foe: noHits() }, heal = { ally: 0, foe: 0 }
     for (const ws of by.values()) for (const w of ws) for (const k of ['ally', 'foe'] as const) {
       for (const f of ['n', 'one', 'half', 'sum', 'pts'] as const) { tot[k][f] += w.hits[k][f]; mag[k][f] += w.mag[k][f] }
@@ -435,7 +438,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
       const rests = ws.reduce((x, w) => x + w.foeRests, 0), acts = ws.reduce((x, w) => x + w.foeRests + w.foeActs, 0)
       console.log([`${n}`, pct(ws.filter(w => won(w) && w.tries === 1).length), pct(ws.filter(won).length), med(ws.map(w => w.turns)),
         pl, `${fl} (${ws[0].foeMax})`, Math.round((fl - pl) * 10) / 10, avg(ws.map(w => w.fallen.length)), `${med(ws.map(w => w.leadLow))}%`,
-        `${Math.round(rests / Math.max(1, acts) * 1000) / 10}%`, pct(ws.filter(w => w.leadEarly).length)].join(' | '))
+        `${Math.round(rests / Math.max(1, acts) * 1000) / 10}%`, pct(ws.filter(w => w.leadEarly).length), `${avg(ws.map(w => w.allLv))} (${avg(ws.map(w => w.minLv))})`].join(' | '))
     }
   }
 }

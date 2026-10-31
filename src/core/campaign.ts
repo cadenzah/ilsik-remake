@@ -80,15 +80,32 @@ export type Note = { text: string }
 
 /** 장면이 아닌 전투 후 단계 하나 (합류·이탈·교체·소지품·플래그). 합류 알림은 notes 에 */
 export function applyStep(s: PostStep, notes: Note[], alive: Alive) {
-  if ('join' in s) { PARTY.push(s.join); notes.push(joinLine(s.join)) }
+  if ('join' in s) join(s.join, notes)
   else if ('leave' in s) PARTY.splice(0, PARTY.length, ...PARTY.filter(t => t !== s.leave))
-  else if ('swap' in s) PARTY.forEach((t, i) => { if (t === s.swap[0]) PARTY[i] = s.swap[1] })
+  else if ('swap' in s) PARTY.forEach((t, i) => { if (t === s.swap[0]) change(i, s.swap[1], notes) })
   else if ('count' in s) PARTY.length = s.count                // 일행 배열 직접 대입 (8장 후 2명으로 재설정)
-  else if ('set' in s) PARTY[s.set[0]] = s.set[1]
+  else if ('set' in s) {
+    const was = PARTY[s.set[0]]
+    if (was !== undefined && was !== s.set[1] && S.types[was]?.name === S.types[s.set[1]]?.name) change(s.set[0], s.set[1], notes)   // 37장 아리크스 2차
+    else PARTY[s.set[0]] = s.set[1]
+  }
   else if ('take' in s) { const i = ITEMS.indexOf(s.take); if (i >= 0) ITEMS.splice(i, 1) }
   else if ('give' in s) ITEMS.push(s.give)
   else if ('setFlag' in s) { if (alive(...s.alive)) FLAGS.add(s.setFlag) }
   else if ('learn' in s) learn(s.learn[0], s.learn[1], s.ifMagic, notes)
+}
+
+/** 합류 (판의 partyChange 가 레벨을 맞출 수 있다) */
+function join(t: number, notes: Note[]) {
+  PARTY.push(t)
+  notes.push(joinLine(t))
+  S.ed.partyChange?.({ join: t }, notes)
+}
+/** 일행 칸 i 를 같은 인물의 새 종류로 (전직·교체). 원작은 새 종류 PAD 값부터 — 판의 partyChange 가 성장을 이어받게 할 수 있다 */
+function change(i: number, to: number, notes: Note[]) {
+  const old = partyType(PARTY[i])
+  PARTY[i] = to
+  S.ed.partyChange?.({ change: to, old }, notes)
 }
 
 /** 일행의 그 종류 대원이 마법을 배운다 (원작 40장 2ff8:37c7: 레이몬이 마법 7개일 때만 8번째로 마수신).
@@ -103,15 +120,16 @@ function learn(type: number, magic: number, ifMagic: number | undefined, notes: 
 
 /** 애슬 전직 (원작 2ff8:0799, 정비 화면 뒤·대륙 지도 전): 출전 대원 중 애슬 (초상 8) 이 도구 미지의책 (174) 을 들고 있으면 그 일행 칸을 유닛 9 (SM여왕) 로.
  *  원작 124e:73d3 이 칸을 PAD 값으로 다시 채우므로 레벨·경험·장비는 새 종류의 기본값이 되고 미지의책은 사라진다. 바뀐 일행 칸 번호를 돌려준다 */
-export function promoteDeployed(deploy: number[]): number[] {
+export function promoteDeployed(deploy: number[], notes: Note[] = []): number[] {
   const done = deploy.filter(i => {
     const t = PARTY[i]
     return t !== undefined && S.types[t]?.por === ATH && partyType(t).equip[2] === UNKNOWN_BOOK
   })
   for (const i of done) {
-    const t = PARTY[i]
+    const t = PARTY[i], old = partyType(t)
     PARTY[i] = ATH_QUEEN
     for (const m of [GROWN, EQUIP] as Map<number, unknown>[]) { m.delete(t); m.delete(ATH_QUEEN) }
+    S.ed.partyChange?.({ change: ATH_QUEEN, old }, notes)
   }
   return done
 }
@@ -121,9 +139,9 @@ const ATH = 8, ATH_QUEEN = 9, UNKNOWN_BOOK = 174
  *  돌려주는 scenes = 재생할 원작 장면 키, notes = 장면 뒤에 보일 합류 알림 (원작은 합류 처리 뒤 대화를 띄우지만 알림은 대화 끝에).
  *  ownSteps = 개선판 대본이 이 장의 캠페인 단계를 대신 쓴다 → 원작 단계(장면 포함)를 모두 건너뛴다 (script-format.md 3절) */
 export function finishStage(joined: number[], reward: number[], alive: Alive, ownSteps = false) {
-  PARTY.push(...joined)
-  ITEMS.push(...reward)
   const scenes: string[] = [], notes: Note[] = []
+  for (const t of joined) { PARTY.push(t); S.ed.partyChange?.({ join: t }, notes) }   // 합류 알림은 checkEnd 가 이미 (전투 중 합류)
+  ITEMS.push(...reward)
   const steps = ownSteps ? [] : S.scenes.post[S.def.n] ?? [], gold = goldAsked(steps)
   for (const s of steps) {
     if (!applies(s)) continue

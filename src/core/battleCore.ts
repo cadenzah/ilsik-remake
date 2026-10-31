@@ -65,6 +65,7 @@ export const taken = new Set<number>()   // 이번 전투에서 주운 보물 (S
 // 대본의 전투 중 시점 (dead·troop·hp) 은 한 전투에 한 번씩 ("시점:값"). 43장: 사바카 1단·최종 모두 사망 조건
 export const told = new Set<string>()
 export const woke: number[] = []   // 움직이기 시작한(상태 0 으로 바뀐) 부대 — 대본 troop N
+export const gained = new Map<Unit, number>()   // 이번 전투에서 얻은 경험치 (일행 대원마다, 개선판 대기 동료 몫 계산)
 
 /** 전투 시작 (다시 하기 포함): 일행·적을 새로 만들어 S.units·S.reserve 에, 기록을 비운다 */
 export function freshBattle() {
@@ -72,6 +73,7 @@ export function freshBattle() {
   S.joined = []
   leveled.clear()
   taken.clear()
+  gained.clear()
   const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
@@ -119,13 +121,22 @@ export function spellResult(a: Unit, m: Magic, c: Pos) {
   return { targets, hits, cured }
 }
 
+/** 전투 밖에서 일행 대원 종류 t 를 levels 만큼 레벨업 (원작 성장식 rules.levelUp 그대로, 장비 승급·마법 습득 포함). 장 사이 상태에 남긴다 */
+export function growParty(t: number, levels: number) {
+  if (levels <= 0) return
+  const u = spawn({ type: t, x: 0, y: 0, troop: 0, member: 0 }, 'ally')
+  for (let i = 0; i < levels; i++) { u.type.lv++; S.ed.rules.levelUp(u, S.tables, S.def.route) }
+  keepGrowth(u.type)
+}
+
 // ---------- 경험치·레벨업 (원작 20ec:9b1d, 0aa2:1afd — 행동 실행 끝, 피로 계산 뒤) ----------
 
 /** 일행(부대 0) 행동자에게 경험치. 100 이상이면 −100, 레벨 +1, 레벨업 결과. 바뀐 값은 장 사이 상태로 (다시 하기는 장 시작 때로 되돌린다) */
 export function addExp(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cured = 0): LevelUp | null {
   if (a.troop !== 0 || a.hp <= 0) return null
-  const t = a.type
-  t.exp += S.ed.rules.expGain(a, hits, m, cured)
+  const t = a.type, got = S.ed.rules.expGain(a, hits, m, cured)
+  t.exp += got
+  gained.set(a, (gained.get(a) ?? 0) + got)
   let r: LevelUp | null = null
   if (t.exp >= 100) {
     t.exp -= 100

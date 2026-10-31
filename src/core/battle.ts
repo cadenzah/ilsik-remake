@@ -465,8 +465,10 @@ export async function checkEnd(): Promise<boolean> {
   for (const item of S.reward) await gotItem('보 상', item)
   // 원작 2ff8:1909: 보상 뒤 장 곡을 멈추고 풀어, 장 뒤 장면·컷신은 음악 없이 (컷신 효과음만). 개선판은 장 곡을 이어 간다
   if (!remake()) stopMusic()
+  const bench: { text: string }[] = []
+  S.ed.afterWin?.(bench)   // 개선판: 대기 동료 경험치
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
-  await story('post', done.scenes, aliveMember, undefined, done.notes)
+  await story('post', done.scenes, aliveMember, undefined, [...done.notes, ...bench])
   if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {
     // 원작 엔딩 영상 (0aa2:3982): 마지막 전투 일행 (쓰러진 대원 포함) 에 채스 (초상 6) +1, 소피아 (초상 28) +2, 루트별 장면. 엔딩 곡은 영상이 튼다
     const party = S.units.filter(u => u.side === 'ally' && u.troop === 0).map(u => u.type.por)
