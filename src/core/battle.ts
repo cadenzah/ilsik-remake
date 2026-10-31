@@ -1,8 +1,8 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type BattleRecord, type CondDo, type CondIf, type Magic, type Member, type StageMap } from './data'
-import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, keepGrowth, partyType, promoteDeployed, joinLine, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
+import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
-import { DIRS, dist, inside, key, moveCost, pathTo, reachable, terrainName } from './grid'
+import { dist, key, pathTo, reachable, terrainName } from './grid'
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
@@ -24,13 +24,14 @@ import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { setSetting, setting } from './settings'
 import { travelMap } from './worldmap'
-import { stageDef, type Placement, type StageDef } from './stage'
+import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, openWin, showMenu, showResult, type Btn } from './ui'
-import { applyMods, equippedStats, type Pos, type Unit } from './unit'
+import { applyMods, type Pos, type Unit } from './unit'
+import { addExp, again, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
-import { SCHOOL_COLOR, SCHOOL_NAME, applyHit, areaCells, hitLine, hitText, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
+import { SCHOOL_COLOR, SCHOOL_NAME, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
 const STEP_MS = 135   // 한 칸 걷기 (ms)
 // 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
@@ -38,53 +39,6 @@ let aiTurn = false
 const pace = () => !remake() ? 1 : (aiTurn && setting('fastEnemy') ? 0.35 : 1) * (setting('shortAnim') ? 0.5 : 1)
 
 // ---------- 초기화 ----------
-
-let uidSeq = 0
-function spawn(p: Placement, side: Unit['side']): Unit {
-  const t = p.troop === 0 ? partyType(p.type) : S.types[p.type]   // 일행은 정비 화면에서 바꾼 장비로
-  const st = equippedStats(t, S.tables.items)
-  if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
-  return {
-    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: t.fatigue, steps: 0,
-    range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
-    base: { atk: st.atk, def: st.def, spi: st.spi, agi: st.agi }, mods: { atk: 0, def: 0, spi: 0, agi: 0 }, poison: 0, coma: 0, ticked: false,
-    facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,
-  }
-}
-
-// 부대 순서 = 0 일행, (npc 있으면) 1 npc, 이후 적 무리 — 원작 부대 배열과 같게 번호를 매긴다 (formats.md "전투 승패 조건")
-function placements(rec: BattleRecord, map: StageMap) {
-  // 출전 대원 = 고른 일행 인덱스 순서대로 출전 칸에
-  const allies: Placement[] = S.deploy.map((k, i) => ({ type: PARTY[k], x: rec.slots[i][0], y: rec.slots[i][1], troop: 0, member: i }))
-  const troopInit = [0]
-  if (rec.npc.length) troopInit.push(rec.npcState)
-  rec.npc.forEach((n, i) => allies.push({ type: n.type, x: n.at[0], y: n.at[1], troop: 1, member: i }))
-  const base = troopInit.length
-  const enemies: Placement[] = rec.groups.flatMap((g, k) =>
-    g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i })))
-  troopInit.push(...rec.groups.map(g => g.active))
-  unstack([...allies, ...enemies], map)
-  return { allies, enemies, troopInit }
-}
-
-/** 원작 배치가 한 칸에 둘을 놓은 곳 (12장 루트 B 흑비·흑박쥐 (7,14), tools/verify.py — 원작 데이터 오류) — 두 판 모두 뒤의 대원을 가장 가까운 빈 칸으로 */
-function unstack(ps: Placement[], map: StageMap) {
-  const used = new Set<number>()
-  for (const p of ps) {
-    if (used.has(key(p.x, p.y))) {
-      const kind = S.types[p.type].moveKind, seen = new Set([key(p.x, p.y)]), todo = [{ x: p.x, y: p.y }]
-      while (todo.length) {
-        const c = todo.shift()!
-        if (!used.has(key(c.x, c.y)) && moveCost(map, c.x, c.y, kind) < Infinity) { p.x = c.x; p.y = c.y; break }
-        for (const [dx, dy] of DIRS) {
-          const n = { x: c.x + dx, y: c.y + dy }
-          if (inside(map, n.x, n.y) && !seen.has(key(n.x, n.y))) { seen.add(key(n.x, n.y)); todo.push(n) }
-        }
-      }
-    }
-    used.add(key(p.x, p.y))
-  }
-}
 
 let looping = false
 
@@ -205,23 +159,12 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
 async function start(resume?: Suspended) {
   await fadeOut()   // 다시 하기 (boot 에서 오면 이미 어둡다)
   clearCut()
-  uidSeq = 0
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
-  S.joined = []
-  leveled.clear()
-  taken.clear()
-  const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
-  S.troopState = [...S.troopInit]
-  S.units = all.filter(u => S.troopState[u.troop] !== 4)
-  S.reserve = all.filter(u => S.troopState[u.troop] === 4)
+  const all = freshBattle()
   preloadSounds(all)
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
-  S.fired.clear()
-  told.clear()
-  woke.length = 0
   resetTalk()
-  S.turn = 1
   S.active = []
   S.mode = { kind: 'busy' }
   S.aim = S.watch = null
@@ -368,16 +311,7 @@ async function attack(a: Unit, c: Unit) {
   if (attackKind(a) === 3) await explode(a.type.equip[0] - 87, area)
   else if (attackKind(a) >= 4 && c !== a) await arrowHit(a, c, attackKind(a) === 4)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
-  const hits: { target: Unit; value: number }[] = []
-  for (const t of targets) {
-    const dmg = S.ed.rules.rollDamage(S.map, a, t)
-    t.hp = Math.max(0, t.hp - dmg)
-    t.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
-    wake(t)
-    t.flash = performance.now() + 160
-    S.floats.push({ x: t.x, y: t.y, text: `-${dmg}`, t0: performance.now(), color: t.side === 'ally' ? '#ff8080' : '#ffffff' })
-    hits.push({ target: t, value: dmg })
-  }
+  const { hits } = strike(a, c)
   await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
   a.pose = undefined
   await sleep(220 * pace())
@@ -388,21 +322,10 @@ async function attack(a: Unit, c: Unit) {
 
 // ---------- 경험치·레벨업 (원작 20ec:9b1d, 0aa2:1afd — 행동 실행 끝, 피로 계산 뒤) ----------
 
-const leveled = new Set<Unit>()   // 이번 차례에 레벨업 → 차례 끝 피로 0 (원작은 피로를 더한 뒤 레벨업이 0 으로)
-
-/** 일행(부대 0) 행동자에게 경험치. 100 이상이면 −100, 레벨 +1, 레벨업. 바뀐 값은 장 사이 상태로 (다시 하기는 장 시작 때로 되돌린다) */
+/** 일행(부대 0) 행동자에게 경험치, 레벨이 오르면 연출 */
 async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cured = 0) {
-  if (a.troop !== 0 || a.hp <= 0) return
-  const t = a.type
-  t.exp += S.ed.rules.expGain(a, hits, m, cured)
-  if (t.exp >= 100) {
-    t.exp -= 100
-    t.lv++
-    const r = S.ed.rules.levelUp(a, S.tables, S.def.route)
-    leveled.add(a)
-    await showLevelUp(a, r)
-  }
-  keepGrowth(t)
+  const r = addExp(a, hits, m, cured)
+  if (r) await showLevelUp(a, r)
 }
 
 /** 레벨업 연출: 머리 위 「Level Up」. 원작판은 승급·습득만 알림 (원작 0aa2:12f2), 개선판은 오른 능력치까지 */
@@ -422,11 +345,6 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 100 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
-}
-
-/** 경계 부대는 공격·마법에 맞으면 깨어난다 (원작 20ec:93b5) */
-function wake(d: Unit) {
-  if (S.troopState[d.troop] === 1) { S.troopState[d.troop] = 0; woke.push(d.troop) }
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
@@ -455,7 +373,6 @@ async function fadeDead(units: Unit[]) {
  *  연출 = 원작 ECLIPSE.MAG 이펙트 (20ec:5c0f): 프레임 id×6 ~ +5 를 박자마다, 범위 반경 r 만큼 바깥 칸이 늦게 (박자 6 + 범위). 결과는 이펙트가 끝난 뒤 */
 async function castSpell(a: Unit, m: Magic, c: Pos) {
   if (c.x !== a.x || c.y !== a.y) a.facing = c.x > a.x ? 'right' : c.x < a.x ? 'left' : c.y > a.y ? 'down' : 'up'
-  const targets = spellTargets(S.ed.rules, a, m, c)
   a.flash = performance.now() + 200
   // 원작 시전 동작 (FIG: 마법 쓰는 인물은 3장 — 오브·마법진이 커진다). 마지막 프레임을 이펙트 동안 유지
   // 효과음: 시전자 초상 번호 소리 → 이펙트 때 마법 소리 ECLIPSE2.FVT[마법 id] (원작 20ec:5d5c → 6348, 6924 → 69eb [근사 시점])
@@ -470,18 +387,7 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   play('e2', m.id)
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
-  const foe = S.ed.rules.spellSide(m) === 'foe'
-  const hits: { target: Unit; value: number }[] = []
-  let cured = 0
-  for (const t of targets) {
-    const h = S.ed.rules.spell(a, t, m)   // 예측과 같은 값 (난수 없음)
-    if (h.kind === 'cure' && ((h.what !== 'coma' && t.poison > 0) || (h.what !== 'poison' && t.coma > 0))) cured++   // 풀린 대상 (20ec:7e3f~7f2f)
-    hits.push({ target: t, value: h.kind === 'hp' || h.kind === 'heal' ? h.value : 0 })
-    applyHit(t, h)
-    if (foe) wake(t)
-    if (h.kind === 'hp') t.flash = performance.now() + 160
-    S.floats.push({ x: t.x, y: t.y, ...hitText(h, t.side), t0: performance.now() })
-  }
+  const { targets, hits, cured } = spellResult(a, m, c)
   await sleep(step)
   S.fx = null
   a.pose = undefined
@@ -490,26 +396,11 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   await gainExp(a, hits, m, cured)
 }
 
-/** 휴식 [확정 20ec:038e]: HP 를 판 규칙만큼 (최대HP 까지) 회복 */
-function rest(u: Unit) {
-  const heal = Math.min(S.ed.rules.restHeal(u), u.maxHp - u.hp)
-  u.hp += heal
-  u.fatigue = S.ed.rules.restFatigue(u)
-  S.floats.push({ x: u.x, y: u.y, text: heal ? `+${heal}` : '휴식', t0: performance.now(), color: '#7dff9a' })
-}
-
 // ---------- 숨은 보물 (원작 20ec:c963: 일행 대원이 행동을 마쳤을 때 선 칸, 이동만 하고 취소하면 줍지 않는다) ----------
 
-const taken = new Set<number>()   // 이번 전투에서 주운 보물 (S.treasure 칸 번호). 다시 하기는 처음부터
-
-/** 그 칸의 보물을 줍는다: 알림 창 (원작 0aa2:12f2 모드 0) 뒤 소지품 끝에 (원작 +0x1cd3 수, 넘침 검사 없음) */
+/** 그 칸의 보물을 줍는다: 알림 창 (원작 0aa2:12f2 모드 0) 뒤 소지품 끝에 */
 async function pickUp(u: Unit) {
-  for (const [i, t] of S.treasure.entries()) {
-    if (taken.has(i) || t.at[0] !== u.x || t.at[1] !== u.y) continue
-    taken.add(i)
-    ITEMS.push(t.item)
-    await gotItem('보 물', t.item, u.type.name)
-  }
+  for (const [i] of treasureAt(u)) await gotItem('보 물', takeTreasure(i), u.type.name)
 }
 
 /** 도구를 얻은 알림 창 (원작 0aa2:12f2 모드 0 보물 줍기·모드 5 전투 보상: ECPLEV "level" 창 + EQU 아이콘 + 파란 이름, 효과음 ECLIPSE1 109).
@@ -531,7 +422,7 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   hideMenu()
   hideBasic()
   S.aim = null
-  const found = u.troop === 0 && u.hp > 0 && S.treasure.some((t, i) => !taken.has(i) && t.at[0] === u.x && t.at[1] === u.y)
+  const found = treasureAt(u).length > 0
   if (found) S.mode = { kind: 'busy' }
   void (found ? pickUp(u).then(() => { S.mode = { kind: 'idle' } }) : Promise.resolve()).then(checkEnd).then(over => {
     if (over) stepDone?.(true)
@@ -540,64 +431,10 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   })
 }
 
-/** 차례를 마칠 때 피로 (공격·이동). 휴식한 차례는 쌓지 않는다 */
-function tire(u: Unit, attacked: boolean, magic?: Magic) {
-  u.fatigue = leveled.delete(u) ? 0 : S.ed.rules.fatigueAfter(u, attacked, magic)
-  u.steps = 0
-}
-
 // ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
 
-// 대본의 전투 중 시점 (dead·troop·hp) 은 한 전투에 한 번씩 ("시점:값"). 43장: 사바카 1단·최종 모두 사망 조건
-const told = new Set<string>()
-const woke: number[] = []   // 움직이기 시작한(상태 0 으로 바뀐) 부대 — 대본 troop N
-const dead = (r: Member) => { const u = member(r); return !!u && u.hp <= 0 }
-// +0x1d56 남은 적 수 — 숨은 부대 대원도 센다
-const enemiesLeft = () => [...S.units, ...S.reserve].filter(u => u.side === 'enemy' && u.hp > 0)
-
-function test(c: CondIf): boolean {
-  if ('dead' in c) return c.dead.every(dead)
-  const lead = member([0, 0])!
-  if ('reach' in c) return lead.x === c.reach[0] && lead.y === c.reach[1]
-  if ('hpBelow' in c) { const u = member(c.hpBelow[0]); return !!u && u.hp > 0 && u.hp < u.maxHp * c.hpBelow[1] }
-  const left = enemiesLeft()
-  return left.length === 1 && left[0] === member(c.onlyLeft)
-}
-
-// 부대 상태를 바꾼다. 숨김(4)에서 풀리면 맵에 나온다. 0~3 의미는 editions/original/ai.ts
-function setTroop(t: number, v: number) {
-  if (v === 0 && S.troopState[t] !== 0) woke.push(t)
-  S.troopState[t] = v
-  if (v === 4) return
-  for (const u of S.reserve.filter(u => u.troop === t)) {
-    S.reserve.splice(S.reserve.indexOf(u), 1)
-    S.units.push(u)
-  }
-}
-
 export async function checkEnd(): Promise<boolean> {
-  const lead = member([0, 0])!
-  let result: 'win' | 'lose' | 'ending' | null = lead.hp <= 0 ? 'lose' : null
-  // 장면: 대원 사망 조건의 장면은 대본 시점 dead <이름>, 나머지(마지막 1명 남기기 등)는 승리와 함께 win 으로
-  const lines: { text: string }[] = [], deadScenes: [string, string[]][] = [], scenes: string[] = []
-  let fallen = lead
-  for (const [i, rule] of S.cond.entries()) {
-    if (result || S.fired.has(i) || !test(rule.if)) continue
-    S.fired.add(i)
-    const dname = 'dead' in rule.if ? member(rule.if.dead[0])!.type.name : ''
-    const into = dname && !told.has(`dead:${dname}`) ? (told.add(`dead:${dname}`), deadScenes.push([dname, []]), deadScenes.at(-1)![1]) : scenes
-    for (const d of rule.do as CondDo[]) {
-      if (typeof d === 'string') {
-        result = d
-        if (d === 'lose' && 'dead' in rule.if) fallen = member(rule.if.dead[0])!
-      }
-      else if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
-      else if ('scene' in d) into.push(d.scene)
-      else if ('flag' in d) FLAGS.add(d.flag)
-      else { S.joined.push(d.join); lines.push(joinLine(d.join)) }
-    }
-  }
-  if (!result && !enemiesLeft().length) result = 'win'
+  const { result, fallen, deadScenes, scenes, lines } = judge()
   if (result === 'lose') {
     S.mode = { kind: 'busy' }
     closeAll()
@@ -754,38 +591,9 @@ function updatePhase(side = phase.side, who = phase.who) {
   setDisabled('end', S.mode.kind === 'busy' || !stepDone)
 }
 
-// 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후)
-/** 전투 시작 처리 (원작 124e:c3da, 전투 전 장면 뒤): 17장 폭탄 (페니 사라짐·일행 HP 70%·매복 출현), 3장 다친 호위, 22장 아티스 자리 비움 */
-function startEvents() {
-  for (const d of S.startEv) {
-    if ('hpScale' in d) {
-      for (const u of S.units) if (u.troop === d.hpScale[0] && u.hp > 0) u.hp = Math.trunc(u.hp * d.hpScale[1])
-    } else if ('absent' in d) {
-      for (const u of S.units) if (u.troop === 0 && u.type.por === d.absent) { u.hp = 0; u.alpha = 0; u.absent = true }
-    } else d.state[0].forEach(t => setTroop(t, d.state[1]))
-  }
-}
-
+/** 턴 시작 이벤트 (원작 124e:e0a5, 턴 수를 올린 직후) 와 그 장면 */
 async function turnEvents() {
-  const scenes: string[] = []
-  for (const e of S.turnEv) {
-    if ((e.route ?? S.def.route) !== S.def.route || (e.flag && !FLAGS.has(e.flag))) continue
-    if (e.area) {
-      const [t, cells] = e.area
-      // 일행 대원을 순서대로 본다. 원작은 사망 대원을 만나면 그만두지만 (원작 버그) 살아 있는 대원을 모두 본다
-      const party = [...S.units, ...S.reserve].filter(u => u.troop === 0).sort((a, b) => a.member - b.member)
-      for (const u of party) {
-        if (u.hp <= 0) continue
-        if (cells.some(([x, y]) => x === u.x && y === u.y)) { if (S.troopState[t] !== 0) setTroop(t, 0); break }
-      }
-    } else if (e.turn === S.turn) {
-      for (const d of e.do ?? []) {
-        if (typeof d === 'string') continue
-        if ('state' in d) d.state[0].forEach(t => setTroop(t, d.state[1]))
-        else if ('scene' in d) scenes.push(d.scene)
-      }
-    }
-  }
+  const scenes = turnStart()
   await story('turn', scenes, aliveMember, String(S.turn))
   for (const [w, a] of scriptMoments()) await story(w, [], aliveMember, a)
 }
@@ -903,16 +711,6 @@ async function aiAct(u: Unit, alone: boolean): Promise<boolean> {
   if (hits) { centerOnIfOff(u); await attack(u, plan.target!) }
   tire(u, hits)
   return checkEnd()
-}
-
-/** 차례를 마친 뒤 두 번째 행동을 받나 (원작 2ff8:1109, 라운드에 한 번). 받으면 이동 기록을 지우고 true */
-function again(u: Unit): boolean {
-  if (u.again || u.hp <= 0 || !S.units.includes(u) || !S.ed.rules.actsTwice(u)) return false
-  u.again = true
-  u.moved = false
-  u.steps = 0
-  if (remake()) S.floats.push({ x: u.x, y: u.y - 0.4, text: '한 번 더', t0: performance.now(), color: '#ffe27a' })
-  return true
 }
 
 /** 차례 시작 (20ec:a419): 판 규칙의 상태 이상 처리. 'over' = 중독으로 전투가 끝남, 'skip' = 혼수·사망으로 이번 차례 없음 */
