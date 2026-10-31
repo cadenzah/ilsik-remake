@@ -18,9 +18,9 @@ export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
-  // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 아군이 칠 때 0.4·A²/(A+D),
-  // 적이 칠 때는 원작 A − D 이되 그 비율식보다 크지 않게. 원작식의 "1 아니면 한두 방" 을 아군 쪽은 없애고, 적 쪽은 큰 한 방만 깎는다
-  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: { form: 'cap', coef: 0.4 } }),
+  // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 비율식 c·A²/(A+D), 아군 c = 0.4 · 적 c = 0.15.
+  // 원작식의 "1 아니면 한두 방" 을 두 편 모두 없애고, 적이 아군보다 2~3배 많은 만큼 적 계수를 낮춰 난이도는 원작판 수준으로
+  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: { form: 'ratio', coef: 0.15 } }),
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

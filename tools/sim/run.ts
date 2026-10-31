@@ -32,6 +32,7 @@ interface Row {
   fallen: string[]; npcFallen: number; leadLow: number      // leadLow = 선두 HP 최저 (%)
   leadEarly: boolean                                         // 첫 아군 차례 전에 선두가 쓰러짐
   foeRests: number; foeActs: number; allyRests: number; levelUps: number; joined: string[]
+  hits: { ally: Hits; foe: Hits }                            // 물리 타격 분포 (아군 쪽 = 일행·NPC 가 친 것)
 }
 
 // ---------- 난수 (레벨업만 쓴다): 씨앗을 정해 같은 결과 ----------
@@ -170,7 +171,10 @@ function partyPlan(u: Unit): AiPlan {
 
 // ---------- 전투 한 판 ----------
 
-interface Tally { foeRests: number; foeActs: number; allyRests: number; levelUps: number; leadLow: number; leadEarly: boolean; allyMoved: boolean }
+/** 물리 타격 분포: n 타격 수, one = 1 피해 (대상 HP 가 1 보다 많을 때), half = 최대HP 절반 이상 한 방, sum = 피해 ÷ 최대HP 합 (평균 = 한 방이 최대HP 의 몇 %) */
+interface Hits { n: number; one: number; half: number; sum: number }
+const noHits = (): Hits => ({ n: 0, one: 0, half: 0, sum: 0 })
+interface Tally { hits: { ally: Hits; foe: Hits }; foeRests: number; foeActs: number; allyRests: number; levelUps: number; leadLow: number; leadEarly: boolean; allyMoved: boolean }
 
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
 function act(u: Unit, party: boolean, t: Tally): Outcome | null {
@@ -192,7 +196,16 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
     if (addExp(u, r.hits, plan.magic, r.cured)) t.levelUps++
     magic = plan.magic
   } else if (plan.target && plan.target.hp > 0) {
+    const before = new Map(S.units.map(o => [o, o.hp]))
     const r = strike(u, plan.target)
+    const h = u.side === 'enemy' ? t.hits.foe : t.hits.ally
+    for (const { target, value } of r.hits) {
+      if (target.side === u.side) continue
+      h.n++
+      if (value === 1 && (before.get(target) ?? 0) > 1) h.one++
+      if (value >= target.maxHp * 0.5) h.half++
+      h.sum += value / target.maxHp
+    }
     if (addExp(u, r.hits)) t.levelUps++
     attacked = true
   }
@@ -231,7 +244,7 @@ function partyStep(live: Unit[], t: Tally): Outcome | null {
 
 function battle(maxTurns: number): { result: Outcome | 'stall'; tally: Tally } {
   freshBattle()
-  const t: Tally = { foeRests: 0, foeActs: 0, allyRests: 0, levelUps: 0, leadLow: 100, leadEarly: false, allyMoved: false }
+  const t: Tally = { hits: { ally: noHits(), foe: noHits() }, foeRests: 0, foeActs: 0, allyRests: 0, levelUps: 0, leadLow: 100, leadEarly: false, allyMoved: false }
   startEvents()
   const lead = member([0, 0])!
   const watch = () => { t.leadLow = Math.min(t.leadLow, Math.round(lead.hp / lead.maxHp * 100)) }
@@ -310,7 +323,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
       fallen: S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name),
       npcFallen: S.units.filter(u => u.side === 'ally' && u.troop !== 0 && u.hp <= 0).length,
       leadLow: res.tally.leadLow, leadEarly: res.tally.leadEarly, foeRests: res.tally.foeRests, foeActs: res.tally.foeActs,
-      allyRests: res.tally.allyRests, levelUps: res.tally.levelUps, joined: [],
+      allyRests: res.tally.allyRests, levelUps: res.tally.levelUps, joined: [], hits: res.tally.hits,
     }
     rows.push(row)
     if (!o.json) printRow(row)
@@ -389,6 +402,10 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     }
     console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
     console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐')
+    const tot = { ally: noHits(), foe: noHits() }
+    for (const ws of by.values()) for (const w of ws) for (const k of ['ally', 'foe'] as const) for (const f of ['n', 'one', 'half', 'sum'] as const) tot[k][f] += w.hits[k][f]
+    const show = (h: Hits) => `1 피해 ${Math.round(h.one / Math.max(1, h.n) * 100)}% · 절반 넘는 한 방 ${Math.round(h.half / Math.max(1, h.n) * 100)}% · 한 방 평균 최대HP ${Math.round(h.sum / Math.max(1, h.n) * 100)}%`
+    console.log(`타격 — 아군이 칠 때: ${show(tot.ally)} / 적이 칠 때: ${show(tot.foe)}`)
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'
       const pct = (k: number) => `${Math.round(k / ws.length * 100)}%`
