@@ -15,9 +15,9 @@ import { stageDef } from '../../src/core/stage'
 import { S, member } from '../../src/core/state'
 import type { Unit } from '../../src/core/unit'
 import { edition as original } from '../../src/editions/original'
-import { edition as remake } from '../../src/editions/remake'
+import { edition as remake, tuning as remakeTuning } from '../../src/editions/remake'
 import { planFor as smartPlan } from '../../src/editions/remake/ai'
-import { makeRules } from '../../src/editions/original/rules'
+import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/rules'
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
@@ -32,7 +32,7 @@ interface Row {
   fallen: string[]; npcFallen: number; leadLow: number      // leadLow = 선두 HP 최저 (%)
   leadEarly: boolean                                         // 첫 아군 차례 전에 선두가 쓰러짐
   foeRests: number; foeActs: number; allyRests: number; levelUps: number; joined: string[]
-  hits: { ally: Hits; foe: Hits }                            // 물리 타격 분포 (아군 쪽 = 일행·NPC 가 친 것)
+  hits: Sides<Hits>; mag: Sides<Hits>; heal: Sides<number>   // 물리·마법 타격 분포, 회복량 합 (아군 쪽 = 일행·NPC)
 }
 
 // ---------- 난수 (레벨업만 쓴다): 씨앗을 정해 같은 결과 ----------
@@ -171,10 +171,22 @@ function partyPlan(u: Unit): AiPlan {
 
 // ---------- 전투 한 판 ----------
 
-/** 물리 타격 분포: n 타격 수, one = 1 피해 (대상 HP 가 1 보다 많을 때), half = 최대HP 절반 이상 한 방, sum = 피해 ÷ 최대HP 합 (평균 = 한 방이 최대HP 의 몇 %) */
-interface Hits { n: number; one: number; half: number; sum: number }
-const noHits = (): Hits => ({ n: 0, one: 0, half: 0, sum: 0 })
-interface Tally { hits: { ally: Hits; foe: Hits }; foeRests: number; foeActs: number; allyRests: number; levelUps: number; leadLow: number; leadEarly: boolean; allyMoved: boolean }
+/** 타격 분포 (물리·생명상해 따로): n 타격 수, one = 1 피해 (대상 HP 가 1 보다 많을 때), half = 최대HP 절반 이상 한 방, sum = 피해 ÷ 최대HP 합 (평균 = 한 방이 최대HP 의 몇 %) */
+interface Hits { n: number; one: number; half: number; sum: number; pts: number }   // pts = 피해 합
+const noHits = (): Hits => ({ n: 0, one: 0, half: 0, sum: 0, pts: 0 })
+type Sides<T> = { ally: T; foe: T }
+interface Tally { hits: Sides<Hits>; mag: Sides<Hits>; heal: Sides<number>; foeRests: number; foeActs: number; allyRests: number; levelUps: number; leadLow: number; leadEarly: boolean; allyMoved: boolean }
+
+function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], before: Map<Unit, number>) {
+  for (const { target, value } of hits) {
+    if (target.side === u.side) continue
+    h.n++
+    h.pts += value
+    if (value === 1 && (before.get(target) ?? 0) > 1) h.one++
+    if (value >= target.maxHp * 0.5) h.half++
+    h.sum += value / target.maxHp
+  }
+}
 
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
 function act(u: Unit, party: boolean, t: Tally): Outcome | null {
@@ -192,20 +204,17 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
   if (path.length > 1) { u.moved = true; u.steps += path.length - 1; u.x = plan.dest.x; u.y = plan.dest.y }
   let attacked = false, magic: Magic | undefined
   if (plan.magic && plan.at) {
+    const before = new Map(S.units.map(o => [o, o.hp]))
     const r = spellResult(u, plan.magic, plan.at)
+    const side = u.side === 'enemy' ? 'foe' : 'ally'
+    if (S.ed.rules.spellSide(plan.magic) === 'foe') tallyHits(t.mag[side], u, r.hits.filter(h => h.value > 0), before)
+    else t.heal[side] += r.hits.reduce((a, h) => a + h.value, 0)
     if (addExp(u, r.hits, plan.magic, r.cured)) t.levelUps++
     magic = plan.magic
   } else if (plan.target && plan.target.hp > 0) {
     const before = new Map(S.units.map(o => [o, o.hp]))
     const r = strike(u, plan.target)
-    const h = u.side === 'enemy' ? t.hits.foe : t.hits.ally
-    for (const { target, value } of r.hits) {
-      if (target.side === u.side) continue
-      h.n++
-      if (value === 1 && (before.get(target) ?? 0) > 1) h.one++
-      if (value >= target.maxHp * 0.5) h.half++
-      h.sum += value / target.maxHp
-    }
+    tallyHits(u.side === 'enemy' ? t.hits.foe : t.hits.ally, u, r.hits, before)
     if (addExp(u, r.hits)) t.levelUps++
     attacked = true
   }
@@ -244,7 +253,7 @@ function partyStep(live: Unit[], t: Tally): Outcome | null {
 
 function battle(maxTurns: number): { result: Outcome | 'stall'; tally: Tally } {
   freshBattle()
-  const t: Tally = { hits: { ally: noHits(), foe: noHits() }, foeRests: 0, foeActs: 0, allyRests: 0, levelUps: 0, leadLow: 100, leadEarly: false, allyMoved: false }
+  const t: Tally = { hits: { ally: noHits(), foe: noHits() }, mag: { ally: noHits(), foe: noHits() }, heal: { ally: 0, foe: 0 }, foeRests: 0, foeActs: 0, allyRests: 0, levelUps: 0, leadLow: 100, leadEarly: false, allyMoved: false }
   startEvents()
   const lead = member([0, 0])!
   const watch = () => { t.leadLow = Math.min(t.leadLow, Math.round(lead.hp / lead.maxHp * 100)) }
@@ -323,7 +332,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
       fallen: S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name),
       npcFallen: S.units.filter(u => u.side === 'ally' && u.troop !== 0 && u.hp <= 0).length,
       leadLow: res.tally.leadLow, leadEarly: res.tally.leadEarly, foeRests: res.tally.foeRests, foeActs: res.tally.foeActs,
-      allyRests: res.tally.allyRests, levelUps: res.tally.levelUps, joined: [], hits: res.tally.hits,
+      allyRests: res.tally.allyRests, levelUps: res.tally.levelUps, joined: [], hits: res.tally.hits, mag: res.tally.mag, heal: res.tally.heal,
     }
     rows.push(row)
     if (!o.json) printRow(row)
@@ -357,13 +366,20 @@ function printRow(w: Row) {
 export async function main(argv: string[]) {
   const arg = (k: string, d: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d }
   const route = arg('route', 'all')
-  // --dmg orig | floor:0.15 | ratio:0.4 — 물리 피해식 (rules.ts Physical). 없으면 그 판 그대로
-  //   --dmg-enemy 같은 꼴 = 적이 칠 때만 다른 식
-  const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as 'orig' | 'floor' | 'ratio' | 'cap', coef: Number(coef ?? 0) } }
-  const dmgEnemy = arg('dmg-enemy', ''), dmg = arg('dmg', '') + (dmgEnemy ? ` 적 ${dmgEnemy}` : '')
+  // 피해 조정 (rules.ts Tuning) — 그 판 값에서 바꾼다: --dmg orig | floor:0.15 | ratio:0.4 (물리식), --spell N (생명상해 배율), --heal N (생명회복 배율),
+  //   --dmg-enemy·--spell-enemy·--heal-enemy = 적이 칠 때만
+  const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as Tuning['form'], coef: Number(coef ?? 0) } }
   const base = arg('ed', 'remake') === 'original' ? original : remake
+  const keys = ['dmg', 'spell', 'heal', 'dmg-enemy', 'spell-enemy', 'heal-enemy'].filter(k => argv.includes(`--${k}`))
+  const dmg = keys.map(k => `${k} ${arg(k, '')}`).join(' ')
+  const tuned = (): Tuning => {
+    const t0 = base === remake ? remakeTuning : ORIGINAL
+    const side = (t: Omit<Tuning, 'enemy'>, sfx: string) => ({ ...t, ...argv.includes(`--dmg${sfx}`) ? parse(arg(`dmg${sfx}`, 'orig')) : {},
+      ...argv.includes(`--spell${sfx}`) ? { spell: Number(arg(`spell${sfx}`, '1')) } : {}, ...argv.includes(`--heal${sfx}`) ? { heal: Number(arg(`heal${sfx}`, '1')) } : {} })
+    return { ...side(t0, ''), enemy: side(t0.enemy ?? t0, '-enemy') }
+  }
   const o: Opts = {
-    ed: dmg ? { ...base, rules: makeRules({ ...parse(arg('dmg', 'orig')), ...dmgEnemy ? { enemy: parse(dmgEnemy) } : {} }) } : base,
+    ed: keys.length ? { ...base, rules: makeRules(tuned()) } : base,
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
     turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'),
@@ -402,10 +418,16 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     }
     console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
     console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐')
-    const tot = { ally: noHits(), foe: noHits() }
-    for (const ws of by.values()) for (const w of ws) for (const k of ['ally', 'foe'] as const) for (const f of ['n', 'one', 'half', 'sum'] as const) tot[k][f] += w.hits[k][f]
-    const show = (h: Hits) => `1 피해 ${Math.round(h.one / Math.max(1, h.n) * 100)}% · 절반 넘는 한 방 ${Math.round(h.half / Math.max(1, h.n) * 100)}% · 한 방 평균 최대HP ${Math.round(h.sum / Math.max(1, h.n) * 100)}%`
+    const tot = { ally: noHits(), foe: noHits() }, mag = { ally: noHits(), foe: noHits() }, heal = { ally: 0, foe: 0 }
+    for (const ws of by.values()) for (const w of ws) for (const k of ['ally', 'foe'] as const) {
+      for (const f of ['n', 'one', 'half', 'sum', 'pts'] as const) { tot[k][f] += w.hits[k][f]; mag[k][f] += w.mag[k][f] }
+      heal[k] += w.heal[k]
+    }
+    const pct = (a: number, b: number) => Math.round(a / Math.max(1, b) * 100)
+    const show = (h: Hits) => `1 피해 ${pct(h.one, h.n)}% · 절반 넘는 한 방 ${pct(h.half, h.n)}% · 한 방 평균 최대HP ${pct(h.sum, h.n)}%`
     console.log(`타격 — 아군이 칠 때: ${show(tot.ally)} / 적이 칠 때: ${show(tot.foe)}`)
+    const share = (k: 'ally' | 'foe') => `마법 몫 ${pct(mag[k].pts, mag[k].pts + tot[k].pts)}% · 마법 한 방 평균 최대HP ${pct(mag[k].sum, mag[k].n)}% · 회복 ${pct(heal[k], tot[k === 'ally' ? 'foe' : 'ally'].pts + mag[k === 'ally' ? 'foe' : 'ally'].pts)}%`
+    console.log(`마법 — 아군: ${share('ally')} / 적: ${share('foe')}   (회복 = 받은 피해 대비)`)
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'
       const pct = (k: number) => `${Math.round(k / ws.length * 100)}%`

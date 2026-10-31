@@ -20,14 +20,15 @@ const flier = (u: Unit) => u.type.moveKind === 3 || u.type.moveKind === 4
 const terrAtk = (map: StageMap, u: Unit, at: Pos) => flier(u) ? 106 : 94 + 2 * layer3(map, at)
 const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map, u)
 
-/** 물리 피해식 (B1 제안 1, balance-proposal.md): orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
- *  A·D = 지형 보정 뒤 k1·k2. enemy = 적이 칠 때의 식 (없으면 같은 식). 원작판은 늘 orig */
-export interface Physical { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; enemy?: Omit<Physical, 'enemy'> }
-export const ORIGINAL: Physical = { form: 'orig', coef: 0 }
+/** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
+ *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'> }
+export const ORIGINAL: Tuning = { form: 'orig', coef: 0 }
+const forSide = (a: Unit, all: Tuning) => a.side === 'enemy' && all.enemy ? all.enemy : all
 
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
-function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Physical = ORIGINAL) {
-  const p = a.side === 'enemy' && all.enemy ? all.enemy : all
+function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL) {
+  const p = forSide(a, all)
   const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d)
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
@@ -58,11 +59,11 @@ function comaHits(a: Unit, d: Unit) {
 }
 
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
-function spell(a: Unit, d: Unit, m: Magic): SpellHit {
-  const P = m.power, e = m.effect
-  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d)), 1, 99), d.hp) }
+function spell(a: Unit, d: Unit, m: Magic, all: Tuning = ORIGINAL): SpellHit {
+  const P = m.power, e = m.effect, t = forSide(a, all)
+  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1)), 1, 99), d.hp) }
   if (e === 0) {
-    const v = clamp(k5(a, P), 1, 99)
+    const v = clamp(tr(k5(a, P) * (t.heal ?? 1)), 1, 99)
     return { kind: 'heal', value: Math.min(v, d.maxHp - d.hp), fatigue: Math.min(d.fatigue, tr(1 + 0.33 * v)) }
   }
   if (e >= 1 && e <= 4) return { kind: 'stat', stat: BUFF[e - 1], value: clamp(k6(a, P) - k7(d), 1, 99) }
@@ -156,13 +157,13 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
 
 const HYEYU = 17, GALE_SHOES = 165   // 두 번 행동 특례 (초상·도구 Item id)
 
-/** 판 규칙 (원작 규칙). physical = 물리 피해식 (개선판·tools/sim 이 바꾼다) */
-export function makeRules(physical: Physical = ORIGINAL): Rules { return {
+/** 판 규칙 (원작 규칙). tuning = 피해 조정 (개선판·tools/sim 이 바꾼다) */
+export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   damageRange(map, a, d, at) {
-    const v = damage(map, a, d, at, physical)
+    const v = damage(map, a, d, at, tuning)
     return [v, v]
   },
-  rollDamage: (map, a, d) => damage(map, a, d, a, physical),
+  rollDamage: (map, a, d) => damage(map, a, d, a, tuning),
   // 무기 EAD f2 = 사거리, f3 = 범위 (0aa2:17dd → +0x44/+0x46, 무기 없으면 1/0). 사거리 범람 모양은 [추정] 마름모.
   // 사거리 칸은 자기 칸을 포함하고 (f2 = 0 이면 자기 칸만, 20ec:d9b0) 자기 칸은 같은 편 표시라 상대를 노리는 공격에선 빠진다 → 최소 1.
   // 기사 (직업 15, 공격 유형 2) 는 같은 편을 중심으로 고르므로 자기 칸부터 (core/attack.ts). 그 밖의 f2 = 0 (지팡이·부적 등) 은 [근사] 1
@@ -187,7 +188,7 @@ export function makeRules(physical: Physical = ORIGINAL): Rules { return {
   // MAD 사거리 = 중심 칸 거리, 0 = 자기 자리 (노래). 범위 = 중심에서 마름모 반경 [추정: 범람 35ae:1253 모양]. 자기 편 마법은 자기 자신도
   spellRange: m => m.range === 0 ? [0, 0] : [isFoeSpell(m) ? 1 : 0, m.range],
   spellSide: m => isFoeSpell(m) ? 'foe' : 'own',
-  spell,
+  spell: (a, d, m) => spell(a, d, m, tuning),
   // 2ff8:1109 [확정]: 차례를 마칠 때 초상 17 (혜유) 이 도구 질풍화 (165) 를 차고 현재 민첩 > 60 이면 그 차례를 한 번 더 (휴식 포함, 세 번째는 없음)
   actsTwice: u => u.type.por === HYEYU && u.type.equip[2] === GALE_SHOES && u.agi > 60,
   // 매 차례 (20ec:a419): 중독 → 1 줄고 HP −= max(1, trunc(HP·0.33)) / 혼수 → 1 줄고 휴식하고 넘김 /

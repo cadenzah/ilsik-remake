@@ -3,7 +3,7 @@ import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { planFor } from './ai'
-import { makeRules, type Physical } from '../original/rules'
+import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
 import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
@@ -16,20 +16,24 @@ const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs',
 const extra = import.meta.glob<ExtraBattle>('../../../content/remake/battles/*.json', { import: 'default', eager: true })
 const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) => [Number(/(\d+)\.json$/.exec(path)![1]), b]))
 
-// 적이 칠 때의 계수 = 난이도 (쉬움·보통·어려움, settings.ts). 시뮬레이터: 0.12 → 첫판 승 86·84·43%, 0.15 → 79·68·30% (원작판 75·63·31%), 0.2 → 71·54·14%
-const ENEMY_COEF = [0.12, 0.15, 0.2]
-const enemyHit: NonNullable<Physical['enemy']> = { form: 'ratio', coef: ENEMY_COEF[1] }
+// 적이 칠 때 = 물리 비율식 계수 0.19 · 생명상해 ×0.6 (B1 제안 1·2, balance-proposal.md "2번 마법 수치") 에 난이도 배율 (쉬움·보통·어려움 = ×0.8·1·1.2, settings.ts).
+// 시뮬레이터 첫판 승 (1~9·10~25·26~43장): 쉬움 89·85·57%, 보통 79·69·38% (원작판 75·63·31%), 어려움 60·55·14%
+const ENEMY = { coef: 0.19, spell: 0.6 }, DIFF_SCALE = [0.8, 1, 1.2]
+const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
+/** 개선판 피해 조정 (tools/sim 이 이 값에서 바꿔 본다). 아군 = 물리 0.4, 마법·회복은 원작 그대로 */
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit }
 
 export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
-  // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 비율식 c·A²/(A+D), 아군 c = 0.4 · 적 c = 0.15.
+  // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 두 편 모두 비율식 c·A²/(A+D) (위 tuning).
   // 원작식의 "1 아니면 한두 방" 을 두 편 모두 없애고, 적이 아군보다 2~3배 많은 만큼 적 계수를 낮춰 난이도는 원작판 수준으로
-  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: enemyHit }),
+  rules: makeRules(tuning),
   beginBattle() {
     const d = difficulty()
-    enemyHit.coef = ENEMY_COEF[d]
+    enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]
+    enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
     FLAGS.add(`diff${d}`)
   },
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
