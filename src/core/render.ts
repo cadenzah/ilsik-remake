@@ -2,7 +2,7 @@
 // 원작 전투 부품 (ux.md 1절): 이동 범위 = 범위 밖 칸에 STA 5 체크무늬, 공격 범위 = 화면을 보랏빛으로 어둡게 + 사거리 칸만 원래 색
 // (사거리 1 이면 STA 3 십자 틀), 차례 유닛 = STA 1 모서리 괄호, 공격 대상 = STA 2 틀, 진영 표시 = 머리 위 STA 13·14·15
 import { A, TH, TW } from './data'
-import { key, pathTo, reachable } from './grid'
+import { key, pathTo, reachable, withinCost } from './grid'
 import { canAim, inReach, reachCells, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { frameImage, layout, mapRect, view } from './screen'
 import { piece, size } from './skin'
@@ -82,9 +82,10 @@ export function centerOnIfOff(p: Pos) {
 // ---------- 렌더 ----------
 
 /** 적 위협 범위 (개선판). only = 그 적만 */
+/** 위협 범위. 경계 부대 (상태 1) 는 깨우기 전엔 오지 않으므로 빼고 wakeTiles 로, 대기 (상태 2) 는 뺀다 (개선판, B1 N1) */
 function threatTiles(only?: Unit | null): Set<number> {
   const out = new Set<number>()
-  for (const e of only ? [only] : alive('enemy')) {
+  for (const e of (only ? [only] : alive('enemy')).filter(e => S.troopState[e.troop] !== 1 && S.troopState[e.troop] !== 2)) {
     // 물리는 공격 유형대로 (core/attack.ts). 마법을 쓰는 적 (공격 유형 1) 은 쓸 수 있는 공격 마법의 사거리 + 범위까지
     const reach = Math.max(0, ...(aiCaster(e) ? spellsOf(e).filter(m => S.ed.rules.spellSide(m) === 'foe' && S.ed.rules.canCast(e, m)).map(m => m.range + m.area) : []))
     for (const k of reachable(S.map, S.units, e).keys()) {
@@ -100,21 +101,33 @@ function threatTiles(only?: Unit | null): Set<number> {
   return out
 }
 
+/** 경계 부대가 깨어나는 범위: 일행 대원이 이 칸에 서면 그 부대가 제 차례에 깨어나 바로 움직인다 (이동력 + 1, original/ai.ts aiGate) */
+function wakeTiles(only?: Unit | null): Set<number> {
+  const out = new Set<number>()
+  for (const e of (only ? [only] : alive('enemy')).filter(e => S.troopState[e.troop] === 1))
+    for (const k of withinCost(S.map, e, e.mov + 1)) out.add(k)
+  return out
+}
+
 // 위협 범위용 붉은 체크무늬 (STA 5 를 붉게)
-let redDither: HTMLCanvasElement | null = null
-function ditherRed() {
-  if (!redDither) {
+const dithers = new Map<string, HTMLCanvasElement>()
+function ditherOf(color: string) {
+  let d = dithers.get(color)
+  if (!d) {
     const { w, h } = size('sta.5')
-    redDither = document.createElement('canvas')
-    redDither.width = w; redDither.height = h
-    const c = redDither.getContext('2d')!
+    d = document.createElement('canvas')
+    d.width = w; d.height = h
+    const c = d.getContext('2d')!
     piece(c, 'sta.5', 0, 0)
     c.globalCompositeOperation = 'source-in'
-    c.fillStyle = '#c01818'
+    c.fillStyle = color
     c.fillRect(0, 0, w, h)
+    dithers.set(color, d)
   }
-  return redDither
+  return d
 }
+const ditherRed = () => ditherOf('#c01818')
+const ditherWake = () => ditherOf('#10b0a0')   // 경계 부대 깨우는 범위 (청록: 위협 빨강·이동 파랑·모래·풀과 다르게)
 
 const MARK = { ally: 'sta.13', npc: 'sta.14', enemy: 'sta.15' }
 
@@ -156,9 +169,12 @@ export function frame(now: number) {
   }
 
   if (remake && (S.threat || S.watch)) {
-    const red = ditherRed()
-    for (const k of threatTiles(S.threat ? null : S.watch))
+    const red = ditherRed(), yellow = ditherWake(), only = S.threat ? null : S.watch
+    const threat = threatTiles(only)
+    for (const k of threat)
       modern ? fill(k % 1000, Math.floor(k / 1000), 'rgba(200,40,16,0.30)', 'rgba(255,190,160,0.55)') : ctx.drawImage(red, (k % 1000) * TW, Math.floor(k / 1000) * TH)
+    for (const k of wakeTiles(only)) if (!threat.has(k))
+      modern ? fill(k % 1000, Math.floor(k / 1000), 'rgba(16,176,160,0.32)', 'rgba(170,255,240,0.6)') : ctx.drawImage(yellow, (k % 1000) * TW, Math.floor(k / 1000) * TH)
   }
 
   const md = S.mode
@@ -261,7 +277,14 @@ export function frame(now: number) {
       ctx.fillRect(x + 8, y + TH - 4, TW - 16, 4)
       ctx.fillStyle = u.side === 'ally' ? '#55d17a' : '#ff6b6b'
       ctx.fillRect(x + 8, y + TH - 4, ((TW - 16) * u.hp) / u.maxHp, 4)
+      if (u.fatigue > 0) {   // 피로 막대 (B1 제안 4): 생명 막대 바로 위, 70 넘으면 붉게 (적 AI 휴식선)
+        ctx.fillStyle = '#000a'
+        ctx.fillRect(x + 8, y + TH - 7, TW - 16, 3)
+        ctx.fillStyle = u.fatigue > 70 ? '#ff4a2a' : '#e8b440'
+        ctx.fillRect(x + 8, y + TH - 7, ((TW - 16) * Math.min(100, u.fatigue)) / 100, 3)
+      }
       statusDots(u, x, y)
+      if (restsNext(u)) restBadge(x, y)
     }
     ctx.globalAlpha = 1
   }
@@ -322,13 +345,29 @@ export function frame(now: number) {
   requestAnimationFrame(frame)
 }
 
-/** 개선판: 상태 이상 점 (중독 보라 · 혼수 파랑 · 강화 하늘 · 약화 주황), 생명 막대 위 오른쪽 */
+/** 컴퓨터 조종 유닛이 다음 제 차례에 쉰다 (휴식선, 행동하는 부대) — 개선판 B1 N1 */
+export const restsNext = (u: Unit) => u.hp > 0 && (u.side === 'enemy' || isNpc(u)) && S.troopState[u.troop] !== 1 && S.troopState[u.troop] !== 2 && S.ed.rules.aiRests(u)
+
+/** 머리 위 오른쪽 「휴식」 표 */
+function restBadge(x: number, y: number) {
+  ctx.font = 'bold 11px sans-serif'
+  ctx.textAlign = 'center'
+  const w = 26, bx = x + TW - w - 2, by = y - 2
+  ctx.fillStyle = 'rgba(20,40,70,0.85)'
+  ctx.fillRect(bx, by, w, 13)
+  ctx.strokeStyle = '#9ad8ff'; ctx.lineWidth = 1
+  ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, 12)
+  ctx.fillStyle = '#cfeeff'
+  ctx.fillText('휴식', bx + w / 2, by + 10)
+}
+
+/** 개선판: 상태 이상 점 (중독 보라 · 혼수 파랑 · 강화 하늘 · 약화 주황), 피로 막대 위 오른쪽 */
 function statusDots(u: Unit, x: number, y: number) {
   const mods = Object.values(u.mods)
   const dots = [u.poison > 0 && '#c070ff', u.coma > 0 && '#5aa8ff', mods.some(v => v > 0) && '#9ad8ff', mods.some(v => v < 0) && '#ff9a40'].filter(Boolean) as string[]
   dots.forEach((c, i) => {
-    ctx.fillStyle = '#000'; ctx.fillRect(x + TW - 14 - i * 8, y + TH - 12, 7, 7)
-    ctx.fillStyle = c; ctx.fillRect(x + TW - 13 - i * 8, y + TH - 11, 5, 5)
+    ctx.fillStyle = '#000'; ctx.fillRect(x + TW - 14 - i * 8, y + TH - 15, 7, 7)
+    ctx.fillStyle = c; ctx.fillRect(x + TW - 13 - i * 8, y + TH - 14, 5, 5)
   })
 }
 

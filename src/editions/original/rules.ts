@@ -189,6 +189,8 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   spellRange: m => m.range === 0 ? [0, 0] : [isFoeSpell(m) ? 1 : 0, m.range],
   spellSide: m => isFoeSpell(m) ? 'foe' : 'own',
   spell: (a, d, m) => spell(a, d, m, tuning),
+  // 20ec:abe1: 피로 > 70 이거나 HP ≤ 최대HP × 0.25 ([0x1f3f]) 면 휴식 (038e) 하고 차례 끝
+  aiRests: u => u.fatigue > 70 || u.hp <= u.maxHp * 0.25,
   // 2ff8:1109 [확정]: 차례를 마칠 때 초상 17 (혜유) 이 도구 질풍화 (165) 를 차고 현재 민첩 > 60 이면 그 차례를 한 번 더 (휴식 포함, 세 번째는 없음)
   actsTwice: u => u.type.por === HYEYU && u.type.equip[2] === GALE_SHOES && u.agi > 60,
   // 매 차례 (20ec:a419): 중독 → 1 줄고 HP −= max(1, trunc(HP·0.33)) / 혼수 → 1 줄고 휴식하고 넘김 /

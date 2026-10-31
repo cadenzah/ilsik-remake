@@ -82,6 +82,7 @@ canvas#view { touch-action: none; }
 #hud .owin.basic.passive { pointer-events: none; }
 .owin.basic .ic.btn { cursor: pointer; }
 .owin.basic .v { position: absolute; top: 50px; width: 24px; text-align: center; color: #2a3c9c; text-shadow: -1px 0 #9aa8e0; }
+.owin.basic .v.red { color: #c01818; text-shadow: -1px 0 #f0a0a0; }   /* 개선판: 피로 70 넘음 (적 AI 휴식선) */
 .owin.basic .x { position: absolute; left: 10px; right: 6px; top: 72px; line-height: 18px; white-space: nowrap; overflow: hidden; }
 /* 큰 인물기본자료 (camp.ts statusWindow): 정비 화면 상태창 */
 .bigstat { position: absolute; width: 330px; height: 330px; cursor: pointer; font: 14px/16px var(--font); }

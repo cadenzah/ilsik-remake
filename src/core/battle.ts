@@ -961,6 +961,16 @@ export function hoverTile(t: Pos | null) {
 }
 
 /** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸 */
+/** 공격자 피로 때문에 줄어든 피해 (피로 0 일 때와의 차). 상대가 받는 만큼 자르기 전 값끼리 비교 */
+function fatigueLoss(u: Unit, t: Unit, at: Pos) {
+  if (!u.fatigue) return 0
+  const now = S.ed.rules.damageRange(S.map, u, t, at)[0], f = u.fatigue, hp = t.hp
+  u.fatigue = 0; t.hp = 999
+  const fresh = Math.min(S.ed.rules.damageRange(S.map, u, t, at)[0], hp)
+  u.fatigue = f; t.hp = hp
+  return Math.max(0, fresh - now)
+}
+
 function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>) {
   const cp = target === u ? spot ?? u : target
   S.aim = { x: cp.x, y: cp.y }
@@ -973,7 +983,8 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
     if (hit.length === 1 && hit[0] === target) {
       const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
       const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
+      const tired = fatigueLoss(u, target, spot ?? u)   // B1 제안 4: 피로 때문에 덜 들어가는 몫
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, tired ? `<span class="red">피로로 −${tired}</span>` : '', `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {

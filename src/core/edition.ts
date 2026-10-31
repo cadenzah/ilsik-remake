@@ -23,6 +23,8 @@ export interface Rules {
   spellSide(m: Magic): 'foe' | 'own'
   /** 대상 하나에 대한 마법 결과. 난수가 없으므로 예측과 실행이 같다 */
   spell(caster: Unit, target: Unit, m: Magic): SpellHit
+  /** 컴퓨터 조종 유닛이 제 차례에 쉬는 선인가 (행동하는 부대일 때, original/ai.ts aiGate). 개선판은 맵·카드에 미리 보인다 (B1 N1) */
+  aiRests(u: Unit): boolean
   /** 이 유닛이 한 차례에 두 번 행동하나 (차례를 마칠 때 검사) */
   actsTwice(u: Unit): boolean
   /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */

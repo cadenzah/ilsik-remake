@@ -4,13 +4,13 @@
 import { terrainName } from './grid'
 import { hud, mapRect, clampBox } from './screen'
 import { pieceUrl } from './skin'
-import { member, S } from './state'
+import { isNpc, member, S } from './state'
 import type { Unit } from './unit'
 import { closeWin, esc, openWin } from './ui'
 import { winUrl } from './skin'
 import { TW } from './data'
 
-const NARROW = 171, WIDE = 208   // 개선판 마우스 올림 창은 정보 줄 때문에 넓게
+const NARROW = 171, WIDE = 224   // 개선판 마우스 올림 창은 정보 줄 때문에 넓게 (지형·이동·사거리 줄이 잘리지 않게)
 
 let basic: HTMLElement | null = null
 /** 작은 인물기본자료. extra = 개선판 줄 (이름·지형). onFace = 얼굴 아이콘 (큰 창) */
@@ -18,16 +18,17 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   basic?.remove()
   basic = null
   if (!u) return
-  const h = opts.extra ? 112 : 74, W = opts.extra ? WIDE : NARROW
+  const next = opts.extra ? nextTurn(u) : ''
+  const h = opts.extra ? (next ? 130 : 112) : 74, W = opts.extra ? WIDE : NARROW
   const el = document.createElement('div')
   el.className = `owin basic${opts.extra ? ' passive' : ''}`   // 개선판 마우스 올림 창은 입력을 가로채지 않는다
   Object.assign(el.style, { width: `${W}px`, height: `${h}px`, backgroundImage: `url(${winUrl('basic', W, h)})` })
   const vals = [u.hp, u.atk, u.def, u.fatigue]
   el.innerHTML = vals.map((v, i) => `<img class="ic" alt="" src="${pieceUrl(`icon.${i}.0`)}" style="left:${(W - NARROW) / 2 + 12 + i * 32}px">
-      <span class="v" style="left:${(W - NARROW) / 2 + 8 + i * 32}px">${String(v).padStart(2, '0')}</span>`).join('')
+      <span class="v${i === 3 && S.ed.id === 'remake' && v > 70 ? ' red' : ''}" style="left:${(W - NARROW) / 2 + 8 + i * 32}px">${String(v).padStart(2, '0')}</span>`).join('')
     + `<img class="ic face" alt="큰 창" src="${pieceUrl('icon.4.0')}" style="left:${(W - NARROW) / 2 + 12 + 4 * 32 + 2}px">`
     + (opts.extra ? `<div class="x"><b>${esc(u.type.name)}</b> Lv ${u.type.lv}${u.side === 'ally' && u.troop !== 0 ? ' · NPC' : ''}${statusTags(u)}
-        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y).replace(/ \(.*\)/, ''))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span></div>` : '')
+        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y).replace(/ \(.*\)/, ''))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span>${next ? `<br>${next}` : ''}</div>` : '')
   const face = el.querySelector<HTMLElement>('.face')!
   if (opts.onFace) { face.classList.add('btn'); face.onclick = e => { e.stopPropagation(); opts.onFace!() } }
   el.oncontextmenu = e => { e.preventDefault(); showBasic(null) }
@@ -39,6 +40,16 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   basic = el
 }
 export const hideBasic = () => showBasic(null)
+
+/** 개선판 줄 (B1 N1): 컴퓨터 조종 유닛의 다음 차례 — 경계 (상태 1) · 대기 (2) · 휴식선 (rules aiRests). 그 밖은 빈 줄 없음 */
+function nextTurn(u: Unit) {
+  if (u.hp <= 0 || !(u.side === 'enemy' || isNpc(u))) return ''
+  const st = S.troopState[u.troop]
+  if (st === 1) return '<span class="blue">경계 — 가까이 가거나 치면 깨어남</span>'
+  if (st === 2) return '<span class="dim">대기 — 움직이지 않음</span>'
+  if (!S.ed.rules.aiRests(u)) return ''
+  return `<span class="blue">다음 차례 휴식 (${u.fatigue > 70 ? `피로 ${u.fatigue}` : '생명 ¼ 이하'})</span>`
+}
 
 /** 개선판 줄: 상태 이상 (중독·혼수 남은 차례, 강화·약화) */
 function statusTags(u: Unit) {

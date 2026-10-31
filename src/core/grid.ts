@@ -52,6 +52,26 @@ export function reachable(map: StageMap, units: Unit[], u: Unit): Moves {
   return stops
 }
 
+/** 지형만 보고 (유닛 무시) 이동 비용 limit 안의 칸. 경계 부대가 깨어나는 범위 = 이동력 + 1 (original/ai.ts partyInReach) */
+export function withinCost(map: StageMap, u: Unit, limit: number): Set<number> {
+  const cost = new Map([[key(u.x, u.y), 0]])
+  const queue: [number, number, number][] = [[0, u.x, u.y]]
+  while (queue.length) {
+    queue.sort((a, b) => a[0] - b[0])
+    const [c, x, y] = queue.shift()!
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy
+      if (!inside(map, nx, ny)) continue
+      const nc = c + moveCost(map, nx, ny, u.type.moveKind)
+      if (nc > limit || nc >= (cost.get(key(nx, ny)) ?? Infinity)) continue
+      cost.set(key(nx, ny), nc)
+      queue.push([nc, nx, ny])
+    }
+  }
+  cost.delete(key(u.x, u.y))
+  return new Set(cost.keys())
+}
+
 export function pathTo(moves: Moves, x: number, y: number): Pos[] {
   const prev = moves.chain
   const out: Pos[] = []

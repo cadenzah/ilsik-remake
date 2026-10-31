@@ -37,8 +37,8 @@ export function aiGate(map: StageMap, units: Unit[], u: Unit, troopState: number
   // 깨어난 그 차례는 휴식 판정 없이 바로 행동 (a7b9)
   if (troopState[u.troop] === 1 && partyInReach(map, units, u)) { troopState[u.troop] = 0; return null }
   if (troopState[u.troop] === 1 || troopState[u.troop] === 2) return stay
-  // 20ec:abe1: 피로 > 70 이거나 HP ≤ 최대HP × 0.25 ([0x1f3f]) 면 휴식 (038e) 하고 차례 끝
-  if (u.fatigue > 70 || u.hp <= u.maxHp * 0.25) return { ...stay, rest: true }
+  // 휴식선 (rules.ts aiRests, 20ec:abe1) 이면 휴식 (038e) 하고 차례 끝
+  if (rules.aiRests(u)) return { ...stay, rest: true }
   return null
 }
 
