@@ -3,7 +3,9 @@ import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { planFor } from './ai'
-import { makeRules } from '../original/rules'
+import { makeRules, type Physical } from '../original/rules'
+import { FLAGS } from '../../core/campaign'
+import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
@@ -14,13 +16,22 @@ const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs',
 const extra = import.meta.glob<ExtraBattle>('../../../content/remake/battles/*.json', { import: 'default', eager: true })
 const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) => [Number(/(\d+)\.json$/.exec(path)![1]), b]))
 
+// 적이 칠 때의 계수 = 난이도 (쉬움·보통·어려움, settings.ts). 시뮬레이터: 0.12 → 첫판 승 86·84·43%, 0.15 → 79·68·30% (원작판 75·63·31%), 0.2 → 71·54·14%
+const ENEMY_COEF = [0.12, 0.15, 0.2]
+const enemyHit: NonNullable<Physical['enemy']> = { form: 'ratio', coef: ENEMY_COEF[1] }
+
 export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
   // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 비율식 c·A²/(A+D), 아군 c = 0.4 · 적 c = 0.15.
   // 원작식의 "1 아니면 한두 방" 을 두 편 모두 없애고, 적이 아군보다 2~3배 많은 만큼 적 계수를 낮춰 난이도는 원작판 수준으로
-  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: { form: 'ratio', coef: 0.15 } }),
+  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: enemyHit }),
+  beginBattle() {
+    const d = difficulty()
+    enemyHit.coef = ENEMY_COEF[d]
+    FLAGS.add(`diff${d}`)
+  },
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

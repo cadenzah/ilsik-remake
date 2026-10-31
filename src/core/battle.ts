@@ -22,7 +22,7 @@ import { playDialogue } from './dialogue'
 import { loadSlots, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
-import { setSetting, setting } from './settings'
+import { DIFFICULTIES, difficulty, setSetting, setting } from './settings'
 import { travelMap } from './worldmap'
 import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
@@ -161,6 +161,7 @@ async function start(resume?: Suspended) {
   clearCut()
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
+  S.ed.beginBattle?.()   // 개선판 난이도 (장 사이 상태를 되돌린 뒤라 다시 하기마다)
   const all = freshBattle()
   preloadSounds(all)
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
@@ -552,7 +553,7 @@ function cleared(ending: boolean) {
   }
   const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name)
   const goals = goalStates(aliveMember)
-  const lines = [`${S.turn}턴 만에 클리어${ending ? ' — 엔딩' : ''}`, fallen.length ? `쓰러진 동료: ${fallen.join(', ')}` : '쓰러진 동료 없음',
+  const lines = [`${S.turn}턴 만에 클리어${ending ? ' — 엔딩' : ''} · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료: ${fallen.join(', ')}` : '쓰러진 동료 없음',
     ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
   const buttons: Btn[] = []
   if (onward) buttons.push(['다음 장', onward])

@@ -33,6 +33,28 @@ export function setSetting(k: Setting, on: boolean) {
   if (was !== on) watchers.get(k)?.(on)
 }
 
+// ---------- 난이도 (개선판만, B1 제안 7 — balance-proposal.md "1번 피해식") ----------
+// 세 단계 = 적이 칠 때의 물리 피해 계수 (remake/index.ts). 바꾸면 다음 전투 (다시 하기 포함) 부터. 판의 기록에는 쓴 가장 낮은 난이도 (플래그 diff0~2)
+export const DIFFICULTIES = ['쉬움', '보통', '어려움'] as const
+export type Difficulty = 0 | 1 | 2
+const DIFF_KEY = 'eclipse.difficulty'
+let diffMem: Difficulty | null = null
+export function difficulty(): Difficulty {
+  try { const v = Number(localStorage.getItem(DIFF_KEY) ?? NaN); if (v === 0 || v === 1 || v === 2) return v } catch { /* 저장 불가 */ }
+  return diffMem ?? 1
+}
+export function setDifficulty(d: Difficulty) {
+  diffMem = d
+  try { localStorage.setItem(DIFF_KEY, String(d)) } catch { /* 저장 불가 */ }
+}
+export const nextDifficulty = () => setDifficulty(((difficulty() + 1) % 3) as Difficulty)
+export const DIFF_TITLE = '개선판: 적이 주는 물리 피해. 보통 = 원작판 수준. 다음 전투부터 적용, 기록에는 이 판에서 쓴 가장 낮은 난이도가 남는다'
+/** 판 플래그에서 쓴 가장 낮은 난이도 (없으면 undefined = 난이도 설정 전의 기록) */
+export function lowestDifficulty(flags: string[]): Difficulty | undefined {
+  const used = ([0, 1, 2] as const).filter(d => flags.includes(`diff${d}`))
+  return used[0]
+}
+
 /** 설정 화면 목록 (타이틀 '설정'·개선판 정비 화면 '설정') */
 export const SETTINGS: { k: Setting; label: string; title: string }[] = [
   { k: 'bitmapFont', label: '원작 글꼴', title: '개선판: 원작 비트맵 글꼴로 글자를 그린다 (끄면 시스템 글꼴). 원작판은 늘 원작 글꼴' },

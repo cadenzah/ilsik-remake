@@ -12,7 +12,7 @@ import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
 import { SONG, playMusic, stopMusic } from './music'
-import { SETTINGS, setSetting, setting } from './settings'
+import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, type Difficulty } from './settings'
 import { stageDef, type StageDef } from './stage'
 
 export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended; prologue?: boolean }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투, prologue = 새 게임 (창세 프롤로그부터)
@@ -128,7 +128,7 @@ export function showTitle(): Promise<Launch> {
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하', title: '새로 시작', on: () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }, undefined, true) } },   // 원작 2ff8:04dc: 새 게임은 창세 프롤로그부터
+        { label: '유랑천하', title: '새로 시작', on: () => ed === 'remake' ? pickDifficulty() : newGame() },   // 원작 2ff8:04dc: 새 게임은 창세 프롤로그부터
         { label: '지난흔적', title: '이어하기·기록 불러오기·기록 옮기기', on: () => loadMenu() },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
@@ -142,11 +142,25 @@ export function showTitle(): Promise<Launch> {
       ])
     }
 
-    // 설정 (개선판 메뉴): 켬/끔 스위치들 + 기록 옮기기. 바꾸면 그 자리에 초점을 둔 채 다시 그린다
+    const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }, undefined, true) }
+    // 개선판 새로 시작: 난이도부터 (설정에서 언제든 바꿀 수 있다)
+    const DIFF_SUB = ['적이 주는 피해가 적다', '원작판 수준', '적이 주는 피해가 크다']
+    const pickDifficulty = () => {
+      win.classList.add('wide')
+      rows([...([0, 1, 2] as Difficulty[]).map(d => ({ label: DIFFICULTIES[d], sub: DIFF_SUB[d], title: '나중에 설정에서 바꿀 수 있습니다',
+        on: () => { setDifficulty(d); newGame() } })),
+        { label: '돌아가기', cls: 'back', on: menu }])
+      body.querySelectorAll<HTMLButtonElement>('button')[difficulty()]?.focus()
+    }
+    /** 기록 칸 글자 뒤에 붙일 그 판의 가장 낮은 난이도 (개선판) */
+    const lowest = (flags: string[]) => { const d = ed === 'remake' ? lowestDifficulty(flags) : undefined; return d === undefined ? '' : ` · ${DIFFICULTIES[d]}` }
+
+    // 설정 (개선판 메뉴): 켬/끔 스위치들 + 난이도 + 기록 옮기기. 바꾸면 그 자리에 초점을 둔 채 다시 그린다
     const settings = (focus = 0) => {
       win.classList.add('wide')
       rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.title,
         on: () => { setSetting(o.k, !setting(o.k)); applyFont(); settings(SETTINGS.indexOf(o)) } })),
+        { label: `난이도 · ${DIFFICULTIES[difficulty()]}`, cls: 'opt', title: DIFF_TITLE, on: () => { nextDifficulty(); settings(SETTINGS.length) } },
         { label: '기록 옮기기', sub: '다른 브라우저·기기로', title: '코드·파일로 진행을 보내고 받는다', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
@@ -159,9 +173,9 @@ export function showTitle(): Promise<Launch> {
       rows([
         ...sus ? [{ label: '중단한 전투', sub: `${sus.title} · ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
           on: () => launch(sus.def, sus.at, sus) }] : [],
-        { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) : '없음', title: '장을 마칠 때마다 자동 기록',
+        { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) + lowest(p.flags) : '없음', title: '장을 마칠 때마다 자동 기록',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
-        ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
+        ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title + lowest(s.camp.flags) : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
           on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
         { label: '돌아가기', cls: 'back', on: menu }])
     }
@@ -174,7 +188,7 @@ export function showTitle(): Promise<Launch> {
       return `<li><b>${e.name}</b> ${parts.join(' · ') || '<span class="dim">없음</span>'}</li>`
     }).join('')
     const openTransfer = async (note = '') => {
-      openPage(() => settings(SETTINGS.length))
+      openPage(() => settings(SETTINGS.length + 1))
       const mine = currentBundle(), has = Object.keys(mine.data).length > 0
       const code = has ? await bundleCode(mine) : ''
       page.innerHTML = `<div class="transfer">

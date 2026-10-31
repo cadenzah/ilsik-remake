@@ -15,7 +15,7 @@ import { equippedStats } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
 import { SFX, play } from './sfx'
-import { SETTINGS, setSetting, setting } from './settings'
+import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
 export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][]; temple?: boolean } | { go: 'title' } | { go: 'load'; slot: number }
@@ -382,20 +382,24 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
 
   /** 개선판 「설정」 창 (원작 창틀·글자 버튼, slotWin 과 같은 모양): 항목마다 켬/끔, 올리면 도구설명 칸에 설명. 닫기 (현대식 설정 창과 같은 이름)·Esc·오른쪽 클릭 = 닫기 */
   const settingsWin = (onClose: () => void, focus = 0) => {
-    const w = 184, bw = 160, n = SETTINGS.length, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9
+    const w = 184, bw = 160, n = SETTINGS.length + 1, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9   // + 난이도
     dialog?.remove()
     dialog = document.createElement('div')
     dialog.className = 'dlg owin slots opts'
     dialog.style.cssText = px((640 - w) / 2, 110, w, h) + `;background-image:url(${winUrl('comma', w, h)})`
     dialog.innerHTML = `<div class="t">설 정</div>` + SETTINGS.map((s, i) =>
       `<button class="obtn sl opt" data-i="${i}" role="switch" aria-checked="${setting(s.k)}" style="${px((w - bw) / 2, 30 + i * 29, bw)}">${esc(s.label)}<b>${setting(s.k) ? '켬' : '끔'}</b></button>`).join('')
+      + `<button class="obtn sl opt diff" style="${px((w - bw) / 2, 30 + (n - 1) * 29, bw)}">난이도<b>${DIFFICULTIES[difficulty()]}</b></button>`
       + `<button class="obtn no" style="${px((w - bw) / 2, 30 + n * 29, bw)}">닫기</button>`
     stage.append(dialog)
-    dialog.querySelectorAll<HTMLButtonElement>('.opt').forEach(b => {
+    dialog.querySelectorAll<HTMLButtonElement>('.opt[data-i]').forEach(b => {
       const s = SETTINGS[Number(b.dataset.i)]
       b.onclick = () => { setSetting(s.k, !setting(s.k)); if (s.k === 'bitmapFont') applyFont(); settingsWin(onClose, Number(b.dataset.i)) }
       b.onmouseenter = b.onfocus = () => say(s.title.replace(/^개선판: /, ''))
     })
+    const diff = dialog.querySelector<HTMLButtonElement>('.diff')!
+    diff.onclick = () => { nextDifficulty(); settingsWin(onClose, n - 1) }
+    diff.onmouseenter = diff.onfocus = () => say(DIFF_TITLE.replace(/^개선판: /, ''))
     dialog.querySelector<HTMLButtonElement>('.no')!.onclick = () => { dialog?.remove(); dialog = null; onClose() }
     dialog.querySelectorAll<HTMLButtonElement>('.obtn')[focus]?.focus()
   }

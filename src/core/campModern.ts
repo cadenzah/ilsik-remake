@@ -11,7 +11,7 @@ import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
 import { SFX, play } from './sfx'
-import { SETTINGS, setSetting, setting } from './settings'
+import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 import { esc } from './ui'
 import { equippedStats, type Stats } from './unit'
 
@@ -366,7 +366,9 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     box.className = 'mc-opts'
     box.innerHTML = SETTINGS.map((o, n) => `<button role="switch" aria-checked="${setting(o.k)}" data-n="${n}" title="${esc(o.title)}">
       <span>${esc(o.label)}<small>${esc(o.title.replace(/^개선판: /, ''))}</small></span><i class="mc-switch" aria-hidden="true"></i></button>`).join('')
-    box.querySelectorAll<HTMLButtonElement>('button').forEach(b => {
+      + `<button class="mc-diff" title="${esc(DIFF_TITLE)}"><span>난이도 · ${DIFFICULTIES[difficulty()]}<small>${esc(DIFF_TITLE.replace(/^개선판: /, ''))}</small></span></button>`
+    box.querySelector<HTMLButtonElement>('.mc-diff')!.onclick = () => { nextDifficulty(); openSettings(SETTINGS.length) }
+    box.querySelectorAll<HTMLButtonElement>('button[data-n]').forEach(b => {
       const o = SETTINGS[Number(b.dataset.n)]
       b.onclick = () => { setSetting(o.k, !setting(o.k)); if (o.k === 'bitmapFont') applyFont(); openSettings(Number(b.dataset.n)) }
     })
