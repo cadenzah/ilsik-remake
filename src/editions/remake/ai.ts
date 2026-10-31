@@ -10,9 +10,9 @@ import { aimsFrom, strikeTargets } from '../../core/attack'
 import { aiCaster, spellCenters, spellTargets, spellsOf } from '../../core/magic'
 import type { Pos, Unit } from '../../core/unit'
 import { aiGate } from '../original/ai'
-import { makeRules } from '../original/rules'
+import { S } from '../../core/state'
 
-const rules = makeRules()   // 개선판 규칙 (index.ts 와 같은 것)
+const rules = () => S.ed.rules   // 지금 판의 규칙 (개선판 피해식, tools/sim 이 바꾼 식)
 
 export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan {
   const gate = aiGate(map, units, u, troopState)
@@ -26,7 +26,7 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
     for (const c of aimsFrom(u, spot, units)) {
       let score = -dist(spot, u) * 0.01, own = 0   // 같으면 이동이 적은 칸
       for (const t of strikeTargets(u, c, spot, units)) {
-        const [lo, hi] = rules.damageRange(map, u, t, spot)
+        const [lo, hi] = rules().damageRange(map, u, t, spot)
         const v = (lo >= t.hp ? 1000 : 0) + (lo + hi) / 2 - t.def * 0.1
         if (t.side === u.side) { own++; score -= 1.5 * Math.max(1, v) } else score += v
       }
@@ -56,8 +56,8 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
  *  같으면 덜 움직이는 자리. 점수 0 이하면 쓰지 않는다 */
 function spellScore(units: Unit[], u: Unit, m: Magic, c: Pos, from: Pos): number {
   let score = 0
-  for (const t of spellTargets(rules, u, m, c, units, from)) {
-    const h = rules.spell(u, t, m)
+  for (const t of spellTargets(rules(), u, m, c, units, from)) {
+    const h = rules().spell(u, t, m)
     if (h.kind === 'hp') score += h.value + (h.value >= t.hp ? 1000 : 0)
     else if (h.kind === 'heal') score += t.hp < t.maxHp * 0.7 ? h.value * 1.2 : 0
     else if (h.kind === 'stat') score += Math.sign(t.mods[h.stat]) === Math.sign(h.value) ? 0 : Math.abs(h.value) * 0.8
@@ -72,10 +72,10 @@ function spellScore(units: Unit[], u: Unit, m: Magic, c: Pos, from: Pos): number
 function bestSpell(units: Unit[], u: Unit, moves: Map<number, number>): { plan: AiPlan; score: number } | null {
   let best: { plan: AiPlan; score: number } | null = null
   for (const m of spellsOf(u)) {
-    if (!rules.canCast(u, m)) continue
+    if (!rules().canCast(u, m)) continue
     for (const k of moves.keys()) {
       const from = { x: k % 1000, y: Math.floor(k / 1000) }
-      for (const c of spellCenters(rules, u, m, units, from)) {
+      for (const c of spellCenters(rules(), u, m, units, from)) {
         const score = spellScore(units, u, m, c, from) - dist(from, u) * 0.01
         if (score > 0.5 && score > (best?.score ?? -Infinity)) best = { plan: { unit: u, dest: from, magic: m, at: c }, score }
       }

@@ -20,9 +20,18 @@ const flier = (u: Unit) => u.type.moveKind === 3 || u.type.moveKind === 4
 const terrAtk = (map: StageMap, u: Unit, at: Pos) => flier(u) ? 106 : 94 + 2 * layer3(map, at)
 const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map, u)
 
+/** 물리 피해식 (B1 제안 1, balance-proposal.md): orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
+ *  A·D = 지형 보정 뒤 k1·k2. enemy = 적이 칠 때의 식 (없으면 같은 식). 원작판은 늘 orig */
+export interface Physical { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; enemy?: Omit<Physical, 'enemy'> }
+export const ORIGINAL: Physical = { form: 'orig', coef: 0 }
+
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
-function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a) {
-  const v = tr((k1(a) * 0.01 * terrAtk(map, a, at) - k2(d) * 0.01 * terrDef(map, d)) * 0.01)
+function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Physical = ORIGINAL) {
+  const p = a.side === 'enemy' && all.enemy ? all.enemy : all
+  const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d)
+  const ratio = p.coef * A * A / Math.max(1, A + D)
+  const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
+  const v = tr(raw * 0.01)
   return Math.min(clamp(v, 1, 99), d.hp)
 }
 
@@ -147,13 +156,13 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
 
 const HYEYU = 17, GALE_SHOES = 165   // 두 번 행동 특례 (초상·도구 Item id)
 
-/** 판 규칙 (두 판 같은 원작 규칙) */
-export function makeRules(): Rules { return {
+/** 판 규칙 (원작 규칙). physical = 물리 피해식 (개선판·tools/sim 이 바꾼다) */
+export function makeRules(physical: Physical = ORIGINAL): Rules { return {
   damageRange(map, a, d, at) {
-    const v = damage(map, a, d, at)
+    const v = damage(map, a, d, at, physical)
     return [v, v]
   },
-  rollDamage: (map, a, d) => damage(map, a, d),
+  rollDamage: (map, a, d) => damage(map, a, d, a, physical),
   // 무기 EAD f2 = 사거리, f3 = 범위 (0aa2:17dd → +0x44/+0x46, 무기 없으면 1/0). 사거리 범람 모양은 [추정] 마름모.
   // 사거리 칸은 자기 칸을 포함하고 (f2 = 0 이면 자기 칸만, 20ec:d9b0) 자기 칸은 같은 편 표시라 상대를 노리는 공격에선 빠진다 → 최소 1.
   // 기사 (직업 15, 공격 유형 2) 는 같은 편을 중심으로 고르므로 자기 칸부터 (core/attack.ts). 그 밖의 f2 = 0 (지팡이·부적 등) 은 [근사] 1

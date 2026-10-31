@@ -3,6 +3,7 @@ import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { planFor } from './ai'
+import { makeRules } from '../original/rules'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
@@ -17,6 +18,9 @@ export const edition: Edition = {
   ...original,
   id: 'remake',
   name: '개선판',
+  // 물리 피해식 (B1 제안 1, 2026-11-01 시뮬레이터로 정함 — balance-proposal.md "1번 피해식"): 아군이 칠 때 0.4·A²/(A+D),
+  // 적이 칠 때는 원작 A − D 이되 그 비율식보다 크지 않게. 원작식의 "1 아니면 한두 방" 을 아군 쪽은 없애고, 적 쪽은 큰 한 방만 깎는다
+  rules: makeRules({ form: 'ratio', coef: 0.4, enemy: { form: 'cap', coef: 0.4 } }),
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

@@ -17,10 +17,11 @@ import type { Unit } from '../../src/core/unit'
 import { edition as original } from '../../src/editions/original'
 import { edition as remake } from '../../src/editions/remake'
 import { planFor as smartPlan } from '../../src/editions/remake/ai'
+import { makeRules } from '../../src/editions/original/rules'
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
-interface Opts { ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; careful: 'lead' | 'all' | 'none' }
+interface Opts { ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; dmg: string; careful: 'lead' | 'all' | 'none' }
 let careful: Opts['careful'] = 'all'
 
 /** 장 하나의 기록 */
@@ -343,11 +344,16 @@ function printRow(w: Row) {
 export async function main(argv: string[]) {
   const arg = (k: string, d: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d }
   const route = arg('route', 'all')
+  // --dmg orig | floor:0.15 | ratio:0.4 — 물리 피해식 (rules.ts Physical). 없으면 그 판 그대로
+  //   --dmg-enemy 같은 꼴 = 적이 칠 때만 다른 식
+  const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as 'orig' | 'floor' | 'ratio' | 'cap', coef: Number(coef ?? 0) } }
+  const dmgEnemy = arg('dmg-enemy', ''), dmg = arg('dmg', '') + (dmgEnemy ? ` 적 ${dmgEnemy}` : '')
+  const base = arg('ed', 'remake') === 'original' ? original : remake
   const o: Opts = {
-    ed: arg('ed', 'remake') === 'original' ? original : remake,
+    ed: dmg ? { ...base, rules: makeRules({ ...parse(arg('dmg', 'orig')), ...dmgEnemy ? { enemy: parse(dmgEnemy) } : {} }) } : base,
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
-    turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', json: argv.includes('--json'),
+    turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'),
     careful: (['lead', 'all', 'none'].includes(arg('careful', 'all')) ? arg('careful', 'all') : 'all') as Opts['careful'],
   }
   careful = o.careful
@@ -381,7 +387,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
       seedRandom(seed)
       for (const w of await runRoute(q, r, { battles })) by.set(w.n, [...by.get(w.n) ?? [], w])
     }
-    console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}) ==`)
+    console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
     console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐')
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'
