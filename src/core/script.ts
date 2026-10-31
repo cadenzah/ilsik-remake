@@ -219,6 +219,22 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
   await flush()
 }
 
+/** 대사 없이 블록의 캠페인 단계 (do) 만 실행 (tools/sim 밸런스 시뮬레이터). 선택지는 pick 이 고른다 (기본 첫째) */
+export function runSteps(blocks: Block[], alive: Alive, pick: (choose: string[]) => number = () => 0) {
+  const notes: Note[] = []
+  const run = (body: Entry[]) => {
+    for (const e of body) {
+      if ('do' in e) e.do.forEach(s => applyStep(s, notes, alive))
+      else if ('choose' in e) run(e.branches[pick(e.choose)] ?? [])
+    }
+  }
+  for (const b of blocks) {
+    afterBattle = b.when === 'post'
+    if (test(b.cond, names, alive)) run(b.body)
+  }
+  afterBattle = false
+}
+
 /** 그 시점의 블록 (조건 검사는 runBlocks 가). 없으면 빈 배열 = 원작 그대로 */
 export const blocksAt = (ch: Chapter | undefined, when: When, arg?: string) =>
   ch?.blocks.filter(b => b.when === when && (arg === undefined || b.arg === arg)) ?? []
