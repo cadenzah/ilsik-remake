@@ -2,7 +2,7 @@
 // 장 파일 하나 = 장 카드·보조 목표·장면 블록. 블록은 원작 장면을 통째로 대신하고, keep 자리에 원작 장면을 재생한다.
 // 블록에 do 가 하나라도 있는 장은 원작 전투 후 캠페인 단계(합류·이탈·소지품) 전체를 대신한다.
 import { FLAGS, GOLD, PARTY, applyStep, cutTalk, giveGold, hasItem, sceneLines, type Alive, type Note } from './campaign'
-import { CUTS, CUT_AFTER, STILL_AFTER, playCut, showStill } from './cutscene'
+import { CUTS, CUT_AFTER, STILLS, STILL_AFTER, playCut, showStill } from './cutscene'
 import type { PostStep, UnitType } from './data'
 import { S } from './state'
 import { playDialogue } from './dialogue'
@@ -20,6 +20,7 @@ export type Entry =
   | { line: number; who: string[]; opt?: boolean; text?: string; ref?: number }   // who = 화자 후보 ('-' 초상 없음, '출전' 출전 동료). opt = "이름?" (없으면 생략). ref = 원작 줄
   | { line: number; keep: true }
   | { line: number; anim: number }   // 원작 컷신 (ECLIPSE1.FAT 묶음 번호, cutscene.ts CUTS)
+  | { line: number; still: number }   // 원작 맵 위 그림 (ECLIPSE.OTH 번호, cutscene.ts STILLS)
   | { line: number; do: PostStep[] }
   | { line: number; choose: string[]; branches: Entry[][] }
 export interface Block { when: When; arg?: string; cond: Cond; body: Entry[] }
@@ -115,6 +116,11 @@ export function parseChapter(file: string, n: number, src: string, name: (s: str
         if (!(n in CUTS)) err(`없는 컷신: ${n}`)
         into.push({ line: no, anim: n })
       }
+      else if (/^still \d+$/.test(line)) {
+        const n = Number(line.slice(6))
+        if (!(n in STILLS)) err(`없는 그림: ${n}`)
+        into.push({ line: no, still: n })
+      }
       else if (line.startsWith('do ')) into.push({ line: no, do: parseDo(line.slice(3), id, err) })
       else {
         const m = /^([^:]+):\s*(.*)$/.exec(line) ?? err('"화자: 대사" 꼴이 아님')
@@ -187,6 +193,7 @@ export async function runBlocks(blocks: Block[], keep: string[], alive: Alive, n
     for (const e of body) {
       if ('keep' in e) { await flush(); await playKeys(keep) }
       else if ('anim' in e) { await flush(); await playCut(e.anim) }
+      else if ('still' in e) { await flush(); await showStill(STILLS[e.still]) }
       else if ('do' in e) {
         const notes: Note[] = []
         e.do.forEach(s => applyStep(s, notes, alive))
@@ -280,7 +287,7 @@ async function playKeys(keys: string[], extra: Line[] = []) {
     }
     buf.push(...lines([k]))
     if (k in CUT_AFTER) { await flush(); await playCut(CUT_AFTER[k]) }
-    if (k in STILL_AFTER) { await flush(); await showStill(STILL_AFTER[k]) }
+    if (k in STILL_AFTER) { await flush(); await showStill(STILLS[STILL_AFTER[k]]) }
   }
   buf.push(...extra)
   await flush()

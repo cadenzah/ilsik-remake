@@ -83,6 +83,7 @@ win: 휴, 다들 무사하지?
 - 목표 창 (#goals, 왼쪽 위): 장 카드의 목표 + goal 상태 (◇ 진행 / ✓ 달성 / ✗ 실패). 개선판 대본이 있는 장만
 - 아직: `lose` 시점 (해석만 됨), banter.ecs, epilogue.ecs, campaign.json (진로 문구는 지금 `editions/remake` routeLabels)
 - `anim N` (블록 안 한 줄, 2026-10-17): 원작 컷신 (ECLIPSE1.FAT 묶음 N, cutscene.ts CUTS) 을 그 자리에서 재생. 원작판처럼 컷신 도중 대화는 없고 앞뒤 줄로 둔다. 컷신의 끝 프레임은 다음 화면까지 남아 뒤 줄이 그 위에 나온다. 넣은 곳: 8 (=87 앞)·10·11·13 (=147 앞)·17 (=199 뒤)·21 (고대은화 블록)·29·32·37·39·40·43 (=434 뒤). `keep` 은 원작 장면과 함께 그 컷신도 재생
+- `still N` (블록 안 한 줄, 2026-10-31): 원작 맵 위 그림 (ECLIPSE.OTH N, cutscene.ts STILLS 의 자리·시간) 을 그 자리에서 보인다. 넣은 곳: 17 (=206 뒤, OTH 8 폭발 뒤 맵 그림 2초 — 원작 0:172 뒤와 같은 자리). `keep` 은 원작 장면과 함께 그 그림도
 - 원작 장면 키 = scenes.json 의 "phase:scene". keep 은 그 시점 원작 장면 전부. 선택지 창 = showResult('선택')
 - 도구: `tools/ecs_draft.py 장…` 원작 장면을 .ecs 꼴 초안으로 (원문 포함 → 저장소 밖에서 고쳐 씀), `tools/ecs_check.py` 화자·원작 줄 번호 점검
 

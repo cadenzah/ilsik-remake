@@ -55,7 +55,8 @@ export const CUT_AFTER: Record<string, number> = { '0:171': 4, '1:43': 9 }
 
 /** 장면 뒤 정지 그림 (battle-ui 조각, 원작 화면 좌표 = 맵 창 기준으로 옮김, ms 동안).
  *  17장 0:172 「폭탄이 있습니다!」 뒤: ECLIPSE.OTH 8 을 맵을 다시 그린 위 (197,180) 에 2000ms (124e:c82e~c8e4, 48e1:2bcf → aaea(0x7d0)) → 0:173 */
-export const STILL_AFTER: Record<string, { piece: string; x: number; y: number; ms: number }> = { '0:172': { piece: 'oth.8', x: 197, y: 180, ms: 2000 } }
+export const STILLS: Record<number, { piece: string; x: number; y: number; ms: number }> = { 8: { piece: 'oth.8', x: 197, y: 180, ms: 2000 } }   // OTH 번호 → 자리·시간 (개선판 대본 `still N`)
+export const STILL_AFTER: Record<string, number> = { '0:172': 8 }
 export async function showStill(s: { piece: string; x: number; y: number; ms: number }) {
   const m = mapRect(), img = document.createElement('img')
   img.className = 'cutscene still'
