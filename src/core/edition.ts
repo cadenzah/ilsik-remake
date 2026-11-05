@@ -1,6 +1,6 @@
 // 판(에디션) 인터페이스. 엔진(core)은 공통이고, 규칙·행동 순서·AI·편의 기능은 판마다 다르다 (.claude/docs/editions.md)
 import type { ScriptSource } from './script'
-import type { ExtraBattle, Item, Magic, StageMap, Tables, UnitType } from './data'
+import type { ExtraBattle, Item, Magic, StageMap, StageTune, Tables, UnitType } from './data'
 import type { BuffStat, Pos, Unit } from './unit'
 import type { Note } from './campaign'
 
@@ -80,6 +80,8 @@ export interface Edition {
   /** 일행이 바뀐 뒤 (campaign.ts). join = 합류, change = 같은 인물이 새 종류로 (전직·교체, old = 바꾸기 전 일행 사본).
    *  개선판 = 늦은 합류 레벨 맞춤 (제안 5)·성장 이어받기 (N2) */
   partyChange?(e: { join: number } | { change: number; old: UnitType }, notes: Note[]): void
+  /** 장별 조정 (키 "장" 또는 "장-루트"). 개선판 = content/remake/tune.json */
+  tune?: Record<string, StageTune>
   /** 판이 더하는 전투 (장 번호 → 배치). 개선판 숨은 장 */
   extraBattles?: Record<number, ExtraBattle>
 }

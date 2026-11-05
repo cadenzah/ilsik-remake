@@ -12,10 +12,17 @@ import { equippedStats, type Pos, type Unit } from './unit'
 
 let uidSeq = 0
 
+/** 지금 장의 판 조정 (장-루트가 장보다 먼저). 숨은 장은 없음 */
+export const stageTune = () => S.ed.extraBattles?.[S.def.n] ? undefined : S.ed.tune?.[`${S.def.n}-${S.def.route}`] ?? S.ed.tune?.[S.def.n]
+
 export function spawn(p: Placement, side: Unit['side']): Unit {
   const t = p.troop === 0 ? partyType(p.type) : S.types[p.type]   // 일행은 정비 화면에서 바꾼 장비로
   const st = equippedStats(t, S.tables.items)
   if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
+  const k = side === 'enemy' ? stageTune()?.foeScale : undefined
+  if (k) for (const f of ['maxHp', 'atk', 'def', 'spi', 'agi'] as const) st[f] = Math.max(1, Math.round(st[f] * k))
+  const h = side === 'ally' && p.troop !== 0 ? stageTune()?.npcHp : undefined
+  if (h) st.maxHp = Math.round(st.maxHp * h)
   return {
     uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: t.fatigue, steps: 0,
     range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
@@ -35,8 +42,11 @@ export function placements(rec: BattleRecord, map: StageMap) {
   const enemies: Placement[] = rec.groups.flatMap((g, k) =>
     g.units.map((u, i) => ({ type: u.type, x: u.at[0], y: u.at[1], troop: base + k, member: i })))
   troopInit.push(...rec.groups.map(g => g.active))
-  unstack([...allies, ...enemies], map)
-  return { allies, enemies, troopInit }
+  for (const [t, v] of Object.entries(stageTune()?.troop ?? {})) troopInit[Number(t)] = v
+  const gone = stageTune()?.remove ?? []
+  const kept = enemies.filter(p => !gone.some(([t, m]) => t === p.troop && m === p.member))
+  unstack([...allies, ...kept], map)
+  return { allies, enemies: kept, troopInit }
 }
 
 /** 원작 배치가 한 칸에 둘을 놓은 곳 (12장 루트 B 흑비·흑박쥐 (7,14), tools/verify.py — 원작 데이터 오류) — 두 판 모두 뒤의 대원을 가장 가까운 빈 칸으로 */

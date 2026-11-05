@@ -10,6 +10,7 @@ import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
+import tune from '../../../content/remake/tune.json'            // 장별 조정 (B1 제안 6)
 
 // 개선판 대본 (content/remake/chapters/NN.ecs, 저장소에 커밋). 원문 그대로 받아 core/script.ts 가 해석한다
 const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs', { query: '?raw', import: 'default', eager: true })
@@ -37,6 +38,7 @@ export const edition: Edition = {
     enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
     FLAGS.add(`diff${d}`)
   },
+  tune: tune as unknown as Edition['tune'],
   afterWin,      // 대기 동료 경험치 (B1 제안 5, growth.ts)
   partyChange,   // 늦은 합류 맞춤·전직·교체 성장 이어받기 (제안 5·N2)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)

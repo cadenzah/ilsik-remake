@@ -21,12 +21,13 @@ import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/ru
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
-interface Opts { ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; dmg: string; careful: 'lead' | 'all' | 'none' }
+interface Opts { until?: number; ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; dmg: string; careful: 'lead' | 'all' | 'none' }
 let careful: Opts['careful'] = 'all'
 
 /** 장 하나의 기록 */
 interface Row {
   n: number; route: number; result: Outcome | 'stall'; tries: number; turns: number
+  lostBy?: string                                            // 진 까닭 = 쓰러져 패배가 된 대원 (선두 또는 지켜야 할 NPC), 정체는 없음
   pushed?: boolean                                           // 지고도 이어 감 (--push): 마지막 시도의 성장으로 다음 장
   deployed: number; partyLv: number; partyMax: number; allLv: number; minLv: number;   // allLv·minLv = 일행 전체 (대기 포함) 평균·최저 레벨
   foes: number; foeLv: number; foeMax: number
@@ -93,9 +94,9 @@ function equipTools() {
 // ---------- 아군 조종 (플레이어 대신) ----------
 
 /** 걸어서 가는 거리 (지형만, 유닛 무시) 로 가장 가까운 상대 쪽 칸. 개선판 AI 의 "가장 가까운 상대 쪽" 은 맨해튼 거리라 강·벽 뒤에서 막힌다 */
-function approach(u: Unit): AiPlan | null {
+function approach(u: Unit, goals?: { x: number; y: number }[]): AiPlan | null {
   const far = new Map<number, number>(), todo: [number, number][] = []
-  for (const o of S.units) if (o.hp > 0 && o.side !== u.side) { far.set(key(o.x, o.y), 0); todo.push([o.x, o.y]) }
+  for (const o of goals ?? S.units.filter(o => o.hp > 0 && o.side !== u.side)) { far.set(key(o.x, o.y), 0); todo.push([o.x, o.y]) }
   for (let i = 0; i < todo.length; i++) {
     const [x, y] = todo[i], d = far.get(key(x, y))!
     for (const [dx, dy] of DIRS) {
@@ -138,10 +139,11 @@ function danger(u: Unit, at: { x: number; y: number }, gone?: Unit) {
  *  계획한 칸이 위험하면 안전한 칸 중 가장 아프게 치는 칸 → 없으면 상대에 가장 가까운 안전한 칸 → 없으면 가장 덜 위험한 칸 (제자리면 휴식).
  *  HP 절반 아래면 쓰러뜨릴 수 있을 때만 치고, 아니면 물러나 쉰다 */
 function safer(u: Unit, p: AiPlan): AiPlan {
-  const safe = (risk: number) => risk * 1.5 < u.hp
+  const lead = u.troop === 0 && u.member === 0
+  const safe = (risk: number) => risk * (lead ? LEAD_CARE : 1.5) < u.hp   // 선두가 쓰러지면 패배라 사람은 더 뒤에 둔다
   const kill = p.target && S.ed.rules.damageRange(S.map, u, p.target, p.dest)[0] >= p.target.hp ? p.target : undefined
   const low = u.hp < u.maxHp * 0.5
-  if (process.env.SIM_DEBUG && S.turn <= Number(process.env.SIM_DEBUG)) console.log('  wary', S.turn, u.type.name, u.hp, '/', u.maxHp, 'dest', [p.dest.x, p.dest.y], 'danger', danger(u, p.dest, kill), 'fat', u.fatigue)
+  if (process.env.SIM_DEBUG && S.turn <= Number(process.env.SIM_DEBUG) && (!process.env.SIM_CH || S.def.n === Number(process.env.SIM_CH))) console.log('  wary', S.turn, u.type.name, u.hp, '/', u.maxHp, 'dest', [p.dest.x, p.dest.y], 'danger', danger(u, p.dest, kill), 'fat', u.fatigue)
   if (p.rest || ((!low || kill) && safe(danger(u, p.dest, kill)))) return p
   let best: { plan: AiPlan; dmg: number; risk: number } | null = null, calm: { plan: AiPlan; risk: number } | null = null
   for (const k of reachable(S.map, S.units, u).keys()) {
@@ -164,9 +166,17 @@ function safer(u: Unit, p: AiPlan): AiPlan {
 
 /** 일행 대원의 행동: 개선판 점수식 AI. 칠 것도 쉴 까닭도 없으면 걸어서 가까운 상대 쪽으로. 조심하는 대원은 safer */
 function partyPlan(u: Unit): AiPlan {
+  // 도착 승리 장 (36·37장): 선두는 목표 칸으로. 이번 차례에 닿으면 위험해도 간다 (닿는 순간 승리)
+  const goal = u.member === 0 ? S.cond.find(c => 'reach' in c.if && (c.do.includes('win') || c.do.includes('ending')))?.if : undefined
+  if (goal && 'reach' in goal) {
+    const at = { x: goal.reach[0], y: goal.reach[1] }, go = approach(u, [at])
+    if (go && go.dest.x === at.x && go.dest.y === at.y) return go
+    if (go) return safer(u, go)
+  }
   let p = smartPlan(S.map, S.units, u, S.troopState)
   if (!p.rest && !p.target && !p.magic) p = approach(u) ?? p
-  const wary = careful === 'all' || (careful === 'lead' && u.member === 0)
+  // 사람은 싸움이 몇 턴 동안 진척이 없으면 들어간다 (43장 2단계: 적은 벽 뒤에서 안 오고, 조심하는 일행은 사거리 앞에서 마법만 쏘며 60턴 정체)
+  const wary = S.turn - lastFight < QUIET && (careful === 'all' || (careful === 'lead' && u.member === 0))
   return wary ? safer(u, p) : p
 }
 
@@ -181,6 +191,7 @@ interface Tally { hits: Sides<Hits>; mag: Sides<Hits>; heal: Sides<number>; foeR
 function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], before: Map<Unit, number>) {
   for (const { target, value } of hits) {
     if (target.side === u.side) continue
+    if (target.hp <= 0) lastFight = S.turn
     h.n++
     h.pts += value
     if (value === 1 && (before.get(target) ?? 0) > 1) h.one++
@@ -188,6 +199,10 @@ function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], be
     h.sum += value / target.maxHp
   }
 }
+
+const LEAD_CARE = Number(process.env.SIM_LEAD ?? 2.5)   // 선두의 조심 배수 (다른 대원 1.5)
+const QUIET = 6   // 이만큼 아무도 안 쓰러지는 턴이 이어지면 조심을 풀고 들어간다
+let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
 function act(u: Unit, party: boolean, t: Tally): Outcome | null {
@@ -200,7 +215,7 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
     return judge().result
   }
   if (!party) t.foeActs++
-  if (process.env.SIM_DEBUG && S.turn <= Number(process.env.SIM_DEBUG)) console.log('  plan', S.turn, u.type.name, u.troop, [u.x, u.y], '->', [plan.dest.x, plan.dest.y], plan.target?.type.name, plan.magic?.name, 'mov', u.mov, 'troop', S.troopState[u.troop])
+  if (process.env.SIM_DEBUG && S.turn <= Number(process.env.SIM_DEBUG) && (!process.env.SIM_CH || S.def.n === Number(process.env.SIM_CH))) console.log('  plan', S.turn, u.type.name, u.troop, [u.x, u.y], '->', [plan.dest.x, plan.dest.y], plan.target?.type.name, plan.magic?.name, 'mov', u.mov, 'troop', S.troopState[u.troop])
   const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
   if (path.length > 1) { u.moved = true; u.steps += path.length - 1; u.x = plan.dest.x; u.y = plan.dest.y }
   let attacked = false, magic: Magic | undefined
@@ -253,7 +268,7 @@ function partyStep(live: Unit[], t: Tally): Outcome | null {
 }
 
 function battle(maxTurns: number): { result: Outcome | 'stall'; tally: Tally } {
-  freshBattle()
+  freshBattle(); lastFight = 0
   const t: Tally = { hits: { ally: noHits(), foe: noHits() }, mag: { ally: noHits(), foe: noHits() }, heal: { ally: 0, foe: 0 }, foeRests: 0, foeActs: 0, allyRests: 0, levelUps: 0, leadLow: 100, leadEarly: false, allyMoved: false }
   startEvents()
   const lead = member([0, 0])!
@@ -336,7 +351,12 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
       leadLow: res.tally.leadLow, leadEarly: res.tally.leadEarly, foeRests: res.tally.foeRests, foeActs: res.tally.foeActs,
       allyRests: res.tally.allyRests, levelUps: res.tally.levelUps, joined: [], hits: res.tally.hits, mag: res.tally.mag, heal: res.tally.heal,
     }
+    if (res.result === 'lose') {
+      const lose = S.cond.filter(c => c.do.includes('lose') && 'dead' in c.if && c.if.dead.every(m => (member(m)?.hp ?? 1) <= 0))
+      row.lostBy = lose.length ? lose.flatMap(c => 'dead' in c.if ? c.if.dead.map(m => member(m)!.type.name) : []).join('·') : member([0, 0])!.type.name
+    }
     rows.push(row)
+    if (o.until && n >= o.until) break
     if (!o.json) printRow(row)
     if (res.result !== 'win' && res.result !== 'ending') {
       if (!o.push) break
@@ -382,9 +402,10 @@ export async function main(argv: string[]) {
     return { ...side(t0, ''), enemy: side(t0.enemy ?? t0, '-enemy') }
   }
   const o: Opts = {
-    ed: { ...base, ...keys.length ? { rules: makeRules(tuned()) } : {}, ...arg('growth', 'yes') === 'no' ? { afterWin: undefined, partyChange: undefined } : {} },
+    ed: { ...base, ...keys.length ? { rules: makeRules(tuned()) } : {}, ...argv.includes('--tune') ? { tune: { ...base.tune, ...JSON.parse(arg('tune', '{}')) } } : {}, ...arg('growth', 'yes') === 'no' ? { afterWin: undefined, partyChange: undefined } : {} },
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
+    until: Number(arg('until', '0')) || undefined,
     turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'),
     careful: (['lead', 'all', 'none'].includes(arg('careful', 'all')) ? arg('careful', 'all') : 'all') as Opts['careful'],
   }
@@ -420,7 +441,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
       for (const w of await runRoute(q, r, { battles })) by.set(w.n, [...by.get(w.n) ?? [], w])
     }
     console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
-    console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐 | 일행 전체 Lv (최저)')
+    console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐 | 일행 전체 Lv (최저) | 진 까닭')
     const tot = { ally: noHits(), foe: noHits() }, mag = { ally: noHits(), foe: noHits() }, heal = { ally: 0, foe: 0 }
     for (const ws of by.values()) for (const w of ws) for (const k of ['ally', 'foe'] as const) {
       for (const f of ['n', 'one', 'half', 'sum', 'pts'] as const) { tot[k][f] += w.hits[k][f]; mag[k][f] += w.mag[k][f] }
@@ -438,7 +459,8 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
       const rests = ws.reduce((x, w) => x + w.foeRests, 0), acts = ws.reduce((x, w) => x + w.foeRests + w.foeActs, 0)
       console.log([`${n}`, pct(ws.filter(w => won(w) && w.tries === 1).length), pct(ws.filter(won).length), med(ws.map(w => w.turns)),
         pl, `${fl} (${ws[0].foeMax})`, Math.round((fl - pl) * 10) / 10, avg(ws.map(w => w.fallen.length)), `${med(ws.map(w => w.leadLow))}%`,
-        `${Math.round(rests / Math.max(1, acts) * 1000) / 10}%`, pct(ws.filter(w => w.leadEarly).length), `${avg(ws.map(w => w.allLv))} (${avg(ws.map(w => w.minLv))})`].join(' | '))
+        `${Math.round(rests / Math.max(1, acts) * 1000) / 10}%`, pct(ws.filter(w => w.leadEarly).length), `${avg(ws.map(w => w.allLv))} (${avg(ws.map(w => w.minLv))})`,
+        [...ws.reduce((m, w) => w.lostBy ? m.set(w.lostBy, (m.get(w.lostBy) ?? 0) + 1) : m, new Map<string, number>())].map(([k, v]) => `${k} ${v}`).join(', ') || '-'].join(' | '))
     }
   }
 }
