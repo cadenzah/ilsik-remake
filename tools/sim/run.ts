@@ -203,6 +203,8 @@ function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], be
 const LEAD_CARE = Number(process.env.SIM_LEAD ?? 2.5)   // 선두의 조심 배수 (다른 대원 1.5)
 const costs = process.env.SIM_COST !== 'no'   // 쓰러진 대가 (제안 12). SIM_COST=no 로 끄고 비교
 let counterK = 0   // --counter 반격 피해 배율 (0 = 없음)
+let counterOnce = false, counterTire = false, counterPhase: Unit['side'] | '' = ''
+const counteredOnce = new Set<Unit>()
 const countered = { ally: 0, foe: 0 }   // 반격 피해 합 (씨앗 묶음마다 비움)
 const QUIET = 6   // 이만큼 아무도 안 쓰러지는 턴이 이어지면 조심을 풀고 들어간다
 let lastFight = 0   // 마지막으로 누가 쓰러진 턴
@@ -211,6 +213,9 @@ let lastFight = 0   // 마지막으로 누가 쓰러진 턴
  *  범위·직선 공격 (기사·포수·궁수·추전수) 은 되받지 않는다. 경험치는 받고 피로는 안 는다. 근사: AI·플레이어 모두 반격을 미리 계산하지 않는다 */
 function counter(a: Unit, c: Unit, t: Tally) {
   if (!counterK || attackKind(a) >= 2 || c.hp <= 0 || c.coma > 0 || S.troopState[c.troop] >= 2 || !inReach(c, c, a)) return
+  if (a.side !== counterPhase) { counterPhase = a.side; counteredOnce.clear() }
+  if (counterOnce && counteredOnce.has(c)) return   // --counter-once: 상대 차례마다 대원당 한 번
+  counteredOnce.add(c)
   const value = Math.min(a.hp, Math.max(1, Math.floor(S.ed.rules.rollDamage(S.map, c, a) * counterK)))
   const before = new Map([[a, a.hp]])
   a.hp -= value
@@ -218,6 +223,7 @@ function counter(a: Unit, c: Unit, t: Tally) {
   tallyHits(t.hits[k], c, [{ target: a, value }], before)
   countered[k] += value
   if (addExp(c, [{ target: a, value }])) t.levelUps++
+  if (counterTire) { const s = c.steps; c.steps = 0; c.fatigue = S.ed.rules.fatigueAfter(c, true); c.steps = s }   // --counter-tire: 반격도 공격처럼 피로
 }
 
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
@@ -407,6 +413,7 @@ export async function main(argv: string[]) {
   const arg = (k: string, d: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d }
   const route = arg('route', 'all')
   counterK = Number(arg('counter', '0'))
+  counterOnce = argv.includes('--counter-once'); counterTire = argv.includes('--counter-tire')
   // 피해 조정 (rules.ts Tuning) — 그 판 값에서 바꾼다: --dmg orig | floor:0.15 | ratio:0.4 (물리식), --spell N (생명상해 배율), --heal N (생명회복 배율),
   //   --dmg-enemy·--spell-enemy·--heal-enemy = 적이 칠 때만
   const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as Tuning['form'], coef: Number(coef ?? 0) } }
