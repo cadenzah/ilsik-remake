@@ -59,7 +59,8 @@ const REPO = 'https://github.com/cadenzah/ilsik-remake'
 const FEEDBACK = `
   <p>버그를 찾으셨거나 바라는 기능이 있으면<br>아래 저장소의 이슈(Issues)로 남겨 주세요.</p>
   <p><a href="${REPO}/issues" target="_blank" rel="noopener">github.com/cadenzah/ilsik-remake</a></p>
-  <p class="dim">어느 판(원작판·개선판)·몇 장에서 무엇을 했을 때인지,<br>가능하면 화면 갈무리를 함께 적어 주시면 큰 도움이 됩니다.</p>`
+  <p class="dim">어느 판(원작판·개선판)·몇 장에서 무엇을 했을 때인지,<br>가능하면 화면 갈무리를 함께 적어 주시면 큰 도움이 됩니다.</p>
+  <p class="dim">버전 ${__VERSION__}</p>`
 
 export function showTitle(): Promise<Launch> {
   const root = document.getElementById('titlescreen')!
@@ -140,6 +141,7 @@ export function showTitle(): Promise<Launch> {
         ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
+      body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
     }
 
     const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }, undefined, true) }

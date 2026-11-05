@@ -1,8 +1,9 @@
 // pages.dev 배포: 원작 자원 확인 → 빌드 → dist 직접 업로드 (wrangler).
 // public/assets 는 gitignore 라 Cloudflare 의 Git 연동 빌드로는 게임이 뜨지 않는다. 반드시 로컬에서 올린다.
 // 프로젝트 이름은 .env 의 CF_PAGES_PROJECT. --dry 는 빌드·검사만 한다.
+// 처음 한 번: pnpm dlx wrangler@4 login → pnpm dlx wrangler@4 pages project create <이름> --production-branch main
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -15,11 +16,17 @@ const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1) }
 const REQUIRED = ['units', 'items', 'magic', 'dialogue', 'battles', 'scenes'].map(n => `assets/data/${n}.json`)
   .concat(['assets/stages/01.json', 'assets/stages/01.png'])
 
-const missing = (dir) => REQUIRED.filter(f => !existsSync(join(ROOT, dir, f)))
+// Pages 설정. 404.html 이 없으면 없는 자원에도 index.html 이 200 으로 나간다 (public/404.html 주석)
+const SITE = ['404.html', '_headers']
+
+const missing = (dir) => REQUIRED.concat(SITE).filter(f => !existsSync(join(ROOT, dir, f)))
 
 if (missing('public').length) {
   fail(`public/ 에 원작 자원이 없습니다: ${missing('public').join(', ')}\n  pnpm run setup 으로 먼저 생성하세요.`)
 }
+
+console.log('\n▶ 데이터 표 갱신')
+run('pnpm', ['run', 'assets'])
 
 console.log('\n▶ 빌드')
 run('pnpm', ['run', 'build'])
@@ -33,5 +40,6 @@ if (dry) {
 const project = process.env.CF_PAGES_PROJECT
 if (!project) fail('.env 의 CF_PAGES_PROJECT 에 Cloudflare Pages 프로젝트 이름을 지정하세요 (.env.example 참고).')
 
-console.log(`\n▶ Cloudflare Pages 업로드 → ${project}`)
+const { version } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+console.log(`\n▶ Cloudflare Pages 업로드 → ${project} (v${version})`)
 run('pnpm', ['dlx', 'wrangler@4', 'pages', 'deploy', 'dist', '--project-name', project, '--branch', 'main'])

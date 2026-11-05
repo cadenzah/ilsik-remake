@@ -1,0 +1,6 @@
+# Cloudflare Pages 응답 헤더. vite 번들은 이름에 해시가 붙어 바뀌지 않으므로 오래 캐시한다.
+# /assets/ 아래 원작 자원 (data/ 등) 은 이름이 그대로라 기본값 (매번 재확인) 을 둔다 — 코드와 어긋나지 않게
+/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable

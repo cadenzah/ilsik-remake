@@ -36,6 +36,14 @@ pnpm start --host
 원작 자원이 저장소에 없으므로 Git 연동 자동 빌드로는 게임이 뜨지 않습니다. 로컬에서 빌드해 직접 올립니다.
 
 ```bash
-pnpm dlx wrangler@4 login   # 처음 한 번
-pnpm run deploy             # .env 의 CF_PAGES_PROJECT 로 업로드
+# 처음 한 번
+pnpm dlx wrangler@4 login
+pnpm dlx wrangler@4 pages project create <이름> --production-branch main   # .env 의 CF_PAGES_PROJECT 에도 같은 이름을
+
+pnpm run deploy:check       # 빌드·검사만
+pnpm run deploy             # 업로드
 ```
+
+주요 배포 때는 올리기 전에 `package.json` 의 `version` 을 올립니다. 그 사이의 작은 수정 배포는 버전을 그대로 두어도 됩니다. 타이틀 메뉴 맨 아래에 버전이 작게 나오고, 제작진의 「버그 제보 · 기능 제안」 페이지에는 `v0.1.0 (d0ea457)` 처럼 빌드한 커밋까지 나와 작은 배포도 구분됩니다.
+
+`pnpm run build` 뒤 `pnpm dlx wrangler@4 pages dev dist` 로 Pages 와 같은 동작(없는 경로, 헤더)을 로컬에서 볼 수 있습니다.

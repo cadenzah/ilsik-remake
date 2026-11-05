@@ -62,6 +62,20 @@
         "--strictPort"
       ],
       "port": 5203
+    },
+    {
+      "name": "pages",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dlx",
+        "wrangler@4",
+        "pages",
+        "dev",
+        "dist",
+        "--port",
+        "8788"
+      ],
+      "port": 8788
     }
   ]
 }
