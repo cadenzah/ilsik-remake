@@ -7,7 +7,7 @@ import type { AiPlan, Edition } from '../../src/core/edition'
 import { EQUIP, GOLD, ITEMS, PARTY, finishStage, giveGold, nextStage, partyType, promoteDeployed, restore, snapshot, type Camp } from '../../src/core/campaign'
 import { addExp, again, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable } from '../../src/core/grid'
-import { aimsFrom, inReach, strikeTargets } from '../../src/core/attack'
+import { aimsFrom, attackKind, inReach, strikeTargets } from '../../src/core/attack'
 import { aiCaster, spellsOf } from '../../src/core/magic'
 import { blocksAt, chapter, initScript, ownsSteps, runSteps } from '../../src/core/script'
 import { canEquip } from '../../src/core/camp'
@@ -202,8 +202,23 @@ function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], be
 
 const LEAD_CARE = Number(process.env.SIM_LEAD ?? 2.5)   // 선두의 조심 배수 (다른 대원 1.5)
 const costs = process.env.SIM_COST !== 'no'   // 쓰러진 대가 (제안 12). SIM_COST=no 로 끄고 비교
+let counterK = 0   // --counter 반격 피해 배율 (0 = 없음)
+const countered = { ally: 0, foe: 0 }   // 반격 피해 합 (씨앗 묶음마다 비움)
 const QUIET = 6   // 이만큼 아무도 안 쓰러지는 턴이 이어지면 조심을 풀고 들어간다
 let lastFight = 0   // 마지막으로 누가 쓰러진 턴
+
+/** 근접 반격 시험 (B1 제안 3, --counter 배율. 게임에는 없음): 근접 (공격 유형 0·1) 으로 맞은 대상이 살아 있고 행동할 수 있으며 (혼수·대기·고정 제외) 공격자가 자기 사거리 안이면 한 번 되받아친다.
+ *  범위·직선 공격 (기사·포수·궁수·추전수) 은 되받지 않는다. 경험치는 받고 피로는 안 는다. 근사: AI·플레이어 모두 반격을 미리 계산하지 않는다 */
+function counter(a: Unit, c: Unit, t: Tally) {
+  if (!counterK || attackKind(a) >= 2 || c.hp <= 0 || c.coma > 0 || S.troopState[c.troop] >= 2 || !inReach(c, c, a)) return
+  const value = Math.min(a.hp, Math.max(1, Math.floor(S.ed.rules.rollDamage(S.map, c, a) * counterK)))
+  const before = new Map([[a, a.hp]])
+  a.hp -= value
+  const k = c.side === 'enemy' ? 'foe' : 'ally'
+  tallyHits(t.hits[k], c, [{ target: a, value }], before)
+  countered[k] += value
+  if (addExp(c, [{ target: a, value }])) t.levelUps++
+}
 
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
 function act(u: Unit, party: boolean, t: Tally): Outcome | null {
@@ -234,10 +249,11 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
     tallyHits(u.side === 'enemy' ? t.hits.foe : t.hits.ally, u, r.hits, before)
     if (addExp(u, r.hits)) t.levelUps++
     attacked = true
+    counter(u, plan.target, t)
   }
   if (party && S.ed.features.autoRest && !attacked && !magic && !u.moved) { rest(u); t.allyRests++ }
   else tire(u, attacked, magic)
-  if (party) for (const [i] of treasureAt(u)) takeTreasure(i)
+  if (party && u.hp > 0) for (const [i] of treasureAt(u)) takeTreasure(i)
   S.floats.length = 0
   return judge().result
 }
@@ -390,6 +406,7 @@ function printRow(w: Row) {
 export async function main(argv: string[]) {
   const arg = (k: string, d: string) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d }
   const route = arg('route', 'all')
+  counterK = Number(arg('counter', '0'))
   // 피해 조정 (rules.ts Tuning) — 그 판 값에서 바꾼다: --dmg orig | floor:0.15 | ratio:0.4 (물리식), --spell N (생명상해 배율), --heal N (생명회복 배율),
   //   --dmg-enemy·--spell-enemy·--heal-enemy = 적이 칠 때만
   const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as Tuning['form'], coef: Number(coef ?? 0) } }
@@ -436,6 +453,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
   const q = { ...o, json: true }
   const med = (xs: number[]) => { const v = [...xs].sort((x, y) => x - y); return v.length ? v[v.length >> 1] : 0 }
   for (const r of o.routes) {
+    countered.ally = countered.foe = 0
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
@@ -453,6 +471,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     console.log(`타격 — 아군이 칠 때: ${show(tot.ally)} / 적이 칠 때: ${show(tot.foe)}`)
     const share = (k: 'ally' | 'foe') => `마법 몫 ${pct(mag[k].pts, mag[k].pts + tot[k].pts)}% · 마법 한 방 평균 최대HP ${pct(mag[k].sum, mag[k].n)}% · 회복 ${pct(heal[k], tot[k === 'ally' ? 'foe' : 'ally'].pts + mag[k === 'ally' ? 'foe' : 'ally'].pts)}%`
     console.log(`마법 — 아군: ${share('ally')} / 적: ${share('foe')}   (회복 = 받은 피해 대비)`)
+    if (counterK) console.log(`반격 — 아군이 준 물리 피해 중 ${pct(countered.ally, tot.ally.pts)}% / 적이 준 물리 피해 중 ${pct(countered.foe, tot.foe.pts)}%`)
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'
       const pct = (k: number) => `${Math.round(k / ws.length * 100)}%`
