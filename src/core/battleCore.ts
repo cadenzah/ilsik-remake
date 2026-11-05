@@ -24,7 +24,7 @@ export function spawn(p: Placement, side: Unit['side']): Unit {
   const h = side === 'ally' && p.troop !== 0 ? stageTune()?.npcHp : undefined
   if (h) st.maxHp = Math.round(st.maxHp * h)
   return {
-    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: t.fatigue, steps: 0,
+    uid: uidSeq++, type: t, side, troop: p.troop, member: p.member, x: p.x, y: p.y, hp: st.maxHp, ...st, fatigue: (p.troop === 0 ? S.ed.startFatigue?.(t) : undefined) ?? t.fatigue, steps: 0,
     range: S.ed.rules.weaponRange(t, S.tables.items), acted: false, moved: false,
     base: { atk: st.atk, def: st.def, spi: st.spi, agi: st.agi }, mods: { atk: 0, def: 0, spi: 0, agi: 0 }, poison: 0, coma: 0, ticked: false,
     facing: side === 'ally' ? 'left' : 'right', px: p.x, py: p.y, alpha: 1, flash: 0,

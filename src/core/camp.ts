@@ -8,6 +8,7 @@
 // 개선판만: 음악 다음에 「설정」 (원작 버튼을 본뜬 camp-setting.png 를 종료 자리에, 종료는 한 칸 아래 camp-quit.png, export_web.py) → 원작 창틀 설정 창. '개선된 UI' 를 켜고 닫으면 현대식으로 다시 연다 (restyle)
 // 현대식 (개선판 설정 modernUi): 다른 화면 (campModern.ts, ux-proposal.md 36). 여기 statusFrame 은 전투 중 큰 인물기본자료의 현대식 바탕
 import { A, MAGIC_EFFECTS, STAT_NAMES, type Item, type Labels, type Tables, type UnitType } from './data'
+import { S } from './state'
 import { hud, mapRect, view } from './screen'
 import { pieceUrl, winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
@@ -94,7 +95,7 @@ export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fa
     `<span class="txt" style="${px(270, 147)}">${st.mov}</span>` +
     `<span class="txt b" style="${px(270, 167)}">${esc(p.move)}</span>` +
     `<span class="txt" style="${px(270, 187)}">${esc(p.rank)}</span>` +
-    `<span class="txt" style="${px(270, 207)}">${cur?.fatigue ?? t.fatigue}</span>` +
+    `<span class="txt" style="${px(270, 207)}">${cur?.fatigue ?? S.ed.startFatigue?.(t) ?? t.fatigue}</span>` +
     `<span class="txt" style="${px(270, 227)}">${t.exp}</span>` +
     t.equip.map((id, k) => id ? `<button class="eq" data-item="${id}" style="${px(35 + 51 * k, 275, 48, 56)}">${icon(id)}</button>` : '').join('') +
     t.magic.slice(0, 8).map((id, k) => `<button class="mg" data-magic="${id}" style="${px(213 + 34 * (k % 4), 255 + 41 * Math.floor(k / 4), 32, 40)};background-position:-${id * 32}px 0"

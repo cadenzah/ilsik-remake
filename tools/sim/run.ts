@@ -201,6 +201,7 @@ function tallyHits(h: Hits, u: Unit, hits: { target: Unit; value: number }[], be
 }
 
 const LEAD_CARE = Number(process.env.SIM_LEAD ?? 2.5)   // 선두의 조심 배수 (다른 대원 1.5)
+const costs = process.env.SIM_COST !== 'no'   // 쓰러진 대가 (제안 12). SIM_COST=no 로 끄고 비교
 const QUIET = 6   // 이만큼 아무도 안 쓰러지는 턴이 이어지면 조심을 풀고 들어간다
 let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 
@@ -364,7 +365,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
     }
     // 승리 처리 (battle.ts checkEnd 뒤): 보상·합류·전투 후 단계. 개선판 대본이 단계를 가지면 대본이 대신 (선택지는 첫째)
     const had = new Set(PARTY)
-    S.ed.afterWin?.([])   // 개선판: 대기 동료 경험치 (battle.ts checkEnd 와 같은 자리)
+    S.ed.afterWin?.([], row.pushed || !costs ? undefined : before)   // 개선판: 대기 동료 경험치·쓰러진 대가 (battle.ts checkEnd 와 같은 자리). 진 장을 이어 가는 근사에는 대가 없음
     const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
     if (S.ed.id === 'remake') runSteps([...blocksAt(chapter(), 'win'), ...blocksAt(chapter(), 'post')], aliveMember)
     else if (done.scenes.includes(GOLD.scene)) giveGold()   // 원작판 9장 「금괴조각주기」 = 결정

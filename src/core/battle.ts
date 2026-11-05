@@ -466,7 +466,7 @@ export async function checkEnd(): Promise<boolean> {
   // 원작 2ff8:1909: 보상 뒤 장 곡을 멈추고 풀어, 장 뒤 장면·컷신은 음악 없이 (컷신 효과음만). 개선판은 장 곡을 이어 간다
   if (!remake()) stopMusic()
   const bench: { text: string }[] = []
-  S.ed.afterWin?.(bench)   // 개선판: 대기 동료 경험치
+  S.ed.afterWin?.(bench, atStart)   // 개선판: 대기 동료 경험치·쓰러진 대가
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, [...done.notes, ...bench])
   if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {

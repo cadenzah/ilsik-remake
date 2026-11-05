@@ -2,7 +2,7 @@
 import type { ScriptSource } from './script'
 import type { ExtraBattle, Item, Magic, StageMap, StageTune, Tables, UnitType } from './data'
 import type { BuffStat, Pos, Unit } from './unit'
-import type { Note } from './campaign'
+import type { Camp, Note } from './campaign'
 
 export interface Rules {
   /** 피해 범위 [최소, 최대]. at = 공격자가 칠 자리 (없으면 지금 자리, 지형 보정용) */
@@ -75,8 +75,10 @@ export interface Edition {
   routeOrder?: number[]
   /** 전투를 시작할 때 (다시 하기 포함, 장 사이 상태를 되돌린 뒤). 개선판 = 난이도를 규칙에 넣고 판 플래그에 남김 */
   beginBattle?(): void
-  /** 전투에서 이긴 직후, 전투 후 단계 전. 개선판 = 대기 동료 경험치 (B1 제안 5). 알림은 notes 에 */
-  afterWin?(notes: Note[]): void
+  /** 전투에서 이긴 직후, 전투 후 단계 전. 개선판 = 대기 동료 경험치 (B1 제안 5)·쓰러진 대가 (제안 12). 알림은 notes 에, start = 이 장 시작 상태 */
+  afterWin?(notes: Note[], start?: Camp): void
+  /** 일행 대원의 전투 시작 피로 (없으면 PAD 값). 개선판 = 지난 장에 쓰러진 대원 (제안 12) */
+  startFatigue?(t: UnitType): number | undefined
   /** 일행이 바뀐 뒤 (campaign.ts). join = 합류, change = 같은 인물이 새 종류로 (전직·교체, old = 바꾸기 전 일행 사본).
    *  개선판 = 늦은 합류 레벨 맞춤 (제안 5)·성장 이어받기 (N2) */
   partyChange?(e: { join: number } | { change: number; old: UnitType }, notes: Note[]): void
