@@ -1,4 +1,5 @@
 // 개선판 장 지도·도감 화면 (.claude/docs/replay-design.md 3·6절). 타이틀의 .page (640×480) 에 그린다
+import { RULE_PAGES } from './help'
 import { A, loadBattles, loadTables, portraitUrl } from './data'
 import { FOUND, HIDDEN, trueEndingOpen } from './replay'
 import { loadPlaces, placeLabel, type Place } from './worldmap'
@@ -222,6 +223,8 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
         return `<h3>${title} <small>${list.length} / ${allItems.filter(i => i.cat === cat).length}</small></h3>
           <div class="items">${list.map(i => `<span>${i.name}</span>`).join('') || '<p>아직 없음</p>'}</div>`
       }).join('')}
+      <h2 class="rule-head">규칙</h2>
+      ${RULE_PAGES.map(p => `<h3>${p.title}</h3><ul class="rules">${p.lines.map(l => `<li>${l}</li>`).join('')}</ul>`).join('')}
     </div>${nav()}`
   page.querySelector<HTMLButtonElement>('nav .close')!.onclick = close
   page.querySelector<HTMLButtonElement>('nav .close')!.focus()

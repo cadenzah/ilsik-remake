@@ -133,7 +133,7 @@ export function showTitle(): Promise<Launch> {
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
           ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
-          { label: '도    감', on: p?.seen ? () => void openCodex() : undefined, title: p?.seen ? '만난 인물·손에 넣은 도구' : '기록 없음' },
+          { label: '도    감', on: p?.seen ? () => void openCodex() : undefined, title: p?.seen ? '만난 인물·손에 넣은 도구·규칙' : '기록 없음' },
           { label: '설 정', title: '글꼴·화면·편의 기능·기록 옮기기', on: () => settings() },
         ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },

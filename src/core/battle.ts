@@ -1,5 +1,6 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
+import { rulesWin } from './help'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
@@ -840,12 +841,13 @@ function toCamp() {
   void boot(S.ed, S.def, atStart)
 }
 
-/** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
+/** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·규칙·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
 function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   const onOff = (title: string, set?: (on: boolean) => void) => () =>
     openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['열기', () => set?.(true)], ['닫기', () => set?.(false)]], onBack: () => closeWin('sub') })
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin()],
+    ['규칙', () => rulesWin(), { title: '게임이 알려 주지 않는 규칙 (피로·전투·직업·성장)' }],
     [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],

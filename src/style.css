@@ -53,6 +53,8 @@ canvas#view { touch-action: none; }
 .owin { position: absolute; background-size: 100% 100%; image-rendering: pixelated; color: #000; font: 16px/16px var(--font); }
 .owin .t { position: absolute; left: 8px; right: 8px; top: 5px; height: 18px; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; }
 .owin .b { position: absolute; left: 12px; right: 12px; line-height: 18px; text-shadow: -1px 0 #aaa; overflow: hidden; text-align: center; }
+.owin .b .rules { text-align: left; }
+.owin .b .rules div { padding-left: 10px; text-indent: -10px; margin-bottom: 4px; }
 .owin .blue, .owin .h.blue { color: #2828e0; text-shadow: -1px 0 #8888ff; }
 .owin .red, .owin .h.red { color: #b00000; text-shadow: -1px 0 #ff8080; }
 .owin .green, .owin .h.green { color: #006a1a; text-shadow: -1px 0 #80c080; }
@@ -281,6 +283,8 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .codex .cell small { color: #8c8c80; font-size: 10px; }
 #titlescreen .codex .items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
 #titlescreen .codex p { margin: 0; color: #6c6c64; }
+#titlescreen .codex .rule-head { margin-top: 14px; }
+#titlescreen .codex .rules { margin: 0; padding-left: 16px; line-height: 17px; }
 
 #titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: #fcfcfc; text-align: center; font: 16px/1.7 var(--font); }
