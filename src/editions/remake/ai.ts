@@ -1,6 +1,7 @@
 // 개선판 적 AI — 점수식. 부대 상태·휴식은 원작과 같은 규칙 (original/ai.ts aiGate).
 // 갈 수 있는 칸 × 칠 수 있는 중심을 모두 점수로 매겨 가장 큰 것: 물리 = 예상 피해 중간값 − 방어 × 0.1, 처치 +1000,
 //   범위 공격 (기사·포수) 은 맞는 적 합, 같은 편이 맞으면 1.5배로 빼고 남는 게 있을 때만. 같으면 덜 움직이는 칸.
+//   근접은 반격을 계산한다 (제안 3): 되받아 쓰러질 공격은 안 하고, 반격 피해의 절반을 뺀다.
 // 마법 직업 (공격 유형 1) 은 쓸 수 있는 마법 × 칸 × 중심도 점수로 매겨 물리보다 크면 마법 (spellScore).
 // 칠 게 없으면 가장 가까운 상대 쪽으로. 원작 AI 와의 차이는 rules.md "마법 직업 AI"·"물리 AI"
 import type { Magic, StageMap } from '../../core/data'
@@ -10,6 +11,7 @@ import { aimsFrom, strikeTargets } from '../../core/attack'
 import { aiCaster, spellCenters, spellTargets, spellsOf } from '../../core/magic'
 import type { Pos, Unit } from '../../core/unit'
 import { aiGate } from '../original/ai'
+import { counterDamage } from '../../core/battleCore'
 import { S } from '../../core/state'
 
 const rules = () => S.ed.rules   // 지금 판의 규칙 (개선판 피해식, tools/sim 이 바꾼 식)
@@ -24,7 +26,9 @@ export function planFor(map: StageMap, units: Unit[], u: Unit, troopState: numbe
   for (const k of moves.keys()) {
     const spot = { x: k % 1000, y: Math.floor(k / 1000) }
     for (const c of aimsFrom(u, spot, units)) {
-      let score = -dist(spot, u) * 0.01, own = 0   // 같으면 이동이 적은 칸
+      const back = counterDamage(u, c, spot)   // 되받아 쓰러질 공격은 안 하고, 반격 피해는 절반만큼 뺀다
+      if (back >= u.hp) continue
+      let score = -dist(spot, u) * 0.01 - back * 0.5, own = 0   // 같으면 이동이 적은 칸
       for (const t of strikeTargets(u, c, spot, units)) {
         const [lo, hi] = rules().damageRange(map, u, t, spot)
         const v = (lo >= t.hp ? 1000 : 0) + (lo + hi) / 2 - t.def * 0.1

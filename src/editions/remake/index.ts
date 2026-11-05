@@ -38,6 +38,7 @@ export const edition: Edition = {
     enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
     FLAGS.add(`diff${d}`)
   },
+  counter: { scale: 0.5, decay: 0.5 },   // 근접 반격 ×½, 같은 상대 차례에 되받을수록 절반 (B1 제안 3)
   tune: tune as unknown as Edition['tune'],
   afterWin,      // 대기 동료 경험치·쓰러진 대가 (B1 제안 5·12, growth.ts)
   startFatigue,  // 지난 장에 쓰러진 대원 피로 30 (제안 12)

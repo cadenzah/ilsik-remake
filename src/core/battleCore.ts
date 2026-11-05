@@ -4,7 +4,7 @@ import type { BattleRecord, CondDo, CondIf, Magic, Member, StageMap } from './da
 import type { LevelUp } from './edition'
 import { FLAGS, ITEMS, PARTY, partyType, keepGrowth, joinLine } from './campaign'
 import { DIRS, inside, key, moveCost } from './grid'
-import { strikeTargets } from './attack'
+import { attackKind, inReach, strikeTargets } from './attack'
 import { applyHit, hitText, spellTargets } from './magic'
 import type { Placement } from './stage'
 import { member, S } from './state'
@@ -84,6 +84,8 @@ export function freshBattle() {
   leveled.clear()
   taken.clear()
   gained.clear()
+  countered.clear()
+  counterTurn = undefined
   const all = [...S.allies.map(p => spawn(p, 'ally')), ...S.enemies.map(p => spawn(p, 'enemy'))]
   S.troopState = [...S.troopInit]
   S.units = all.filter(u => S.troopState[u.troop] !== 4)
@@ -111,6 +113,46 @@ export function strike(a: Unit, c: Unit) {
     hits.push({ target: t, value: dmg })
   }
   return { targets, hits }
+}
+
+// ---------- 반격 (개선판 B1 제안 3, balance-proposal.md "3 반격") ----------
+const countered = new Map<Unit, number>()   // 이번 상대 차례에 되받은 횟수
+let counterTurn: Unit['side'] | undefined   // 그 상대 차례의 공격 쪽
+
+/** a 가 from 에 서서 c 를 쳤을 때 c 가 되받는 피해, 0 = 안 되받음 (타격 전에 부른다).
+ *  근접 공격 (공격 유형 0·1) 만, 맞고 살아남고 공격자가 자기 사거리 안일 때. 혼수·대기·휴식선 (맞은 뒤 생명 기준) 이면 못 한다 (고정 부대는 제자리에서 싸우니 되받는다 — 못 하면 AI 가 호위 NPC 만 노린다).
+ *  피해 = 물리 피해 × scale × decay^(이번 상대 차례에 이미 되받은 횟수), 최소 1 */
+export function counterDamage(a: Unit, c: Unit, from: Pos = a): number {
+  const cfg = S.ed.counter
+  if (!cfg || c.side === a.side || attackKind(a) >= 2 || c.coma > 0 || S.troopState[c.troop] === 2 || !inReach(c, c, from)) return 0
+  const dealt = S.ed.rules.damageRange(S.map, a, c, from)[0], hp = c.hp
+  if (dealt >= hp) return 0
+  c.hp = hp - dealt
+  const tired = S.ed.rules.aiRests(c)
+  c.hp = hp
+  if (tired) return 0
+  const ox = a.x, oy = a.y   // 지형 방어는 공격자가 설 칸으로
+  a.x = from.x; a.y = from.y
+  const full = S.ed.rules.rollDamage(S.map, c, a)
+  a.x = ox; a.y = oy
+  const n = a.side === counterTurn ? countered.get(c) ?? 0 : 0
+  return Math.min(a.hp, Math.max(1, Math.floor(full * cfg.scale * cfg.decay ** n)))
+}
+
+/** 되받기를 적용 (counterDamage 값). 반격도 공격처럼 피로가 쌓이고 경험치를 받는다. 레벨이 오르면 결과 */
+export function applyCounter(a: Unit, c: Unit, value: number): LevelUp | null {
+  if (a.side !== counterTurn) { counterTurn = a.side; countered.clear() }
+  countered.set(c, (countered.get(c) ?? 0) + 1)
+  a.hp = Math.max(0, a.hp - value)
+  a.flash = performance.now() + 160
+  S.floats.push({ x: a.x, y: a.y, text: `-${value}`, t0: performance.now(), color: a.side === 'ally' ? '#ff8080' : '#ffffff' })
+  const steps = c.steps
+  c.steps = 0
+  c.fatigue = S.ed.rules.fatigueAfter(c, true)
+  c.steps = steps
+  const r = addExp(c, [{ target: a, value }])
+  leveled.delete(c)   // 레벨업이 이미 피로를 0 으로. 다음 행동까지 끌고 가지 않는다
+  return r
 }
 
 /** 마법 결과를 범위 안 대상편마다 적용 (판 규칙, 난수 없음). cured = 상태가 풀린 대상 수 */
@@ -179,6 +221,7 @@ export function tire(u: Unit, attacked: boolean, magic?: Magic) {
 
 /** 차례를 마친 뒤 두 번째 행동을 받나 (원작 2ff8:1109, 라운드에 한 번). 받으면 이동 기록을 지우고 true */
 export function again(u: Unit): boolean {
+  if (u.hp <= 0) return false   // 반격에 쓰러짐
   if (u.again || u.hp <= 0 || !S.units.includes(u) || !S.ed.rules.actsTwice(u)) return false
   u.again = true
   u.moved = false

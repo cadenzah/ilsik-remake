@@ -30,7 +30,7 @@ import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, openWin, showMenu, showResult, type Btn } from './ui'
 import { applyMods, type Pos, type Unit } from './unit'
-import { addExp, again, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
+import { addExp, again, applyCounter, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
 import { SCHOOL_COLOR, SCHOOL_NAME, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
@@ -313,6 +313,7 @@ async function attack(a: Unit, c: Unit) {
   if (attackKind(a) === 3) await explode(a.type.equip[0] - 87, area)
   else if (attackKind(a) >= 4 && c !== a) await arrowHit(a, c, attackKind(a) === 4)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
+  const back = counterDamage(a, c)   // 타격 전 상태로 판단 (맞으면 혼수가 풀린다)
   const { hits } = strike(a, c)
   await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
   a.pose = undefined
@@ -320,6 +321,25 @@ async function attack(a: Unit, c: Unit) {
   S.fx = null
   await fadeDead(targets)
   await gainExp(a, hits)
+  if (back) await counterAct(a, c, back)
+}
+
+/** 반격 연출 (개선판 제안 3): 맞은 쪽이 공격 동작으로 되받는다 */
+async function counterAct(a: Unit, c: Unit, value: number) {
+  c.facing = a.x > c.x ? 'right' : a.x < c.x ? 'left' : a.y > c.y ? 'down' : 'up'
+  S.floats.push({ x: c.x, y: c.y, text: '반격', t0: performance.now(), color: '#ffd24a' })
+  if (!await playPose(c, 280)) {
+    c.px += Math.sign(a.x - c.x) * 0.25; c.py += Math.sign(a.y - c.y) * 0.25
+    play('e1', c.type.por)
+    await sleep(200 * pace())
+    c.px = c.x; c.py = c.y
+  } else play('e1', c.type.por)
+  const r = applyCounter(a, c, value)
+  await sleep(320 * pace())
+  c.pose = undefined
+  await sleep(220 * pace())
+  await fadeDead([a])
+  if (r) await showLevelUp(c, r)
 }
 
 // ---------- 경험치·레벨업 (원작 20ec:9b1d, 0aa2:1afd — 행동 실행 끝, 피로 계산 뒤) ----------
@@ -424,7 +444,7 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
   hideMenu()
   hideBasic()
   S.aim = null
-  const found = treasureAt(u).length > 0
+  const found = u.hp > 0 && treasureAt(u).length > 0
   if (found) S.mode = { kind: 'busy' }
   void (found ? pickUp(u).then(() => { S.mode = { kind: 'idle' } }) : Promise.resolve()).then(checkEnd).then(over => {
     if (over) stepDone?.(true)
@@ -988,7 +1008,8 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
       const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
       const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
       const tired = fatigueLoss(u, target, spot ?? u)   // B1 제안 4: 피로 때문에 덜 들어가는 몫
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, tired ? `<span class="red">피로로 −${tired}</span>` : '', `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, kill].filter(Boolean).join('<br>')
+      const back = counterDamage(u, target, spot ?? u)   // 제안 3: 되받는 피해
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, tired ? `<span class="red">피로로 −${tired}</span>` : '', `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, back ? `<span class="red">반격 −${back}${back >= u.hp ? ' (쓰러짐)' : ''}</span>` : '', kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {
