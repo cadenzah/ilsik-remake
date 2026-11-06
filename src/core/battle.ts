@@ -788,9 +788,9 @@ function chapterTitle() {
 
 const remake = () => !S.ed.features.commandFirst
 
-/** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
 onWinChange(() => setOn('menu', isOpen('system')))   // 메뉴가 떠 있는 동안 띠 「메뉴」 를 눌린 모양으로 (다시 누르면 닫힌다)
 
+/** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
 function setupScreen(ed: Edition, def: StageDef) {
   applyScreenStyle(ed.id === 'remake')
   S.marks = true
