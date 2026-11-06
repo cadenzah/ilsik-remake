@@ -1,13 +1,16 @@
 // 원작 창 (comma 창틀: 주황 제목 띠 + 크림 바탕, ECPBUT 글자 버튼) — 명령창·확인창·결과·선택 팝업을 모두 이것으로 (ux-proposal.md 2·6·22·24).
 // 창은 #hud (논리 좌표) 안 DOM. 원작처럼 모달: 창이 떠 있으면 맵 클릭은 무시하고, 오른쪽 클릭·Esc 는 맨 위 창의 '뒤로'.
 // 원작 치수 (DOSBox u30): 제목 띠 25, 아래 9, 옆 8, 버튼 25 높이·4 간격, 첫 버튼은 바탕 5 아래, 명령창 버튼 64 폭·창 86
-import { hud, mapRect, clampBox } from './screen'
+import { hud, mapRect, clampBox, onLayout } from './screen'
 import { buttonUrl, winUrl } from './skin'
 
 export type Btn = [string, () => void] | [string, () => void, { disabled?: boolean; title?: string }]
 
-interface Win { el: HTMLElement; onBack?: () => void; modal: boolean; kind: string; keys?: (e: KeyboardEvent) => boolean }
+interface Win { el: HTMLElement; onBack?: () => void; modal: boolean; kind: string; dim: boolean; keys?: (e: KeyboardEvent) => boolean }
 const stack: Win[] = []
+const changeFns: (() => void)[] = []
+/** 창이 열리고 닫힐 때마다 (띠 「메뉴」 눌린 표시 등) */
+export const onWinChange = (f: () => void) => { changeFns.push(f) }
 
 export const BAR = 25, BOTTOM = 9, SIDE = 8, BTN_H = 25, GAP = 4
 const CH = 16   // 글자 폭 (원작 글꼴 한글 16)
@@ -48,6 +51,8 @@ export interface WinOpts {
   modal?: boolean        // 기본 true
   kind?: string          // 같은 kind 창은 하나만 (다시 열면 바꿈)
   closeOnPick?: boolean  // 버튼을 누르면 창을 닫고 동작 (기본 true)
+  x?: boolean            // 제목 줄 오른쪽 ✕ (= onBack, 터치 기기용). 기본: 제목과 onBack 이 있으면
+  dim?: boolean          // 맵을 어둡게 덮고 누르면 onBack. 기본: 가운데 창이고 onBack 이 있으면
 }
 
 /** comma 창을 연다. 돌려준 요소에 더 붙일 수 있다 */
@@ -85,11 +90,22 @@ export function openWin(o: WinOpts): HTMLElement {
   el.style.left = `${p.x}px`
   el.style.top = `${p.y}px`
   hud.append(el)
-  const win: Win = { el, onBack: o.onBack, modal: o.modal ?? true, kind: o.kind ?? '' }
+  const win: Win = { el, onBack: o.onBack, modal: o.modal ?? true, kind: o.kind ?? '', dim: !!o.onBack && (o.dim ?? o.at === 'center') }
+  if (o.onBack && (o.x ?? !!o.title)) {
+    const x = document.createElement('button')
+    x.className = 'oclose'
+    x.innerHTML = '<i></i>'   // i = 작은 판, 그 위 ✕ 두 획 (style.css)
+    x.setAttribute('aria-label', '닫기')
+    x.tabIndex = -1
+    x.onclick = e => { e.stopPropagation(); win.onBack?.() }
+    el.append(x)
+    el.classList.add('hasx')   // 제목은 ✕ 를 뺀 자리 가운데 (원작 창 크기는 그대로)
+  }
   stack.push(win)
   const close = () => closeEl(el)
   el.querySelector<HTMLButtonElement>('.obtn:not(:disabled)')?.focus({ preventScroll: true })
   el.oncontextmenu = e => { e.preventDefault(); back() }
+  changed()
   return el
 }
 
@@ -97,7 +113,32 @@ function closeEl(el: HTMLElement) {
   const i = stack.findIndex(w => w.el === el)
   if (i >= 0) stack.splice(i, 1)
   el.remove()
+  changed()
 }
+
+// 맵 덮개: 어둡게 하는 창이 하나라도 있으면 맨 위 창 바로 밑에 깔고, 누르면 맨 위 창의 '뒤로' (창 바깥 = 닫기를 보이게).
+// 맵 칸만 덮어 띠 버튼 (「메뉴」 다시 누르기) 은 그대로 쓴다
+let shade: HTMLElement | null = null
+function changed() {
+  const top = [...stack].reverse().find(w => w.modal)
+  if (top && stack.some(w => w.dim && w.modal)) {
+    if (!shade) {
+      shade = document.createElement('div')
+      shade.className = 'oshade'
+      shade.onclick = e => { e.stopPropagation(); back() }
+      shade.oncontextmenu = e => { e.preventDefault(); back() }
+    }
+    placeShade()
+    if (shade.nextSibling !== top.el) hud.insertBefore(shade, top.el)
+  } else shade?.remove()
+  for (const f of changeFns) f()
+}
+function placeShade() {
+  if (!shade) return
+  const m = mapRect()
+  Object.assign(shade.style, { left: `${m.x}px`, top: `${m.y}px`, width: `${m.w}px`, height: `${m.h}px` })
+}
+onLayout(placeShade)
 
 /** kind 창 (없으면 맨 위 창) 을 닫는다 */
 export function closeWin(kind?: string) {
@@ -129,15 +170,15 @@ export function enter(): boolean {
 // ---------- 자주 쓰는 창 ----------
 
 /** 명령창 (원작: 누른 유닛 오른쪽 옆, 제목 '명령') */
-export function showMenu(items: Btn[], x: number, y: number, title = '명령', onBack?: () => void) {
-  openWin({ title, buttons: items, at: { x, y }, kind: 'menu', onBack: onBack ?? (() => closeWin('menu')) })
+export function showMenu(items: Btn[], x: number, y: number, title = '명령', onBack?: () => void, more?: Partial<WinOpts>) {
+  openWin({ title, buttons: items, at: { x, y }, kind: 'menu', onBack: onBack ?? (() => closeWin('menu')), ...more })
 }
 export const hideMenu = () => closeWin('menu')
 
 /** 확인창 (원작 「전 투」「휴식」「대기화면」: 136×66, 결정·취소). body = 개선판 예측 줄 */
 export function confirmWin(title: string, at: { x: number; y: number } | 'center', ok: () => void, cancel: () => void = () => {}, body?: string, width?: number) {
   openWin({ title, at, kind: 'confirm', dir: 'row', btnW: 54, body, width: width ?? (body ? 168 : 136),
-    buttons: [['결정', ok], ['취소', cancel]], onBack: () => { closeWin('confirm'); cancel() } })
+    buttons: [['결정', ok], ['취소', cancel]], onBack: () => { closeWin('confirm'); cancel() }, x: false })
 }
 
 /** 결과·선택 팝업 (맵 창 가운데). 버튼을 누르면 닫고 그 동작 */

@@ -29,7 +29,7 @@ import { travelMap } from './worldmap'
 import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
-import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, openWin, showMenu, showResult, type Btn } from './ui'
+import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, showMenu, showResult, type Btn } from './ui'
 import { applyMods, type Pos, type Unit } from './unit'
 import { addExp, again, applyCounter, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
@@ -369,7 +369,7 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   if (got.length) play('e1', SFX.upgrade)   // 원작 알림 창 0aa2:12f2 모드 1~3 (승급·습득) = 110
   await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 100 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
-    buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
+    buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
@@ -434,7 +434,7 @@ function gotItem(title: string, item: number, who?: string) {
   play('e1', SFX.gotItem)
   const name = esc(S.tables.items.get(item)?.name ?? '')
   return new Promise<void>(ok => openWin({ title, body: `<div class="lvup"><figure>${icon(item)}<figcaption>${who ? `${esc(who)}<br>` : ''}<span class="blue">${name}</span></figcaption></figure></div>`,
-    bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() } }))
+    bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
 }
 
 /** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
@@ -788,6 +788,8 @@ function chapterTitle() {
 const remake = () => !S.ed.features.commandFirst
 
 /** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
+onWinChange(() => setOn('menu', isOpen('system')))   // 메뉴가 떠 있는 동안 띠 「메뉴」 를 눌린 모양으로 (다시 누르면 닫힌다)
+
 function setupScreen(ed: Edition, def: StageDef) {
   applyScreenStyle(ed.id === 'remake')
   S.marks = true
@@ -901,7 +903,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     ['조건', () => showGoalsWin()],
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],
   ]
-  openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 112 : 64,
+  openWin({ title: '시스템', buttons: items, kind: 'system', at: at ?? 'center', btnW: remake() ? 112 : 64, dim: true,
     closeOnPick: !!remake(), onBack: () => { closeWin('system'); if (from) commandMenu(from) } })   // 원작: 오른쪽 클릭 = 명령창으로
 }
 
@@ -1100,7 +1102,7 @@ export function actionMenu(u: Unit, from: Pos) {
       ['상태', () => bigStatus(u, () => actionMenu(u, from))], ['취소', undo]]   // 상태 = 터치 기기용 (마우스는 올리면 작은 창)
     : [...magic, ['전투', () => fightMode(u, from)], ['결정', () => finishUnit(u)], ['취소', undo]]
   const p = beside(u)
-  showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() })
+  showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() }, { x: false })   // 취소 버튼이 있다
 }
 
 export async function doAttack(u: Unit, target: Unit) {
@@ -1185,7 +1187,7 @@ function magicMenu(u: Unit, from: Pos, onBack: () => void) {
  *  웹 보탬: 피로가 모자란 마법은 큰 아이콘이 흐리고 눌리지 않는다 (원작 창은 막지 않음, 피로 검사는 시전 처리 124e:3481 쪽 [추정]), ←→↑↓·Enter */
 function magicWinOriginal(list: Magic[], usable: (m: Magic) => boolean, pick: (m: Magic) => void, at: Pos, onBack: () => void) {
   const W = 157, H = 184, X = 9, Y = 24
-  const el = openWin({ kind: 'menu', at, width: W, body: ' ', bodyH: H - 44, onBack })
+  const el = openWin({ kind: 'menu', at, width: W, body: ' ', bodyH: H - 44, onBack, x: true })
   el.classList.add('magicwin')
   el.style.backgroundImage = `url(${winUrl('magic', W, H)})`
   el.querySelector('.b')?.remove()

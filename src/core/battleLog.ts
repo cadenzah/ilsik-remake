@@ -69,7 +69,7 @@ export function logWin() {
   const body = `<div class="rules battlelog">${rows.join('') || '<div class="dim">기록 없음</div>'}</div>`
   const width = Math.min(mapRect().w - 16, 520)
   const open = (bodyH?: number) => openWin({ title: '전투 기록', kind: 'log', at: 'center', width, dir: 'row', bodyH,
-    body, buttons: [['닫기', () => {}]], onBack: () => closeWin('log') })
+    body, buttons: [['닫기', () => {}]], onBack: () => closeWin('log'), x: false })
   // 창 높이는 글자 수 어림이라 → 그려 본 높이로 다시 연다 (넘치면 맵 높이까지, 나머지는 스크롤)
   const b = open().querySelector<HTMLElement>('.b')!
   if (b.scrollHeight !== b.clientHeight) open(Math.min(b.scrollHeight, mapRect().h - 100))

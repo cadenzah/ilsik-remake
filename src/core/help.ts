@@ -50,7 +50,7 @@ export function rulesWin(page = 0) {
     title: '규 칙', kind: 'rules', at: 'center', width: WIDTH, dir: 'row', btnW: 72, bodyH,
     body: `<div class="rules">${lines.map(l => `<div>· ${l}</div>`).join('')}</div>`,
     buttons: [...RULE_PAGES.map((p, i): Btn => [p.title, () => rulesWin(i), { disabled: i === page }]), ['닫기', () => {}]],
-    onBack: () => closeWin('rules'),
+    onBack: () => closeWin('rules'), x: false,
   })
   // 창 높이는 글자 수 어림이라 줄바꿈이 많으면 모자란다 → 그려 본 높이로 다시 연다
   const body = open().querySelector<HTMLElement>('.b')!

@@ -51,6 +51,20 @@ canvas#view { touch-action: none; }
 /* 원작 창 (comma): 제목 띠 25 · 크림 바탕. 글자 = 검정 + 왼쪽 회색 그림자 (원작 색 7/0) */
 .owin { position: absolute; background-size: 100% 100%; image-rendering: pixelated; color: #000; font: 16px/16px var(--font); }
 .owin .t { position: absolute; left: 8px; right: 8px; top: 5px; height: 18px; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; }
+/* 제목 줄 ✕ (웹 보탬: 오른쪽 클릭·Esc 가 없는 터치 기기용) · 맵 덮개 (창 바깥 = 닫기) */
+.oclose { all: unset; position: absolute; right: 2px; top: 1px; width: 24px; height: 24px; cursor: pointer; }
+/* 원작 창틀: 글자 버튼처럼 볼록한 작은 판 (밝은 위·왼 테, 어두운 아래·오른 테) + 새긴 듯한 ✕ */
+.oclose i { position: absolute; left: 4px; top: 4px; width: 16px; height: 16px; box-sizing: border-box; border: 1px solid #4a2c0c; border-radius: 3px;
+  background: linear-gradient(#fbecc0, #e2bb72); box-shadow: inset 1px 1px #fffbe6, inset -1px -1px #b27e36, 0 1px 0 rgba(60, 30, 0, .35); }
+.oclose i::before, .oclose i::after { content: ""; position: absolute; left: 2px; top: 6px; width: 10px; height: 2px; border-radius: 1px;
+  background: #4a2008; box-shadow: 0 1px 0 rgba(255, 246, 210, .8); transform: rotate(45deg); }
+.oclose i::after { transform: rotate(-45deg); }
+.oclose:hover i { background: linear-gradient(#fff4d4, #eccb86); }
+.oclose:hover i::before, .oclose:hover i::after { background: #a00000; }
+.oclose:active i { background: linear-gradient(#e2bb72, #f4dca4); box-shadow: inset 1px 1px #a87430, inset -1px -1px #fff2c8; }
+.oclose:active i::before, .oclose:active i::after { top: 7px; left: 3px; }
+.owin.hasx .t { right: 26px; }
+#hud .oshade { background: rgba(0, 0, 0, .38); }
 .owin .b { position: absolute; left: 12px; right: 12px; line-height: 18px; text-shadow: -1px 0 #aaa; overflow: hidden; text-align: center; }
 .owin .b .rules { text-align: left; }
 .owin .b .rules div { padding-left: 10px; text-indent: -10px; margin-bottom: 4px; }
@@ -130,6 +144,11 @@ html.ui-modern .plate .ally { color: var(--ec-blue); } html.ui-modern .plate .en
 html.ui-modern .owin { background: linear-gradient(var(--ec-ribbon) 0 24px, var(--ec-bronze-dk) 24px 25px, var(--ec-parch) 25px) !important;
   border: 1px solid var(--ec-bronze-dk); border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(255, 250, 220, .6), 0 3px 0 rgba(0, 0, 0, .35); color: var(--ec-text); image-rendering: auto; }
 html.ui-modern .owin .t { color: var(--ec-text); }
+html.ui-modern .oclose i { border-color: var(--ec-bronze); border-radius: 50%; background: var(--ec-parch); box-shadow: 0 1px 0 rgba(0, 0, 0, .2); }
+html.ui-modern .oclose i::before, html.ui-modern .oclose i::after { background: var(--ec-text-2); box-shadow: none; }
+html.ui-modern .oclose:hover i { background: var(--ec-orange); border-color: var(--ec-orange-dk); }
+html.ui-modern .oclose:hover i::before, html.ui-modern .oclose:hover i::after { background: var(--ec-text); }
+html.ui-modern .oclose:active i { background: var(--ec-parch-3); box-shadow: none; }
 html.ui-modern .owin .t::before, html.ui-modern .owin .t::after { content: "◆"; font-size: 8px; color: var(--ec-bronze); margin: 0 6px; vertical-align: 2px; }
 html.ui-modern .owin .b { color: var(--ec-text); text-shadow: none; }
 html.ui-modern .owin .blue, html.ui-modern .owin .h.blue { color: var(--ec-blue); text-shadow: none; }

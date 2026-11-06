@@ -100,7 +100,7 @@ export function showConditions(o: { title?: string; goal?: string; goals?: { tex
   ]
   const w = Math.min(mapRect().w - 16, Math.max(200, ...body.map(l => l.replace(/<[^>]+>/g, '').length * 16 + 40)))
   openWin({ title: o.title ?? '', body: body.join('<br>'), width: w, kind: 'cond', dir: 'row', at: 'center',
-    buttons: [['확인', () => o.onClose?.()]], onBack: () => { closeWin('cond'); o.onClose?.() } })
+    buttons: [['확인', () => o.onClose?.()]], onBack: () => { closeWin('cond'); o.onClose?.() }, x: false })
 }
 
 // ---------- GO!! GO!! (OTH 4) ----------

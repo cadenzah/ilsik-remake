@@ -5,7 +5,7 @@
 // 조작: 클릭·Space·Enter = 이 쪽 다 보이기 → 다음, Ctrl 누르고 있기 = 빨리 넘김, Esc = 장면 넘기기
 import { portraitUrl, type UnitType } from './data'
 import { hud, mapRect, view } from './screen'
-import { esc } from './ui'
+import { back as winBack, esc, modalOpen } from './ui'
 import { winUrl } from './skin'
 
 export interface Line { who?: UnitType; text: string }
@@ -121,9 +121,14 @@ export function playDialogue(lines: Line[], edition: 'original' | 'remake' = vie
       if (e.button === 2) return
       e.preventDefault()
       e.stopPropagation()
+      if (modalOpen()) { winBack(); return }   // 대화 중 띠 「메뉴」 로 연 창: 바깥을 누르면 창만 닫고 대화는 그대로
       advance()
     }
     const onKey = (e: KeyboardEvent) => {
+      if (modalOpen()) {   // 창이 떠 있으면 Esc = 창 닫기, Enter·Space = 창 버튼 (대화를 넘기지 않는다)
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); winBack() }
+        return
+      }
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); advance() }
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish() }
       else if (e.key === 'Control' && !fast && remake) { fast = true; advance() }
