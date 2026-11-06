@@ -112,7 +112,7 @@ export function writeSlot(ed: EditionId, i: number, slot: SaveSlot) {
   try { localStorage.setItem(slotKey(ed), JSON.stringify(all)) } catch { /* 저장 불가 */ }
 }
 
-// ---------- 중단 저장 (개선판 전투 중 메뉴 → 중단, ux-proposal.md 21). 이어하기 때 불러오고 지운다 ----------
+// ---------- 전투 중 저장 (개선판 전투 메뉴 → 중간 저장, ux-proposal.md 21). 판마다 한 칸, 그 장을 이기면 지운다 (2026-11-06 전: 「중단」 = 저장 후 타이틀, 불러오면 지움) ----------
 
 export interface UnitSave { x: number; y: number; hp: number; fatigue: number; acted: boolean; moved: boolean; steps: number
   facing: 'down' | 'up' | 'left' | 'right'; alpha: number; onMap: boolean
@@ -132,7 +132,7 @@ export function writeSuspended(ed: EditionId, s: Suspended | null) {
 }
 
 // ---------- 기록 옮기기 (다른 브라우저·기기로, 서버 없이 코드·파일로) ----------
-// 옮기는 것 = 두 판의 진행 (이어하기·장 지도·도감)·기록 3칸·중단한 전투. 설정(글꼴·화면 등)은 기기마다라 옮기지 않는다.
+// 옮기는 것 = 두 판의 진행 (이어하기·장 지도·도감)·기록 3칸·전투 중 저장. 설정(글꼴·화면 등)은 기기마다라 옮기지 않는다.
 // 코드 = "ECL1." + base64url(deflate-raw(JSON)). 압축을 못 쓰는 브라우저는 "ECL0." + base64url(JSON). 파일 = 같은 묶음의 JSON
 
 export interface SaveBundle { app: 'eclipse-web'; v: 1; at: number; data: Record<string, unknown> }

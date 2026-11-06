@@ -9,6 +9,9 @@ export type Btn = [string, () => void] | [string, () => void, { disabled?: boole
 interface Win { el: HTMLElement; onBack?: () => void; modal: boolean; kind: string; dim: boolean; keys?: (e: KeyboardEvent) => boolean }
 const stack: Win[] = []
 const changeFns: (() => void)[] = []
+let outsideCloses = () => false
+/** 창 바깥을 누르면 '뒤로' 인가 (개선판 전투 = input.ts). 그런 창에는 ✕ 를 달지 않는다 (2026-11-06) */
+export const setOutsideCloses = (f: () => boolean) => { outsideCloses = f }
 /** 창이 열리고 닫힐 때마다 (띠 「메뉴」 눌린 표시 등) */
 export const onWinChange = (f: () => void) => { changeFns.push(f) }
 
@@ -51,7 +54,7 @@ export interface WinOpts {
   modal?: boolean        // 기본 true
   kind?: string          // 같은 kind 창은 하나만 (다시 열면 바꿈)
   closeOnPick?: boolean  // 버튼을 누르면 창을 닫고 동작 (기본 true)
-  x?: boolean            // 제목 줄 오른쪽 ✕ (= onBack, 터치 기기용). 기본: 제목과 onBack 이 있으면
+  x?: boolean            // 제목 줄 오른쪽 ✕ (= onBack, 터치 기기용). 기본: 제목과 onBack 이 있고, 바깥 누르기로 닫을 수 없는 창 (원작판 전투의 덮개 없는 창)
   dim?: boolean          // 맵을 어둡게 덮고 누르면 onBack. 기본: 가운데 창이고 onBack 이 있으면
 }
 
@@ -89,9 +92,10 @@ export function openWin(o: WinOpts): HTMLElement {
   const p = clampBox(at.x, at.y, w, h)
   el.style.left = `${p.x}px`
   el.style.top = `${p.y}px`
+  if (o.at === 'center' || !o.at) el.dataset.at = 'center'
   hud.append(el)
   const win: Win = { el, onBack: o.onBack, modal: o.modal ?? true, kind: o.kind ?? '', dim: !!o.onBack && (o.dim ?? o.at === 'center') }
-  if (o.onBack && (o.x ?? !!o.title)) {
+  if (o.onBack && (o.x ?? (!!o.title && !win.dim && !outsideCloses()))) {
     const x = document.createElement('button')
     x.className = 'oclose'
     x.innerHTML = '<i></i>'   // i = 작은 판, 그 위 ✕ 두 획 (style.css)
@@ -139,6 +143,21 @@ function placeShade() {
   Object.assign(shade.style, { left: `${m.x}px`, top: `${m.y}px`, width: `${m.w}px`, height: `${m.h}px` })
 }
 onLayout(placeShade)
+
+/** 화면 배치가 바뀌면 (개선된 UI 켜고 끄기·창 크기) 떠 있는 창을 지금 맵 창에 다시 둔다: 가운데 창은 가운데로, 나머지는 맵 창 안으로 밀어 넣는다.
+ *  창·인물기본자료 (.owin) 와 큰 상태창 (.bigstat, camp.ts statusWindow) */
+function placeFloating() {
+  const m = mapRect()
+  for (const el of hud.querySelectorAll<HTMLElement>(':scope > .owin, :scope > .bigstat')) {
+    const w = el.offsetWidth, h = el.offsetHeight
+    const p = el.dataset.at === 'center'
+      ? { x: Math.round(m.x + (m.w - w) / 2), y: Math.round(m.y + Math.max(0, (m.h - h) / 2)) }
+      : clampBox(parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0, w, h)
+    el.style.left = `${p.x}px`
+    el.style.top = `${p.y}px`
+  }
+}
+onLayout(placeFloating)
 
 /** kind 창 (없으면 맨 위 창) 을 닫는다 */
 export function closeWin(kind?: string) {

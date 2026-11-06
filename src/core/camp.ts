@@ -130,6 +130,7 @@ export function statusWindow(t: UnitType, tables: Tables, cur: Parameters<typeof
   const m = mapRect()
   const el = document.createElement('div')
   el.className = 'bigstat'
+  el.dataset.at = 'center'   // 화면 배치가 바뀌면 다시 가운데로 (ui.ts placeFloating)
   Object.assign(el.style, { left: `${Math.round(m.x + (m.w - 330) / 2)}px`, top: `${Math.round(m.y + Math.max(0, (m.h - 330) / 2))}px` })
   el.classList.toggle('modern', view.modern)
   el.innerHTML = `${statusFrame(view.modern)}

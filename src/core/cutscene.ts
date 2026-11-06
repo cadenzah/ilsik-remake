@@ -3,6 +3,7 @@
 // 덩어리 수 N 의 마지막 것은 고리 (프레임 N = 프레임 0) 라 원작은 프레임 0..N−1 을 그린다 (8장 루프가 di == 10 을 검사, N = 11). 원작 재생부 (2ff8 캠페인 루프, 124e 전투) 는 묶음마다 손으로 짠 루프라 단계표 CUTS 로 옮겼다:
 // 프레임마다 타이머(aaea) → 그 프레임 앞 일 → 그리기(8647) → 뒤 일 → 타이머 끝까지 기다림(ab16). 시간은 BIOS 틱 (55ms) 단위라 평균값으로.
 // 그리는 자리: 원작 화면 좌표. 맵 창 (68,57) 504×384 기준이라 개선판 넓은 화면에서는 맵 창 가운데로 옮기고, 맵 창을 다 덮는 컷신은 둘레를 검게.
+import { busy } from './loading'
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { mapRect, hud, view } from './screen'
@@ -184,7 +185,7 @@ export async function playCut(n: number, talk?: () => Promise<void>) {
   const d = CUTS[n]
   if (!d) return
   if (d.delay) await sleep(biosMs(d.delay))
-  const c = await loadCut(n)
+  const c = await busy(loadCut(n))
   if (!c) { await talk?.(); return }
   clearCut()
   const px = c.px.slice(), clip: Clip = { ...c, px }

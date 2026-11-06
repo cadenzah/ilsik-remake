@@ -220,7 +220,7 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
         return `<h3>${title} <small>${list.length} / ${allItems.filter(i => i.cat === cat).length}</small></h3>
           <div class="items">${list.map(i => `<span>${i.name}</span>`).join('') || '<p>아직 없음</p>'}</div>`
       }).join('')}
-      <h2 class="rule-head">규칙</h2>
+      <h2 class="rule-head">도움말</h2>
       ${RULE_PAGES.map(p => `<h3>${p.title}</h3><ul class="rules">${p.lines.map(l => `<li>${l}</li>`).join('')}</ul>`).join('')}
     </div>${nav()}`
   page.querySelector<HTMLButtonElement>('nav .close')!.onclick = close

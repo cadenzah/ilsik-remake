@@ -12,12 +12,13 @@ import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, l
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
+import { busy, imgReady, pageReady } from './loading'
 import { SONG, playMusic, stopMusic } from './music'
 import { VOLUME_KINDS, volumeRow } from './volumeUi'
 import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, volumeGain, type Difficulty } from './settings'
 import { stageDef, type StageDef } from './stage'
 
-export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
+export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 전투 중 저장 (중간 저장)
 
 const EDITIONS: { id: EditionId; name: string }[] = [
   { id: 'original', name: '원작판' },
@@ -181,7 +182,7 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed), sus = loadSuspended(ed)
       win.classList.add('wide')
       rows([
-        ...sus ? [{ label: '중단한 전투', sub: `${sus.title} · ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
+        ...sus ? [{ label: '전투 중 저장', sub: `${sus.title} · ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
           on: () => launch(sus.def, sus.at, sus) }] : [],
         { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) + lowest(p.flags) : '없음',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
@@ -194,7 +195,7 @@ export function showTitle(): Promise<Launch> {
     const summary = (b: SaveBundle) => EDITIONS.map(e => {
       const d = b.data, p = d[`eclipse.progress.${e.id}`] as Progress | undefined, s = d[`eclipse.suspend.${e.id}`] as Suspended | undefined
       const n = (d[`eclipse.slots.${e.id}`] as (SaveSlot | null)[] | undefined)?.filter(Boolean).length ?? 0
-      const parts = [p ? `이어하기 ${chapterName(p.next.n, p.next.route)}` : '', n ? `기록 ${n}칸` : '', s ? '중단한 전투' : ''].filter(Boolean)
+      const parts = [p ? `이어하기 ${chapterName(p.next.n, p.next.route)}` : '', n ? `기록 ${n}칸` : '', s ? '전투 중 저장' : ''].filter(Boolean)
       return `<li><b>${e.name}</b> ${parts.join(' · ') || '<span class="dim">없음</span>'}</li>`
     }).join('')
     const openTransfer = async (note = '') => {
@@ -326,10 +327,11 @@ export function showTitle(): Promise<Launch> {
     }
     addEventListener('keydown', onKey)
 
-    const showMenu = () => {
+    const showMenu = async () => {
       bg.src = `${A}/ui/mark1.png`
       win.hidden = false
       menu()
+      await busy(pageReady(stage))   // 첫 실행: 배경·창틀 그림과 글꼴이 오기 전에 밝히지 않는다
       stage.classList.remove('dark')
     }
 
@@ -353,7 +355,7 @@ export function showTitle(): Promise<Launch> {
       else await intro(stage, bg)
       win.inert = false
       attracting = false
-      showMenu()
+      void showMenu()
       armIdle()
     }
     for (const t of IDLE_INPUTS) addEventListener(t, armIdle, true)   // 캡처: 프롤로그가 입력을 막아도 먼저 받는다 (재생 중이면 attracting 이 거른다)
@@ -370,7 +372,7 @@ export function showTitle(): Promise<Launch> {
         await intro(stage, bg)
       }
       else { stage.classList.add('cut', 'dark'); void stage.offsetWidth; stage.classList.remove('cut') }   // 타이틀로 돌아올 때도 밝아지며
-      showMenu()
+      void showMenu()
       armIdle()
     })()
   })
@@ -388,7 +390,8 @@ async function intro(stage: HTMLElement, bg: HTMLImageElement) {
   // decode() 는 숨은 탭에서 끝나지 않을 수 있어 load 이벤트로 (최대 2초)
   const loaded = new Promise<void>(ok => { bg.onload = bg.onerror = () => ok() })
   bg.src = `${A}/ui/mark0.png`
-  await Promise.race([loaded, sleep(2000)])
+  void imgReady(`${A}/ui/mark1.png`)   // 로고 동안 메뉴 배경도 받아 둔다
+  await busy(Promise.race([loaded, sleep(8000)]))
   stage.classList.add('cut', 'dark')
   // 원작: 세 번 번쩍 — 켬 10~159ms, 끔 10~309ms, 세 번째 직전에 천둥
   for (let i = 0; i < 3 && !skip; i++) {

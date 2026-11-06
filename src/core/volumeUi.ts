@@ -24,10 +24,10 @@ export function volumeRow(k: VolumeKind, cls: string, always = false): HTMLEleme
   return row
 }
 
-/** 개선판 전투 메뉴 「소리」 창: 배경음악·효과음 켬/끔 + 음량. 바꿔도 창은 그대로 (초점 유지) */
-export function soundWin() {
+/** 개선판 전투 메뉴 「소리」 창: 배경음악·효과음 켬/끔 + 음량. 바꿔도 창은 그대로 (초점 유지). back = 메뉴에서 열었을 때 「이전」 */
+export function soundWin(back?: () => void) {
   const el = openWin({ title: '소리', kind: 'sound', at: 'center', width: 216, dir: 'row', body: '<div class="snd"></div>', bodyH: 2 * 54 + 4,
-    buttons: [['닫기', () => {}]], onBack: () => closeWin('sound') })
+    buttons: [[back ? '이전' : '닫기', () => back?.()]], onBack: () => { closeWin('sound'); back?.() } })
   const box = el.querySelector<HTMLElement>('.snd')!
   for (const k of VOLUME_KINDS) {
     const b = document.createElement('button')

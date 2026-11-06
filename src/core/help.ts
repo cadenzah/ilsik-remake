@@ -1,6 +1,7 @@
-// 개선판 규칙 도움말 (B1 제안 N5, balance-proposal.md "N5 규칙 도움말"). 전투 메뉴 「규칙」과 도감에서 본다. 문구는 짧게, 내부 계수·배율은 쓰지 않는다 (2026-11-06 정리).
+// 개선판 규칙 도움말 (B1 제안 N5, balance-proposal.md "N5 규칙 도움말"). 전투 메뉴 「도움말」과 도감에서 본다 (2026-11-06 「규칙」 → 「도움말」). 문구는 짧게, 내부 계수·배율은 쓰지 않는다 (2026-11-06 정리).
 // 수치의 근거 = editions/original/rules.ts (피로 계수·휴식·행동 뒤 피로·aiRests·actsTwice), core/attack.ts (사격·범위), core/battleCore.ts counterDamage (반격), editions/remake/growth.ts (성장·쓰러진 대가)
 // 규칙을 바꾸면 여기도 고친다. 피로 % = 공격 계수 (2.6 − F) · 방어 계수 (2.4 − F) 의 피로 0 대비 감소 (30: 18·20, 50: 34·37, 70: 54·59)
+import { mapRect } from './screen'
 import { closeWin, openWin, type Btn } from './ui'
 
 export const RULE_PAGES: { title: string; lines: string[] }[] = [
@@ -43,16 +44,18 @@ export const RULE_PAGES: { title: string; lines: string[] }[] = [
 
 const WIDTH = 500
 
-/** 전투 메뉴 「규칙」: 위쪽 쪽 이름 버튼으로 넘긴다. 오른쪽 클릭·Esc·닫기 = 닫음 */
-export function rulesWin(page = 0) {
+/** 전투 메뉴 「도움말」: 위쪽 쪽 이름 버튼으로 넘긴다. back = 메뉴에서 열었을 때 「이전」 (오른쪽 클릭·Esc·바깥 누르기도) */
+export function rulesWin(page = 0, back?: () => void) {
   const { lines } = RULE_PAGES[page]
+  const m = mapRect()
+  const leave = () => { closeWin('rules'); back?.() }
   const open = (bodyH?: number) => openWin({
-    title: '규 칙', kind: 'rules', at: 'center', width: WIDTH, dir: 'row', btnW: 72, bodyH,
+    title: '도움말', kind: 'rules', at: 'center', width: Math.min(WIDTH, m.w - 16), dir: 'row', btnW: 64, bodyH,
     body: `<div class="rules">${lines.map(l => `<div>· ${l}</div>`).join('')}</div>`,
-    buttons: [...RULE_PAGES.map((p, i): Btn => [p.title, () => rulesWin(i), { disabled: i === page }]), ['닫기', () => {}]],
-    onBack: () => closeWin('rules'), x: false,
+    buttons: [...RULE_PAGES.map((p, i): Btn => [p.title, () => rulesWin(i, back), { disabled: i === page }]), [back ? '이전' : '닫기', leave]],
+    onBack: leave, closeOnPick: false,
   })
-  // 창 높이는 글자 수 어림이라 줄바꿈이 많으면 모자란다 → 그려 본 높이로 다시 연다
+  // 창 높이는 글자 수 어림이라 줄바꿈이 많으면 모자란다 → 그려 본 높이로 다시 연다. 맵 창보다 길면 맵 창에 맞추고 본문을 스크롤
   const body = open().querySelector<HTMLElement>('.b')!
-  if (body.scrollHeight !== body.clientHeight) open(body.scrollHeight)
+  if (body.scrollHeight !== body.clientHeight) open(Math.min(body.scrollHeight, m.h - 90))
 }

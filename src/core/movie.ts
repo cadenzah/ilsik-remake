@@ -1,6 +1,7 @@
 // 창세 프롤로그 (원작 0aa2:37f5, 프로그램을 켤 때 메뉴 앞 2ff8:04dc — 웹은 title.ts 가 페이지를 열 때) 와 엔딩 (0aa2:3982, 43장 뒤 2ff8:39f4) — formats.md "프롤로그·엔딩".
 // 화면 전체 640×480 을 창에 맞춰 키운다 (promote.ts 와 같은 방식). 묶음 풀기·흰 막은 cutscene.ts. 자원 movie/ (export_web.py movies)
 import { A } from './data'
+import { busy } from './loading'
 import { PAL_MS, apply, biosMs, dropClip, dropWhite, loadClip, palette, type Clip } from './cutscene'
 import { fadeIn, fadeOut } from './fade'
 import { SONG, playMusic, stopMusic } from './music'
@@ -75,7 +76,7 @@ export async function prologue() {
   let next = loadClip(path(0))
   await fadeIn(0)
   for (let k = 0; k < 10 && !skip; k++) {
-    const c = await next
+    const c = await busy(next)   // 첫 실행은 묶음 (모두 5MB 남짓) 을 받는 동안 「불러오는 중」
     if (k + 1 < 10) next = loadClip(path(k + 1))
     dropClip(path(k))
     if (!c) continue

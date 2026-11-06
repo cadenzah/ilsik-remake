@@ -18,6 +18,7 @@ let root: HTMLElement | null = null
 let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null
 let buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
 const hiddenIds = new Set<string>()
+let talk: HTMLButtonElement | null = null, talkFn: (() => void) | null = null   // 대화 중에만 「대화 기록」 (두 판)
 const BTN_Y = 14, GAP = 4, EDGE = 14
 
 /** 띠를 만든다. remake = 개선판 (버튼·턴 패·지형 패) */
@@ -35,6 +36,10 @@ export function initBand(remake: boolean, btns: BandButton[] = []) {
   buttons = remake ? btns : []
   els = new Map()
   plate = terrain = null
+  talk = button(['대화 기록', () => talkFn?.()])
+  talk.classList.add('talklog-btn')
+  talk.hidden = !talkFn
+  root.append(talk)
   if (remake) {
     plate = document.createElement('div')
     plate.className = 'plate turn'
@@ -49,6 +54,15 @@ export function initBand(remake: boolean, btns: BandButton[] = []) {
       root.append(e)
     }
   }
+  place()
+}
+
+/** 대화 중 「대화 기록」 버튼 (fn = 누르면 열 창, null = 숨김). 화면 쪽 조작이라 대화창이 아니라 띠에 둔다:
+ *  창틀 화면 = 아래 띠 오른쪽 끝, 현대식 = 위 바 버튼들 왼쪽 */
+export function showTalkLog(fn: (() => void) | null) {
+  talkFn = fn
+  if (!talk) return
+  talk.hidden = !fn
   place()
 }
 
@@ -114,6 +128,7 @@ function place() {
   for (const [id, e] of els) e.hidden = hiddenIds.has(id)
   const by = view.h - FRAME.b + 7
   if (terrain) Object.assign(terrain.style, { left: `${EDGE + 54}px`, top: `${by}px` })
+  if (talk) Object.assign(talk.style, { left: `${view.w - EDGE - 54 - parseFloat(talk.style.width)}px`, top: `${by}px` })   // 지형 패와 맞선 자리
 }
 
 /** 현대식 위 바: 왼쪽부터 턴 패·제목, 오른쪽 끝부터 버튼 (자리가 모자라면 순위 낮은 것부터 메뉴로) */
@@ -138,6 +153,11 @@ function placeModern() {
   for (const b of [...shown].reverse()) {
     x -= width(b)
     Object.assign(els.get(b.id)!.style, { left: `${x}px`, top: `${by}px` })
+    x -= GAP
+  }
+  if (talk && !talk.hidden) {
+    x -= parseFloat(talk.style.width)
+    Object.assign(talk.style, { left: `${x}px`, top: `${by}px` })
     x -= GAP
   }
   Object.assign(titleEl.style, { left: `${titleX}px`, top: '0px', width: `${Math.max(0, x - titleX - 8)}px`, height: `${TOP_BAR}px` })

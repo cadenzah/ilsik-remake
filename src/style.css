@@ -551,6 +551,11 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 
 #fade { position: fixed; inset: 0; z-index: 1000; background: #000; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 #fade.on { opacity: 1; pointer-events: auto; }
+/* 불러오는 중 (loading.ts busy): 기다림이 길 때만 오른쪽 아래. 검은 막·영상 위 */
+#loading { position: fixed; right: 20px; bottom: 16px; z-index: 1100; color: #9c9c90; font: 14px/1 var(--font); letter-spacing: 2px; pointer-events: none;
+  animation: loading-pulse 1.2s ease-in-out infinite alternate; }
+#loading::after { content: "…"; }
+@keyframes loading-pulse { from { opacity: .35 } to { opacity: 1 } }
 
 /* 원작판 「마법일람표」 (battle.ts magicWinOriginal): 제목은 창틀 그림 안 글자. 글자 = 원작 색 (이름 회색 그림자 + 검정, 아군 효과 EGA 9 + 1, 그 밖 EGA 4 두 번) */
 .magicwin .mgi, .magicwin .mgbig { all: unset; position: absolute; width: 32px; height: 40px; background: url(/assets/ui/magic-icons.png) no-repeat; image-rendering: pixelated; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -613,7 +618,11 @@ html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; posi
 .cut-white { position: fixed; inset: 0; z-index: 999; background: #fff; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 .cut-white.on { opacity: 1; }
 /* 개선판 전투 기록 (battleLog.ts, B1 N6) */
-.owin.log .b { overflow-y: auto; }
+.owin.log .b, .owin.rules .b, .owin.talklog .b { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.owin .b .talklog { display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 6px; }
+.owin .b .talklog .who { white-space: nowrap; }
+.owin .b .talklog .say { word-break: keep-all; overflow-wrap: anywhere; }
+.owin .b .talklog .narr, .owin .b .talklog > div { grid-column: 1 / -1; font-style: italic; }
 .owin .b .battlelog div { margin-bottom: 3px; word-break: keep-all; }
 
 /* 설정의 음량 줄 (volumeUi.ts): 「음량 ─○─ 80」. 배경음악·효과음 스위치 바로 아래 */

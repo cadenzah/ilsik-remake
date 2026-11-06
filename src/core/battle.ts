@@ -1,5 +1,5 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
-import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
+import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
@@ -15,14 +15,15 @@ import { SONG, playMusic, stageSong, stopMusic } from './music'
 import { endingMovie } from './movie'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
+import { busy, imgReady } from './loading'
 import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
 import { loadSkin, pieceUrl, winUrl } from './skin'
 import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
-import { playDialogue } from './dialogue'
-import { loadSlots, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
+import { playDialogue, resetTalkLog } from './dialogue'
+import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { DIFFICULTIES, difficulty, setSetting, setting } from './settings'
@@ -30,7 +31,7 @@ import { travelMap } from './worldmap'
 import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
-import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, showMenu, showResult, type Btn } from './ui'
+import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, setOutsideCloses, showMenu, showResult, type Btn } from './ui'
 import { applyMods, type Pos, type Unit } from './unit'
 import { addExp, again, applyCounter, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
@@ -69,7 +70,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   const extra = ed.extraBattles?.[def.n]   // 개선판 숨은 장: 원작 맵 재사용 + 새 배치·고정 일행
   if (extra) S.def = def = { ...def, title: `숨은 장 · ${extra.title}` }
   song = stageSong(extra?.map ?? def.n)   // 숨은 장은 빌려 쓰는 맵의 장 곡
-  const [tables, dialogue, stage, battles, scenes] = await Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes(), loadSkin()])
+  const [tables, dialogue, stage, battles, scenes] = await busy(Promise.all([loadTables(), loadDialogue(), loadStage(extra?.map ?? def.n), loadBattles(), loadScenes(), loadSkin()]))
   initSkinCss()
   S.tables = tables
   S.types = tables.types
@@ -85,7 +86,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   // 출전 인원 상한: 원작은 8 하드코딩 (BAD 칸 수와 비교 안 함), 칸보다 많이 고르면 놓을 곳이 없으므로 칸 수로 자른다
   const max = Math.min(8, rec.slots.length), first = PARTY.slice(0, max).map((_, i) => i)
   S.deploy = first
-  if (resume) {   // 중단한 전투: 정비 화면·대륙 지도 없이 그 자리부터
+  if (resume) {   // 전투 중 저장: 정비 화면·대륙 지도 없이 그 자리부터
     restore(resume.at)
     atStart = snapshot()
     S.deploy = resume.deploy
@@ -147,11 +148,12 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
   S.map = stage.map
   S.atlas = stage.atlas
   const ids = new Set([...S.allies, ...S.enemies].map(p => p.type))
-  await Promise.all([...ids].map(async id => {
+  for (const id of ids) { const t = S.types[id]; if (t) void imgReady(portraitUrl(t.por)) }   // 대화 초상을 미리 (dialogue.ts 는 안 온 초상을 기다린다)
+  await busy(Promise.all([...ids].map(async id => {
     const [img, fig] = await Promise.all([loadUnitSprite(id), loadFig(id)])
     S.sprites.set(id, img)
     if (fig) S.figs.set(id, fig)
-  }))
+  })))
   S.floats = []
   setupScreen(ed, def)
   resize()
@@ -167,6 +169,7 @@ async function start(resume?: Suspended) {
   S.ed.beginBattle?.()   // 개선판 난이도 (장 사이 상태를 되돌린 뒤라 다시 하기마다)
   const all = freshBattle()
   resetLog()
+  resetTalkLog()
   since = null
   preloadSounds(all)
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
@@ -539,10 +542,10 @@ function bossHit() {
 }
 
 /** 조건 창: 원작 승리·실패 조건 (+ 개선판 장 카드 목표·보조 목표) */
-function showGoalsWin(onClose?: () => void) {
+function showGoalsWin(onClose?: () => void, button?: string) {
   const card = chapter()?.card
   showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined,
-    goals: remake() ? goalStates(aliveMember) : undefined, orig: !remake(), onClose })
+    goals: remake() ? goalStates(aliveMember) : undefined, orig: !remake(), onClose, button })
 }
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
@@ -554,6 +557,8 @@ export const toTitle = () => {
 
 function cleared(ending: boolean) {
   const def = S.def, next = ending ? null : nextStage(def.n, def.route)
+  const sus = loadSuspended(S.ed.id)
+  if (sus && sus.def.n === def.n && sus.def.route === def.route) writeSuspended(S.ed.id, null)   // 이긴 전투의 중간 저장은 지난 것
   if (def.campaign) recordClear(S.ed.id, def, next && 'n' in next ? next : null, atStart, snapshot())
   // 판을 넘는 기록: 분기점·엔딩·찾은 사건 (캠페인 진행일 때), 도감 (늘)
   const now = snapshot(), camp = def.campaign
@@ -788,7 +793,11 @@ function chapterTitle() {
 
 const remake = () => !S.ed.features.commandFirst
 
-onWinChange(() => setOn('menu', isOpen('system')))   // 메뉴가 떠 있는 동안 띠 「메뉴」 를 눌린 모양으로 (다시 누르면 닫힌다)
+// 개선판 메뉴와 거기서 여는 창 (「이전」 으로 메뉴에 돌아간다). 떠 있는 동안 띠 「메뉴」 를 눌린 모양으로 (다시 누르면 모두 닫힌다)
+const MENU_WINS = ['system', 'screen', 'sound', 'rules', 'log']
+const menuOpen = () => MENU_WINS.some(isOpen)
+onWinChange(() => setOn('menu', menuOpen()))
+setOutsideCloses(() => S.map !== null && remake())   // 개선판 전투: 창 바깥 = 뒤로 (input.ts) → 창에 ✕ 없음
 
 /** 장마다: 논리 화면 크기 (개선판 = 창에 맞춰 넓게), 띠 버튼, 미니맵 */
 function setupScreen(ed: Edition, def: StageDef) {
@@ -798,7 +807,7 @@ function setupScreen(ed: Edition, def: StageDef) {
   initBand(ed.id === 'remake', [
     { id: 'goal', label: '목표', side: 'left', prio: 2, on: () => showGoalsWin() },
     { id: 'end', label: '턴 종료', side: 'right', prio: 0, on: confirmEnd },
-    { id: 'menu', label: '메뉴', side: 'right', prio: 0, on: () => isOpen('system') ? closeWin('system') : systemMenu() },
+    { id: 'menu', label: '메뉴', side: 'right', prio: 0, on: () => menuOpen() ? MENU_WINS.forEach(k => closeWin(k)) : systemMenu() },
     { id: 'threat', label: '위험', side: 'right', prio: 1, on: toggleThreat },
     { id: 'map', label: '지도', side: 'right', prio: 3, on: toggleMinimap },
   ])
@@ -835,8 +844,9 @@ export function toggleMinimap() {
   setOn('map', on)
 }
 
-/** 중단 (개선판): 아군 차례 중 지금 상태를 저장하고 타이틀로. 이어하기는 그 턴 아군 차례부터 */
-function suspend() {
+/** 중간 저장 (개선판 메뉴, 2026-11-06 「중단」 에서 바꿈): 아군 차례 중 지금 상태를 저장하고 전투는 그대로. 한 칸 (판마다) 을 덮어쓴다.
+ *  타이틀 「지난흔적」 → 「전투 중 저장」 에서 그 턴 아군 차례부터. 이 장을 이기면 지운다 */
+function midSave(back: () => void) {
   if (!stepDone || S.mode.kind === 'busy') return
   cancel()
   const all = [...S.units, ...S.reserve].sort((a, b) => a.uid - b.uid)
@@ -847,12 +857,11 @@ function suspend() {
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
     grown: snapshot().grown, equip: snapshot().equip, items: [...ITEMS], taken: [...taken],
   })
-  toTitle()
+  showResult('중간 저장', `${S.turn}턴 아군 차례를 저장했습니다.\n타이틀 「지난흔적」에서 이어 할 수 있습니다.`, [['확인', back]])
 }
 
-/** 중단 저장에서 이어 하기: 유닛·부대·발동 기록을 되돌리고 그 턴 아군 차례부터 */
+/** 중간 저장에서 이어 하기: 유닛·부대·발동 기록을 되돌리고 그 턴 아군 차례부터. 저장은 이 장을 이길 때까지 남는다 */
 async function resumeAt(r: Suspended, all: Unit[]) {
-  writeSuspended(S.ed.id, null)   // 한 번 불러오면 지운다
   all.forEach((u, i) => { const v = r.units[i]; if (!v) return; const { onMap: _, ...rest } = v; Object.assign(u, rest, { px: v.x, py: v.y }); applyMods(u) })
   S.units = all.filter((_, i) => r.units[i]?.onMap ?? true)
   S.reserve = all.filter((_, i) => r.units[i] && !r.units[i].onMap)
@@ -880,25 +889,53 @@ function toCamp() {
   void boot(S.ed, S.def, atStart)
 }
 
-/** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·규칙·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
+/** 개선판 메뉴 「화면」: 위험 범위·미니맵·표기·화면 틀 켬/끔 (「소리」 창과 같은 모양). 바꿔도 창은 그대로, 「이전」 = 메뉴 */
+function screenWin(back: () => void) {
+  const opts: [string, () => boolean, () => void][] = [
+    ['위험 범위', () => S.threat, toggleThreat],
+    ['미니맵', minimapOn, toggleMinimap],
+    ['표기', () => S.marks, () => { S.marks = !S.marks }],
+    ['개선된 UI', () => view.modern, toggleScreenStyle],
+  ]
+  const open = (focus = 0) => {
+    const el = openWin({ title: '화면', kind: 'screen', at: 'center', width: 216, dir: 'row', body: '<div class="snd"></div>', bodyH: opts.length * 29 - 2,
+      buttons: [['이전', back]], onBack: () => { closeWin('screen'); back() } })
+    const box = el.querySelector<HTMLElement>('.snd')!
+    opts.forEach(([name, on, flip], i) => {
+      const b = document.createElement('button')
+      b.className = 'obtn opt'
+      b.setAttribute('role', 'switch')
+      b.setAttribute('aria-checked', String(on()))
+      b.innerHTML = `${name}<b>${on() ? '켬' : '끔'}</b>`
+      b.onclick = e => { e.stopPropagation(); flip(); open(i) }   // 화면 틀을 바꾸면 창 자리도 바뀌어 새로 연다
+      box.append(b)
+    })
+    box.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus({ preventScroll: true })
+  }
+  open()
+}
+
+/** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·도움말·기록·화면·소리·턴 종료·정비 화면·중간 저장·타이틀로 (하위 창의 「이전」 = 이 창) */
 function systemMenu(at?: { x: number; y: number }, from?: Unit) {
+  const back = () => systemMenu(at, from)
   // 원작 [열기][닫기] (0aa2:0c58 모드 1) = 켜기·끄기 (開/關 를 글자대로 옮긴 번역으로 보고 고침). 지금 상태 쪽 버튼을 붉게, 닫기는 제목 ✕·Esc
   const onOff = (title: string, cur: () => boolean, set: (on: boolean) => void) => () => {
     const el = openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['켜기', () => set(true)], ['끄기', () => set(false)]], onBack: () => closeWin('sub') })
     el.querySelectorAll('.obtn').forEach((b, i) => b.classList.toggle('on', cur() === (i === 0)))
   }
   const items: Btn[] = remake() ? [
-    ['목표', () => showGoalsWin()],
-    ['규칙', () => rulesWin()],
-    ['기록', () => logWin()],
-    ['소리', () => soundWin()],
-    [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
-    [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
-    [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
-    [view.modern ? '원작 UI' : '개선된 UI', toggleScreenStyle],
+    ['목표', () => showGoalsWin(back, '이전')],
+    ['도움말', () => rulesWin(0, back)],
+    ['기록', () => logWin(back)],
+    ['화면', () => screenWin(back)],
+    ['소리', () => soundWin(back)],
     ['턴 종료', confirmEnd, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
-    ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로 갑니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
+    ['중간 저장', () => {
+      const old = loadSuspended(S.ed.id)   // 다른 장의 저장을 덮을 때만 묻는다
+      if (old && (old.def.n !== S.def.n || old.def.route !== S.def.route)) confirmWin('중간 저장', 'center', () => midSave(back), back, `${esc(old.title)} 저장을 덮어씁니다.`, 220)
+      else midSave(back)
+    }, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
   ] : [
     ['알림', onOff('알림전환', () => S.notice, on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)

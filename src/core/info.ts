@@ -90,7 +90,7 @@ export function conditions(orig = false): { win: string[]; lose: string[] } {
 }
 
 /** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표, orig = 원작판 문형 (원작 0aa2:225a) */
-export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; orig?: boolean; onClose?: () => void } = {}) {
+export function showConditions(o: { title?: string; goal?: string; goals?: { text: string; state: 'open' | 'done' | 'failed' }[]; orig?: boolean; onClose?: () => void; button?: string } = {}) {
   const c = conditions(o.orig)
   const mark = { open: '◇', done: '✓', failed: '✗' }
   const body = [
@@ -100,7 +100,7 @@ export function showConditions(o: { title?: string; goal?: string; goals?: { tex
   ]
   const w = Math.min(mapRect().w - 16, Math.max(200, ...body.map(l => l.replace(/<[^>]+>/g, '').length * 16 + 40)))
   openWin({ title: o.title ?? '', body: body.join('<br>'), width: w, kind: 'cond', dir: 'row', at: 'center',
-    buttons: [['확인', () => o.onClose?.()]], onBack: () => { closeWin('cond'); o.onClose?.() }, x: false })
+    buttons: [[o.button ?? '확인', () => o.onClose?.()]], onBack: () => { closeWin('cond'); o.onClose?.() }, x: false })
 }
 
 // ---------- GO!! GO!! (OTH 4) ----------

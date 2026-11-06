@@ -62,15 +62,16 @@ export function record(turn: number, side: 'ally' | 'enemy', html: string) {
 
 // ---------- 전투 기록 창 (메뉴) ----------
 
-/** 턴마다 아군·적 차례 한 줄씩, 최근 것이 위 */
-export function logWin() {
+/** 턴마다 아군·적 차례 한 줄씩, 최근 것이 위. back = 메뉴에서 열었을 때 「이전」 (오른쪽 클릭·Esc·바깥 누르기도) */
+export function logWin(back?: () => void) {
   const rows = [...battleLog].reverse().map(e =>
     `<div><span class="${e.side === 'enemy' ? 'red' : 'blue'}">${e.turn}턴 ${e.side === 'enemy' ? '적' : '아군'}</span> ${e.html}</div>`)
   const body = `<div class="rules battlelog">${rows.join('') || '<div class="dim">기록 없음</div>'}</div>`
-  const width = Math.min(mapRect().w - 16, 520)
+  const m = mapRect(), width = Math.min(m.w - 16, 520)
+  const leave = () => { closeWin('log'); back?.() }
   const open = (bodyH?: number) => openWin({ title: '전투 기록', kind: 'log', at: 'center', width, dir: 'row', bodyH,
-    body, buttons: [['닫기', () => {}]], onBack: () => closeWin('log'), x: false })
+    body, buttons: [[back ? '이전' : '닫기', () => back?.()]], onBack: leave, x: false })
   // 창 높이는 글자 수 어림이라 → 그려 본 높이로 다시 연다 (넘치면 맵 높이까지, 나머지는 스크롤)
   const b = open().querySelector<HTMLElement>('.b')!
-  if (b.scrollHeight !== b.clientHeight) open(Math.min(b.scrollHeight, mapRect().h - 100))
+  if (b.scrollHeight !== b.clientHeight) open(Math.min(b.scrollHeight, m.h - 90))
 }

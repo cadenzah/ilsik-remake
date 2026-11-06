@@ -1,6 +1,7 @@
 // 화면 전환 페이드 (원작은 팔레트를 어둡게 → 다음 화면 → 밝게). 맨 위 검은 막의 투명도로 흉내 낸다.
 // 이미 어두우면 fadeOut, 이미 밝으면 fadeIn 은 바로 끝난다 → 전환 경로마다 겹쳐 불러도 된다.
-// transitionend 대신 setTimeout (숨은 탭에서도 끝나게)
+// transitionend 대신 setTimeout (숨은 탭에서도 끝나게). 밝히기 전에 화면에 붙은 그림·글꼴이 오기를 기다린다 (loading.ts, 첫 실행·느린 망)
+import { busy, pageReady } from './loading'
 export const FADE_MS = 400
 
 let dark = false
@@ -26,11 +27,13 @@ export function fadeOut(ms = FADE_MS): Promise<void> {
   return sleep(ms)
 }
 
-export function fadeIn(ms = FADE_MS): Promise<void> {
-  if (!dark) return Promise.resolve()
-  dark = false
+export async function fadeIn(ms = FADE_MS): Promise<void> {
+  if (!dark) return
+  dark = false   // 기다리는 사이 다시 불려도 한 번만
+  await busy(pageReady())
+  if (dark) return   // 기다리는 사이 다시 어둡게 했다
   const e = veil()
   e.style.transitionDuration = `${ms}ms`
   e.classList.remove('on')
-  return sleep(ms)
+  await sleep(ms)
 }
