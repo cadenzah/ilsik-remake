@@ -67,8 +67,6 @@ canvas#view { touch-action: none; }
 .owin.hasx .t { right: 26px; }
 #hud .oshade { background: rgba(0, 0, 0, .38); }
 .owin .b { position: absolute; left: 12px; right: 12px; line-height: 18px; text-shadow: -1px 0 #aaa; overflow: hidden; text-align: center; }
-.owin .b .rules { text-align: left; }
-.owin .b .rules div { padding-left: 10px; text-indent: -10px; margin-bottom: 4px; }
 .owin .blue, .owin .h.blue { color: #2828e0; text-shadow: -1px 0 #8888ff; }
 .owin .red, .owin .h.red { color: #b00000; text-shadow: -1px 0 #ff8080; }
 .owin .green, .owin .h.green { color: #006a1a; text-shadow: -1px 0 #80c080; }
@@ -293,8 +291,18 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .page:has(.wmap) nav { height: 30px; background: linear-gradient(transparent, rgba(12, 10, 6, .92) 40%); z-index: 3; }
 
 /* 도감 (개선판) */
-#titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px; color: #c8c8bc; font-size: 12px; overflow: auto; }
-#titlescreen .codex h2 { margin: 0 0 6px; font-size: 16px; color: var(--gold); font-weight: 400; }
+#titlescreen .codex { position: absolute; inset: 0 0 30px; padding: 10px 16px 0; color: #c8c8bc; font-size: 12px; display: flex; flex-direction: column; }
+#titlescreen .codex h2 { margin: 0 14px 0 0; font-size: 16px; color: var(--gold); font-weight: 400; }
+#titlescreen .codex .ctabs { display: flex; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid #3c3c34; margin-bottom: 4px; }
+#titlescreen .codex .ctabs button { all: unset; cursor: pointer; padding: 2px 12px; border-radius: 3px; color: #8c8c80; font-size: 13px; }
+#titlescreen .codex .ctabs button:hover, #titlescreen .codex .ctabs button:focus-visible { color: #e8e6df; }
+#titlescreen .codex .ctabs button.on { color: #1c1a14; background: var(--gold); }
+#titlescreen .codex .cpane { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+#titlescreen .codex .cpane[hidden] { display: none; }
+#titlescreen .codex p.empty { margin: 40px auto 0; max-width: 420px; text-align: center; color: #9c9c90; font-size: 13px; line-height: 1.9; }
+#titlescreen .codex .help .sum { color: var(--hacc); }
+#titlescreen .codex .help .where { color: var(--hdim); }
+#titlescreen .codex .help { --hfg: #d8d6cc; --hdim: #8c8c80; --hacc: var(--gold); --hline: #3c3c34; --hsel: #2c2a22; font-size: 13px; }
 #titlescreen .codex h3 { margin: 10px 0 4px; font-size: 13px; font-weight: 400; color: #9c9c90; }
 #titlescreen .codex h3 small { color: #6c6c64; }
 #titlescreen .codex .cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -305,8 +313,6 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .codex .cell small + small { display: block; }
 #titlescreen .codex .items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
 #titlescreen .codex p { margin: 0; color: #6c6c64; }
-#titlescreen .codex .rule-head { margin-top: 14px; }
-#titlescreen .codex .rules { margin: 0; padding-left: 16px; line-height: 17px; }
 
 #titlescreen .notice { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: #fcfcfc; text-align: center; font: 16px/1.7 var(--font); }
@@ -625,7 +631,7 @@ html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; posi
 .cut-white { position: fixed; inset: 0; z-index: 999; background: #fff; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 .cut-white.on { opacity: 1; }
 /* 개선판 전투 기록 (battleLog.ts, B1 N6) */
-.owin.log .b, .owin.rules .b, .owin.talklog .b { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.owin.log .b, .owin.talklog .b { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .owin .b .talklog { display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 6px; }
 .owin .b .talklog .who { white-space: nowrap; }
 .owin .b .talklog .say { word-break: keep-all; overflow-wrap: anywhere; }
@@ -659,3 +665,51 @@ html.ui-modern .owin .snd .ovol input { accent-color: var(--ec-green); }
 /* 정비 화면 「음악」 창 ✕ (camp.ts withVolume): #camp button 의 all: unset 을 되돌린다 */
 #camp .dlg .oclose { position: absolute; left: auto; right: 2px; top: 1px; width: 24px; height: 24px; cursor: pointer; }
 #camp .dlg .obtn.on { color: #a00000; text-shadow: -1px 0 #ffb080; }   /* 「음악」 창의 지금 상태 쪽 */
+
+/* 도움말 (help.ts mountHelp, 2026-11-07 개편 help-proposal.md): 왼쪽 주제 목록 + 오른쪽 한 주제. 도감 (어두운 바탕) 과 전투 창 (밝은 창) 이 색 변수만 다르다 */
+.help { --hfg: #000; --hdim: #4c4434; --hacc: #7a2c10; --hline: #8c7c5c; --hsel: rgba(120, 90, 40, .22);
+  display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 10px; height: 100%; color: var(--hfg); text-align: left; text-shadow: none; line-height: 1.6; }
+.help .hl { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; border-right: 1px solid var(--hline); padding-right: 6px; }
+.help .hl button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 3px; color: var(--hdim); line-height: 1.35; }
+.help .hl button:hover, .help .hl button:focus-visible { color: var(--hfg); }
+.help .hl button.on { color: var(--hfg); background: var(--hsel); }
+.help .hb { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-right: 6px; }
+.help h4 { margin: 0 0 2px; font-size: 1.1em; font-weight: 400; color: var(--hfg); }
+.help h4 em { font-style: normal; font-size: 11px; margin-left: 8px; padding: 0 6px; border: 1px solid var(--hline); border-radius: 3px; color: var(--hdim); vertical-align: 2px; }
+.help .sum { margin: 2px 0 8px; color: var(--hacc); }
+.help ul { margin: 0 0 6px; padding-left: 16px; }
+.help li { margin-bottom: 4px; }
+.help li.x { list-style: none; margin-left: -16px; }
+.help b { font-weight: 400; color: var(--hacc); }
+.help table { border-collapse: collapse; width: 100%; font-size: .92em; line-height: 1.45; }
+.help th, .help td { border: 1px solid var(--hline); padding: 2px 6px; text-align: left; vertical-align: top; font-weight: 400; }
+.help th { color: var(--hdim); }
+.help details { margin-top: 2px; color: var(--hdim); }
+.help details summary { cursor: pointer; margin-bottom: 4px; }
+.help details summary:hover { color: var(--hfg); }
+.help .where { margin: 6px 0 0; padding-top: 4px; border-top: 1px dashed var(--hline); color: var(--hdim); font-size: .92em; }
+.help .fig { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; }
+.help .fig span { color: var(--hdim); font-size: .92em; line-height: 1.4; }
+.help .fig svg { flex: none; }
+.help .fig rect { fill: none; stroke: var(--hline); stroke-width: 1; }
+.help .fig text { font-size: 11px; text-anchor: middle; fill: var(--hfg); }
+.help .fig .c-M { fill: #b08a2a; stroke: #e3c06b; }
+.help .fig .c-A, .help .fig .c-a { fill: #2c6a62; stroke: #5fb0a4; }
+.help .fig .c-F, .help .fig .c-f { fill: #7a2c2c; stroke: #d06060; }
+.help .fig .c-a, .help .fig .c-f, .help .fig .c-h { stroke: #ff7060; stroke-width: 2; }
+.help .fig .c-h { fill: rgba(208, 80, 64, .35); }
+.help .fig .c-r { fill: rgba(227, 192, 107, .25); }
+.help .fig .c-s { fill: rgba(227, 192, 107, .25); stroke: #e3a020; stroke-width: 2; }
+.help .fig .c-x { fill: rgba(0, 0, 0, .3); stroke-dasharray: 2 2; }
+.owin .b .hwrap { height: 100%; }
+.owin .b .help .fig text { fill: #fff; }
+.owin .b .help .hl button { padding: 1px 6px; line-height: 24px; }
+
+/* 스크롤 영역 「더 있음」 (scrollHint.ts): 넘치는 쪽 가장자리를 흐리게, 얇은 스크롤바는 늘 보이게 (Chrome 은 scrollbar-width·color 가 auto 일 때만 ::-webkit-scrollbar 를 쓴다) */
+[data-scroll] { scrollbar-width: auto; scrollbar-color: auto; }
+[data-scroll]::-webkit-scrollbar { width: 6px; height: 6px; }
+[data-scroll]::-webkit-scrollbar-track { background: rgba(128, 112, 80, .18); border-radius: 3px; }
+[data-scroll]::-webkit-scrollbar-thumb { background: rgba(200, 160, 80, .75); border-radius: 3px; }
+[data-scroll="down"] { -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
+[data-scroll="up"] { -webkit-mask-image: linear-gradient(transparent, #000 36px); mask-image: linear-gradient(transparent, #000 36px); }
+[data-scroll="both"] { -webkit-mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 36px), transparent); }

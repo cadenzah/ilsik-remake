@@ -8,6 +8,7 @@ import { reachable } from './core/grid'
 import { applyFont } from './core/font'
 import { bindInput } from './core/input'
 import { resize, toScreen } from './core/render'
+import { installScrollHints } from './core/scrollHint'
 import { stageDef } from './core/stage'
 import { S } from './core/state'
 import { showTitle, type Launch } from './core/title'
@@ -64,6 +65,7 @@ function lockPage() {
 async function main() {
   lockPage()
   applyFont()
+  installScrollHints()   // 타이틀 (도감·장 지도) 부터 쓴다
   const q = new URLSearchParams(import.meta.env.DEV ? location.search : '')   // 배포판은 늘 타이틀부터
   const n = Number(q.get('stage'))
   const ids = (k: string) => (q.get(k) ?? '').split(',').filter(Boolean).map(Number)

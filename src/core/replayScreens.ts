@@ -1,5 +1,5 @@
 // 개선판 장 지도·도감 화면 (.claude/docs/replay-design.md 3·6절). 타이틀의 .page (640×480) 에 그린다
-import { RULE_PAGES } from './help'
+import { helpKnown, mountHelp } from './help'
 import { A, loadBattles, loadTables, portraitUrl, type UnitType } from './data'
 import { FOUND, HIDDEN, trueEndingOpen } from './replay'
 import { loadPlaces, placeLabel, type Place } from './worldmap'
@@ -219,21 +219,33 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
   const met = names.filter(n => forms.get(n)!.some(id => seen.has(id)))
   const itemCats: [string, number][] = [['무기', 0], ['방어구', 1], ['도구', 2]]
   const allItems = [...t.items.values()]
+  // 탭: 인물·물건·도움말 (2026-11-07 help-proposal.md). 도감은 처음부터 열리고, 만난 것이 없는 무리는 그리지 않는다. 탭이 통째로 비면 무엇이 모이는 곳인지 안내 (사용자 2026-11-07). 처음 = 아직 아무도 안 만났으면 도움말
+  const people = groups.map((title, g) => {
+    const list = met.filter(n => groupOf(n) === g)
+    return list.length ? `<h3>${title} <small>${list.length} / ${names.filter(n => groupOf(n) === g).length}</small></h3><div class="cells">${list.map(personCell).join('')}</div>` : ''
+  }).join('')
+  const things = itemCats.map(([title, cat]) => {
+    const list = allItems.filter(i => i.cat === cat && items.has(i.id))
+    return list.length ? `<h3>${title} <small>${list.length} / ${allItems.filter(i => i.cat === cat).length}</small></h3>
+      <div class="items">${list.map(i => `<span>${i.name}</span>`).join('')}</div>` : ''
+  }).join('')
+  const TABS = [['people', '인물'], ['items', '물건'], ['help', '도움말']] as const
   page.innerHTML = `<div class="codex">
-      <h2>도감</h2>
-      ${groups.map((title, g) => {
-        const list = met.filter(n => groupOf(n) === g)
-        const total = names.filter(n => groupOf(n) === g).length
-        return `<h3>${title} <small>${list.length} / ${total}</small></h3><div class="cells">${list.map(personCell).join('') || '<p>아직 없음</p>'}</div>`
-      }).join('')}
-      ${itemCats.map(([title, cat]) => {
-        const list = allItems.filter(i => i.cat === cat && items.has(i.id))
-        return `<h3>${title} <small>${list.length} / ${allItems.filter(i => i.cat === cat).length}</small></h3>
-          <div class="items">${list.map(i => `<span>${i.name}</span>`).join('') || '<p>아직 없음</p>'}</div>`
-      }).join('')}
-      <h2 class="rule-head">도움말</h2>
-      ${RULE_PAGES.map(p => `<h3>${p.title}</h3><ul class="rules">${p.lines.map(l => `<li>${l}</li>`).join('')}</ul>`).join('')}
+      <div class="ctabs"><h2>도감</h2>${TABS.map(([k, l]) => `<button data-tab="${k}">${l}</button>`).join('')}</div>
+      <div class="cpane" data-tab="people">${people || '<p class="empty">아직 만난 인물이 없습니다.<br>전투에서 만난 동료와 적이 이곳에 모이고,<br>종족과 약점·내성도 함께 적힙니다.</p>'}</div>
+      <div class="cpane" data-tab="items">${things || '<p class="empty">아직 손에 넣은 물건이 없습니다.<br>얻거나 장비한 무기·방어구·도구가 이곳에 모입니다.<br>한 번 얻은 물건은 새로 시작해도 남습니다.</p>'}</div>
+      <div class="cpane" data-tab="help"></div>
     </div>${nav()}`
+  mountHelp(page.querySelector<HTMLElement>('.cpane[data-tab="help"]')!, helpKnown(seen, t.types, t.labels.race))
+  const tabs = [...page.querySelectorAll<HTMLButtonElement>('.ctabs button')]
+  const show = (k: string) => {
+    codexTab = k
+    tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === k))
+    page.querySelectorAll<HTMLElement>('.cpane').forEach(p => p.hidden = p.dataset.tab !== k)
+  }
+  tabs.forEach(b => b.onclick = () => show(b.dataset.tab!))
+  show(codexTab ?? (met.length ? 'people' : 'help'))
   page.querySelector<HTMLButtonElement>('nav .close')!.onclick = close
   page.querySelector<HTMLButtonElement>('nav .close')!.focus()
 }
+let codexTab: string | undefined   // 다시 열면 마지막 탭

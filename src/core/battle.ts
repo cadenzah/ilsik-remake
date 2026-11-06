@@ -1,6 +1,6 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
-import { rulesWin } from './help'
+import { helpKnown, rulesWin } from './help'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, takePromo, type Camp } from './campaign'
@@ -23,7 +23,7 @@ import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './b
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
 import { playDialogue, resetTalkLog } from './dialogue'
-import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
+import { loadProgress, loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
 import { stageMarks, starText } from './grade'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
@@ -945,7 +945,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   }
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin(back, '이전')],
-    ['도움말', () => rulesWin(0, back)],
+    ['도움말', () => rulesWin(helpKnown([...loadProgress(S.ed.id)?.seen?.units ?? [], ...S.units.map(u => u.type.id)], S.tables.types, S.tables.labels.race), back)],
     ['기록', () => logWin(back)],
     ['화면', () => screenWin(back)],
     ['소리', () => soundWin(back)],
