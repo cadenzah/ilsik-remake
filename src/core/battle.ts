@@ -1,6 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
+import { diff, hideSummary, logWin, mark, record, resetLog, showSummary } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
@@ -164,6 +165,8 @@ async function start(resume?: Suspended) {
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
   S.ed.beginBattle?.()   // 개선판 난이도 (장 사이 상태를 되돌린 뒤라 다시 하기마다)
   const all = freshBattle()
+  resetLog()
+  since = null
   preloadSounds(all)
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
   resetTalk()
@@ -457,6 +460,7 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
 
 export async function checkEnd(): Promise<boolean> {
   const { result, fallen, deadScenes, scenes, lines } = judge()
+  if (result) hideSummary()
   if (result === 'lose') {
     S.mode = { kind: 'busy' }
     closeAll()
@@ -543,6 +547,7 @@ function showGoalsWin(onClose?: () => void) {
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
+  hideSummary()
   stopMusic()
   try { sessionStorage.setItem(SKIP_INTRO, '1') } catch { /* 무시 */ }
   void fadeOut().then(() => { location.href = location.pathname })
@@ -643,14 +648,31 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
       if (party && live.every(u => u.acted)) continue   // 중단 저장에서 이어 온 턴: 이미 마친 단계
       updatePhase(side, step.length > 1 ? '' : lead.type.name)
       if (party) {   // 차례 시작 처리 (중독·혼수·강화 되돌림). 혼수 대원은 휴식하고 넘긴다
+        if (remake()) enemySummary()
+        const before = mark()
+        let skipped = false
         for (const u of live) if (await tickUnit(u) === 'over') return
-        if (live.every(u => u.acted || u.hp <= 0)) continue
-      }
-      if (party && step.length > 1) await goGo(900)
-      if (await (party ? playerStep(live) : aiStep(step))) return
+        if (live.every(u => u.acted || u.hp <= 0)) skipped = true
+        else {
+          if (step.length > 1) await goGo(900)
+          if (await playerStep(live)) return
+        }
+        if (remake()) { record(S.turn, 'ally', diff(before, 'ally')); since = { at: mark(), turn: S.turn } }
+        if (skipped) continue
+      } else if (await aiStep(step)) return
     }
     S.turn++
   }
+}
+
+/** 개선판 적 차례 요약 (B1 N6): 아군 차례가 끝난 뒤부터 (동료·적 차례, 다음 턴 시작 장면) 바뀐 것을 기록하고 맵 아래 한 줄로 */
+let since: { at: ReturnType<typeof mark>; turn: number } | null = null
+function enemySummary() {
+  if (!since) return
+  const line = diff(since.at, 'enemy')
+  record(since.turn, 'enemy', line)
+  if (line) showSummary(since.turn, line)
+  since = null
 }
 
 // 플레이어 단계: 단계의 일행 대원이 모두 행동하거나 턴 종료(원작판은 휴식)를 누를 때까지
@@ -856,6 +878,7 @@ async function resumeAt(r: Suspended, all: Unit[]) {
 /** 전투를 그만두고 이 장 정비 화면으로 (원작 시스템 → 종료 「대기화면」) */
 function toCamp() {
   S.mode = { kind: 'busy' }
+  hideSummary()
   closeAll()
   hideBasic()
   void boot(S.ed, S.def, atStart)
@@ -868,6 +891,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin()],
     ['규칙', () => rulesWin(), { title: '게임이 알려 주지 않는 규칙 (피로·전투·직업·성장)' }],
+    ['기록', () => logWin(), { title: '턴마다 아군·적 차례에 일어난 일' }],
     [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
