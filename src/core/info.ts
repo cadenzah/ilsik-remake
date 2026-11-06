@@ -98,7 +98,7 @@ export function showConditions(o: { title?: string; goal?: string; goals?: Goal[
     '<span class="h blue">승리조건</span>', ...(o.goal ? [esc(o.goal)] : c.win.map(esc)),
     '<span class="h red">실패조건</span>', ...c.lose.map(esc),
     ...(o.goals?.length ? ['<span class="h green">보조 목표</span>', ...o.goals.map(g => `<span class="${g.state}">${mark[g.state]} ${esc(g.text)}</span>`)] : []),
-    ...(o.marks?.length ? ['<span class="h green">평가</span>', ...o.marks.map(g => `<span class="${g.state}">${mark[g.state]} ${esc(g.text)}</span>`)] : []),
+    ...(o.marks?.length ? ['<span class="h green">도전 과제</span>', ...o.marks.map(g => `<span class="${g.state}">${mark[g.state]} ${esc(g.text)}</span>`)] : []),
   ]
   const w = Math.min(mapRect().w - 16, Math.max(200, ...body.map(l => l.replace(/<[^>]+>/g, '').length * 16 + 40)))
   openWin({ title: o.title ?? '', body: body.join('<br>'), width: w, kind: 'cond', dir: 'row', at: 'center',

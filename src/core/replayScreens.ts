@@ -115,7 +115,7 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   // 장 평가 (제안 11·34): 그 장의 최고 별. 갈래를 안 가린 줄 (공통 장) 은 갈래 중 가장 좋은 것
   const best = (n: number, route?: number) => [0, 1, 2].filter(r => route === undefined || r === route).map(r => p?.stars?.[`${n}-${r}`])
     .reduce<[number, number] | undefined>((a, b) => !b ? a : !a || b[0] / b[1] > a[0] / a[1] ? b : a, undefined)
-  const stars = (n: number, route?: number) => { const b = best(n, route); return b ? `<i class="stars" title="장 평가">${starText(...b)}</i>` : '' }
+  const stars = (n: number, route?: number) => { const b = best(n, route); return b ? `<i class="stars" title="도전 과제">${starText(...b)}</i>` : '' }
   const row = (n: number, route: number | undefined, extra = '') =>
     `<button class="crow${n === next ? ' next' : ''}" data-n="${n}"${route === undefined ? '' : ` data-route="${route}"`}>
       <b>${n}</b><span>${places[n - 1]?.name ?? ''}<small>${places[n - 1]?.title ?? ''}</small></span>${extra || stars(n, route)}</button>`

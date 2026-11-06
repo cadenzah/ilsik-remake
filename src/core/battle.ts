@@ -588,7 +588,7 @@ function cleared(ending: boolean) {
   const goals = goalStates(aliveMember)
   const marks = stageMarks(true), got = marks.filter(m => m.state === 'done').length   // 장 평가 (제안 11·34)
   if (marks.length) recordStars(S.ed.id, def.n, def.route, got, marks.length)
-  const lines = [...marks.length ? [`평가 ${starText(got, marks.length)}`, ...marks.map(m => `${m.state === 'done' ? '✓' : '✗'} ${m.text}`), ''] : [],
+  const lines = [...marks.length ? [`도전 과제 ${starText(got, marks.length)}`, ...marks.map(m => `${m.state === 'done' ? '✓' : '✗'} ${m.text}`), ''] : [],
     `${S.turn}턴 · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료 ${fallen.join(', ')}` : '쓰러진 동료 없음',
     ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
   const buttons: Btn[] = []
