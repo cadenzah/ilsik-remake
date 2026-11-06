@@ -21,6 +21,7 @@ export function spawn(p: Placement, side: Unit['side']): Unit {
   if (S.troopInit[p.troop] === 3) st.mov = 0   // 상태 3 = 제자리 고정 (원작 124e:1d41, 전투 로드 때만)
   const k = side === 'enemy' ? stageTune()?.foeScale : undefined
   if (k) for (const f of ['maxHp', 'atk', 'def', 'spi', 'agi'] as const) st[f] = Math.max(1, Math.round(st[f] * k))
+  if (side === 'enemy' && S.ed.foeHp) st.maxHp = Math.max(1, Math.round(st.maxHp * S.ed.foeHp))
   const h = side === 'ally' && p.troop !== 0 ? stageTune()?.npcHp : undefined
   if (h) st.maxHp = Math.round(st.maxHp * h)
   return {
@@ -121,7 +122,7 @@ let counterTurn: Unit['side'] | undefined   // 그 상대 차례의 공격 쪽
 
 /** a 가 from 에 서서 c 를 쳤을 때 c 가 되받는 피해, 0 = 안 되받음 (타격 전에 부른다).
  *  근접 공격 (공격 유형 0·1) 만, 맞고 살아남고 공격자가 자기 사거리 안일 때. 혼수·대기·휴식선 (맞은 뒤 생명 기준) 이면 못 한다 (고정 부대는 제자리에서 싸우니 되받는다 — 못 하면 AI 가 호위 NPC 만 노린다).
- *  피해 = 물리 피해 × scale × decay^(이번 상대 차례에 이미 되받은 횟수), 최소 1 */
+ *  피해 = 물리 피해 × scale × decay^(이번 상대 차례에 이미 되받은 횟수), 최소 1. 개선판 = scale 1 · decay 1 (원래 위력, 감쇠 없음) */
 export function counterDamage(a: Unit, c: Unit, from: Pos = a): number {
   const cfg = S.ed.counter
   if (!cfg || c.side === a.side || attackKind(a) >= 2 || c.coma > 0 || S.troopState[c.troop] === 2 || !inReach(c, c, from)) return 0

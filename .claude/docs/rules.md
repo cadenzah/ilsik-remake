@@ -28,7 +28,7 @@
   14 상태회복 = 중독·혼수 카운터 0 (강화·약화는 그대로 [추정]). 강화·약화는 능력치마다 부호 있는 값 하나 (원작은 증가·감소 남은량 배열이 따로 — 둘 다 걸린 경우만 다를 수 있음).
   차례 시작 처리는 원작판 = 그 유닛 차례, 개선판 = 아군·적 단계 시작에 그 단계 대원 모두. AI: 원작판 = 원작 AI (아래 '원작 AI'), 개선판 = 점수식 (remake/ai.ts) — 공격 유형 1 (직업 8~14) 만 마법. 사바카(직업 20) 는 원작 규칙대로 마법을 안 씀
 
-- 근접 반격 [개선판만, B1 제안 3]: `battleCore.ts` counterDamage. 규칙·수치는 balance-proposal.md "3 반격"
+- 근접 반격 [개선판만, B1 제안 3]: `battleCore.ts` counterDamage. 직접 칠 때와 같은 피해·감쇠 없음, 대신 적 최대 생명 ×1.15 (`Edition.foeHp`). 규칙·수치는 balance-proposal.md "3 반격"
 
 ## 원작 전투 공식 [확정, 2026-10-13 역분석 — DOSBox 수치 대조 전]
 도구 `tools/fpdis.py` (FP 에뮬 int 34h~3Dh 치환 역어셈블, DS 실수 상수 주석, `far_calls`), `tools/simp.py` (20ec:6e92 요약). 웹 `src/editions/original/rules.ts`
