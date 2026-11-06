@@ -59,6 +59,7 @@ canvas#view { touch-action: none; }
 .oclose i::before, .oclose i::after { content: ""; position: absolute; left: 2px; top: 6px; width: 10px; height: 2px; border-radius: 1px;
   background: #4a2008; box-shadow: 0 1px 0 rgba(255, 246, 210, .8); transform: rotate(45deg); }
 .oclose i::after { transform: rotate(-45deg); }
+.oclose:hover { background: none; }   /* 전역 button:hover 남색 바탕 막기 (판은 i 가 그린다) */
 .oclose:hover i { background: linear-gradient(#fff4d4, #eccb86); }
 .oclose:hover i::before, .oclose:hover i::after { background: #a00000; }
 .oclose:active i { background: linear-gradient(#e2bb72, #f4dca4); box-shadow: inset 1px 1px #a87430, inset -1px -1px #fff2c8; }
