@@ -1,8 +1,9 @@
 // 개선판 적 차례 요약·전투 기록 (B1 제안 N6, balance-proposal.md).
 // 페이즈제라 적 14~30명이 잇달아 움직여 무슨 일이 있었는지 놓친다 → 아군 차례가 끝날 때와 다음 아군 차례가 시작할 때 전장을 찍어 두고,
-// 그 사이 바뀐 것 (맞은 아군·쓰러진 아군·쓰러진 적·중독·혼수·깨어난 부대·증원) 을 한 줄로. 한 줄은 맵 아래 판으로 잠시, 전부는 메뉴 「기록」.
+// 그 사이 바뀐 것 (맞은 아군·쓰러진 아군·쓰러진 적·중독·혼수·깨어난 부대·증원) 을 한 줄로 메뉴 「기록」 에 남긴다.
+// 맵에 띄우는 판도 만들었다가 뺐다 — 장르에서 낯설고 매 턴 뜨면 과하다 (사용자 결정 2026-11-06)
 // 기록은 전투마다 새로 (중단 저장에는 넣지 않는다 — 이어 하면 그 뒤부터)
-import { hud, mapRect } from './screen'
+import { mapRect } from './screen'
 import { S } from './state'
 import { esc, openWin, closeWin } from './ui'
 import type { Unit } from './unit'
@@ -11,7 +12,7 @@ interface Mark { hp: Map<Unit, { hp: number; poison: number; coma: number }>; tr
 export interface LogEntry { turn: number; side: 'ally' | 'enemy'; html: string }
 
 export const battleLog: LogEntry[] = []
-export const resetLog = () => { battleLog.length = 0; hideSummary() }
+export const resetLog = () => { battleLog.length = 0 }
 
 /** 지금 전장을 찍어 둔다 */
 export function mark(): Mark {
@@ -57,33 +58,6 @@ export function diff(m: Mark, side: 'ally' | 'enemy'): string {
 /** 기록에 한 줄 (아무 일 없으면 "피해 없음" / "변화 없음") */
 export function record(turn: number, side: 'ally' | 'enemy', html: string) {
   battleLog.push({ turn, side, html: html || '<span class="dim">' + (side === 'enemy' ? '피해 없음' : '변화 없음') + '</span>' })
-}
-
-// ---------- 맵 아래 한 줄 판 ----------
-
-let plate: HTMLElement | null = null, timer = 0
-
-/** 적 차례 요약을 맵 아래 가운데에 잠시 띄운다. 누르면 전투 기록. 입력을 막지 않는다 */
-export function showSummary(turn: number, html: string, ms = 6000) {
-  hideSummary()
-  const m = mapRect()
-  const el = document.createElement('div')
-  el.className = 'plate turnsum'
-  el.innerHTML = `<b class="enemy">${turn}턴 적 차례</b> — ${html}`
-  el.title = '눌러서 전투 기록'
-  el.style.maxWidth = `${m.w - 32}px`
-  hud.append(el)
-  el.style.left = `${m.x + (m.w - el.offsetWidth) / 2}px`
-  el.style.top = `${m.y + m.h - el.offsetHeight - 12}px`
-  el.onclick = () => { hideSummary(); logWin() }
-  plate = el
-  timer = window.setTimeout(hideSummary, ms)
-}
-
-export function hideSummary() {
-  clearTimeout(timer)
-  plate?.remove()
-  plate = null
 }
 
 // ---------- 전투 기록 창 (메뉴) ----------

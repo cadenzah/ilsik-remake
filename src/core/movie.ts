@@ -59,10 +59,11 @@ function napper() {
 
 /** 창세 프롤로그: ECPTIT.FAT 10묶음을 차례로, 프레임 0..N (고리 프레임까지 — 다음 묶음의 조각난 첫 화면으로 이어진다).
  *  원작 프레임 타이머 = 21번째 앞까지 70ms (조각이 모이는 부분), 그 뒤 150ms (자막이 한 글자씩). 키 하나 (kbhit) 면 통째로 건너뜀 → 검게.
- *  웹은 조각 모임·장면 사이를 원작 타이머보다 늘린다 (아래 상수). 원작은 큰 그림을 그리는 시간이 더 걸리는데 웹은 그 시간이 없어 지나치게 빨리 지나간다.
+ *  타이머는 그리기 앞에 걸고 뒤에서 기다리므로 (0aa2:38b1 → 8647 → ab16) 그리기가 느린 기계 (DOSBox 기본 cycles 등) 에서는 더 느려 보이지만, 그건 성능이고 의도는 타이머 값.
+ *  웹은 그 타이머 그대로 (조각 모임 묶음당 약 0.6초). 장면 사이 대기만 웹 보탬 (사용자 결정 2026-11-06).
  *  화면이 어두운 상태에서 불러 어둡게 끝낸다 */
-const PROLOGUE_MOSAIC_MS = 90   // 조각이 모이는 프레임 하나 (타이머 그대로면 biosMs(70) = 27.5ms, 묶음당 0.6초)
-const PROLOGUE_HOLD_MS = 2000   // 자막까지 다 나온 장면을 다음 장면 전에 보여 주는 시간
+const PROLOGUE_MOSAIC_MS = biosMs(0x46)   // 조각이 모이는 프레임 하나 = 원작 타이머 70ms → BIOS 1틱 (평균 27.5ms)
+const PROLOGUE_HOLD_MS = 2000   // 자막까지 다 나온 장면을 다음 장면 전에 보여 주는 시간 (웹 보탬)
 export async function prologue() {
   if (typeof DecompressionStream === 'undefined') return false   // 묶음이 gzip 이라 못 푸는 옛 브라우저: 받지 않고 넘어간다
   stopMusic()   // 0aa2:392a

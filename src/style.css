@@ -596,10 +596,6 @@ html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; posi
 .cutscene canvas, #hud > .cutscene.still { position: absolute; image-rendering: pixelated; }
 .cut-white { position: fixed; inset: 0; z-index: 999; background: #fff; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 .cut-white.on { opacity: 1; }
-/* 개선판 적 차례 요약·전투 기록 (battleLog.ts, B1 N6) */
-#hud .turnsum { height: auto; min-height: 25px; white-space: normal; word-break: keep-all; text-align: left; padding: 3px 10px; line-height: 19px; cursor: pointer;
-  box-shadow: inset 0 0 0 1px #ecd084, 0 2px 6px rgba(0,0,0,.35); animation: turnsum-in .25s ease-out; }
-#hud .turnsum .red { color: #b00000; } #hud .turnsum .blue { color: #2828e0; } #hud .turnsum .dim { color: #555; }
-@keyframes turnsum-in { from { opacity: 0; transform: translateY(6px); } }
+/* 개선판 전투 기록 (battleLog.ts, B1 N6) */
 .owin.log .b { overflow-y: auto; }
 .owin .b .battlelog div { margin-bottom: 3px; word-break: keep-all; }

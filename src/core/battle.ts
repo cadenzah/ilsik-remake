@@ -1,7 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
-import { diff, hideSummary, logWin, mark, record, resetLog, showSummary } from './battleLog'
+import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
@@ -460,7 +460,6 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic) {
 
 export async function checkEnd(): Promise<boolean> {
   const { result, fallen, deadScenes, scenes, lines } = judge()
-  if (result) hideSummary()
   if (result === 'lose') {
     S.mode = { kind: 'busy' }
     closeAll()
@@ -547,7 +546,6 @@ function showGoalsWin(onClose?: () => void) {
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
 export const toTitle = () => {
-  hideSummary()
   stopMusic()
   try { sessionStorage.setItem(SKIP_INTRO, '1') } catch { /* 무시 */ }
   void fadeOut().then(() => { location.href = location.pathname })
@@ -665,13 +663,11 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
   }
 }
 
-/** 개선판 적 차례 요약 (B1 N6): 아군 차례가 끝난 뒤부터 (동료·적 차례, 다음 턴 시작 장면) 바뀐 것을 기록하고 맵 아래 한 줄로 */
+/** 개선판 적 차례 요약 (B1 N6): 아군 차례가 끝난 뒤부터 (동료·적 차례, 다음 턴 시작 장면) 바뀐 것을 전투 기록에 */
 let since: { at: ReturnType<typeof mark>; turn: number } | null = null
 function enemySummary() {
   if (!since) return
-  const line = diff(since.at, 'enemy')
-  record(since.turn, 'enemy', line)
-  if (line) showSummary(since.turn, line)
+  record(since.turn, 'enemy', diff(since.at, 'enemy'))
   since = null
 }
 
@@ -878,7 +874,6 @@ async function resumeAt(r: Suspended, all: Unit[]) {
 /** 전투를 그만두고 이 장 정비 화면으로 (원작 시스템 → 종료 「대기화면」) */
 function toCamp() {
   S.mode = { kind: 'busy' }
-  hideSummary()
   closeAll()
   hideBasic()
   void boot(S.ed, S.def, atStart)
