@@ -414,7 +414,7 @@ export async function main(argv: string[]) {
     return { ...side(t0, ''), enemy: side(t0.enemy ?? t0, '-enemy') }
   }
   const o: Opts = {
-    ed: { ...base, ...keys.length ? { rules: makeRules(tuned()) } : {}, ...argv.includes('--tune') ? { tune: { ...base.tune, ...JSON.parse(arg('tune', '{}')) } } : {}, ...argv.includes('--counter') ? { counter: arg('counter', 'no') === 'no' ? undefined : { scale: Number(arg('counter', '0.5')), decay: Number(arg('counter-decay', '0.5')) } } : {}, ...argv.includes('--foe-hp') ? { foeHp: Number(arg('foe-hp', '1')) } : {}, ...arg('growth', 'yes') === 'no' ? { afterWin: undefined, partyChange: undefined } : {} },
+    ed: { ...base, ...keys.length ? { rules: makeRules(tuned()) } : {}, ...argv.includes('--tune') ? { tune: { ...base.tune, ...JSON.parse(arg('tune', '{}')) } } : {}, ...argv.includes('--counter') ? { counter: arg('counter', 'no') === 'no' ? undefined : { scale: Number(arg('counter', '0.5')), decay: Number(arg('counter-decay', '0.5')) } } : {}, ...argv.includes('--foe-hp') ? { foeHp: Number(arg('foe-hp', '1')) } : {}, ...argv.includes('--zoc') ? { zoc: arg('zoc', 'yes') !== 'no' } : {}, ...arg('growth', 'yes') === 'no' ? { afterWin: undefined, partyChange: undefined } : {} },
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
     until: Number(arg('until', '0')) || undefined,

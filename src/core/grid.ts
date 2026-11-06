@@ -1,6 +1,7 @@
 // 맵 격자: 이동 비용·이동 범위·경로·사거리 — 두 판 공통
 import type { StageMap } from './data'
 import type { Pos, Unit } from './unit'
+import { S } from './state'
 
 export const key = (x: number, y: number) => y * 1000 + x
 
@@ -23,10 +24,17 @@ export const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
 /** 정지 가능한 칸 → 직전 칸. `chain` 은 통과만 가능한 칸까지 포함한 전체 경로 정보. */
 export type Moves = Map<number, number> & { chain: Map<number, number> }
 
-/** 이동 범위. 적 유닛은 통과 불가, 같은 편은 통과 가능하나 정지 불가. */
+/** 통제 영역 (B1 제안 13, 판 설정 zoc) 을 무시하는 유닛: 비행 (이동방식 4)·도둑 (직업 3) */
+export const slips = (u: Unit) => u.type.moveKind === 4 || u.type.job === 3
+
+/** 이동 범위. 적 유닛은 통과 불가, 같은 편은 통과 가능하나 정지 불가.
+ *  통제 영역 (S.ed.zoc): 상대 (혼수 아님) 옆 칸에 들어가면 거기서 멈춘다 — 처음 선 칸은 빼고, slips 유닛은 무시 */
 export function reachable(map: StageMap, units: Unit[], u: Unit): Moves {
   const occ = new Map<number, Unit>()
   for (const o of units) if (o.hp > 0 && o !== u) occ.set(key(o.x, o.y), o)
+  const held = new Set<number>()   // 멈추는 칸
+  if (S.ed?.zoc && !slips(u))
+    for (const o of occ.values()) if (o.side !== u.side && !o.coma) for (const [dx, dy] of DIRS) held.add(key(o.x + dx, o.y + dy))
   const cost = new Map<number, number>([[key(u.x, u.y), 0]])
   const prev = new Map<number, number>([[key(u.x, u.y), -1]])
   const queue: [number, number, number][] = [[0, u.x, u.y]]
@@ -34,6 +42,7 @@ export function reachable(map: StageMap, units: Unit[], u: Unit): Moves {
     queue.sort((a, b) => a[0] - b[0])
     const [c, x, y] = queue.shift()!
     if (c > (cost.get(key(x, y)) ?? Infinity)) continue
+    if (c > 0 && held.has(key(x, y))) continue
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy
       if (!inside(map, nx, ny)) continue

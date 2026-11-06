@@ -41,6 +41,7 @@ export const edition: Edition = {
   // 근접 반격 원래 위력, 감쇠 없음 (B1 제안 3, 2026-11-06 ×½·감쇠 → ×1). 대신 적 생명 ×1.15 — balance-proposal.md "반격 원래 위력 + 적 생명"
   counter: { scale: 1, decay: 1 },
   foeHp: 1.15,
+  zoc: true,
   tune: tune as unknown as Edition['tune'],
   afterWin,      // 대기 동료 경험치·쓰러진 대가 (B1 제안 5·12, growth.ts)
   startFatigue,  // 지난 장에 쓰러진 대원 피로 30 (제안 12)

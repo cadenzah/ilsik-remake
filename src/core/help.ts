@@ -1,5 +1,5 @@
 // 개선판 규칙 도움말 (B1 제안 N5, balance-proposal.md "N5 규칙 도움말"). 전투 메뉴 「도움말」과 도감에서 본다 (2026-11-06 「규칙」 → 「도움말」). 문구는 짧게, 내부 계수·배율은 쓰지 않는다 (2026-11-06 정리).
-// 수치의 근거 = editions/original/rules.ts (피로 계수·휴식·행동 뒤 피로·aiRests·actsTwice), core/attack.ts (사격·범위), core/battleCore.ts counterDamage (반격), editions/remake/growth.ts (성장·쓰러진 대가)
+// 수치의 근거 = editions/original/rules.ts (피로 계수·휴식·행동 뒤 피로·aiRests·actsTwice), core/attack.ts (사격·범위), core/battleCore.ts counterDamage (반격), core/grid.ts reachable (통제 영역), editions/remake/growth.ts (성장·쓰러진 대가)
 // 규칙을 바꾸면 여기도 고친다. 피로 % = 공격 계수 (2.6 − F) · 방어 계수 (2.4 − F) 의 피로 0 대비 감소 (30: 18·20, 50: 34·37, 70: 54·59)
 import { mapRect } from './screen'
 import { closeWin, openWin, type Btn } from './ui'
@@ -17,6 +17,7 @@ export const RULE_PAGES: { title: string; lines: string[] }[] = [
     '공격과 마법에 운은 없다. 확인창의 숫자대로 들어간다.',
     '근접 공격을 맞고 살아남으면 공격자를 되받아친다. 피해는 직접 칠 때와 같고, 몇 번을 되받아도 약해지지 않는다. 적도 같다.',
     '피로가 70을 넘었거나 생명이 ¼ 이하이거나 혼수·대기 상태면 되받지 못한다. 기사·포수·궁수·추전수의 공격과 마법은 되받지 않는다.',
+    '적 바로 옆 칸에 들어가면 이동이 거기서 멈춘다. 적도 같다. 비행하는 유닛과 도둑은 멈추지 않고, 혼수에 빠진 유닛 옆에서는 멈추지 않는다.',
     '선두가 쓰러지면 패배다. 적은 쓰러뜨릴 수 있는 대상부터 노린다.',
     '적과 NPC도 피로가 70을 넘거나 생명이 ¼ 이하면 그 차례에 쉰다. 일행이 닿지 않는 곳이 있으면 그리로 물러나서 쉰다.',
     '보스는 자리를 지키다가 그 차례에 닿는 상대가 있을 때만 움직인다.',

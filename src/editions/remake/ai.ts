@@ -10,7 +10,7 @@
 //   회복·강화 마법을 쓰는 상대를 칠 때 점수 ×1.3. 장별 덮어쓰기 = tune.json "ai" { "부대" 또는 "부대.대원": 성향 }
 import type { Magic, Member, StageMap } from '../../core/data'
 import type { AiPlan } from '../../core/edition'
-import { dist, key, reachable } from '../../core/grid'
+import { dist, key, pathTo, reachable } from '../../core/grid'
 import { aimsFrom, reachCells, strikeTargets } from '../../core/attack'
 import { aiCaster, spellCenters, spellTargets, spellsOf } from '../../core/magic'
 import type { Pos, Unit } from '../../core/unit'
@@ -142,7 +142,11 @@ function retreat(map: StageMap, units: Unit[], u: Unit): Pos {
   }
   if (!danger.has(key(u.x, u.y))) return { x: u.x, y: u.y }
   let best: Pos | null = null, cost = Infinity
-  for (const [k, c] of reachable(map, units, u)) if (!danger.has(k) && c < cost) { cost = c; best = { x: k % 1000, y: Math.floor(k / 1000) } }
+  const moves = reachable(map, units, u)
+  for (const k of moves.keys()) {
+    const p = { x: k % 1000, y: Math.floor(k / 1000) }, c = pathTo(moves, p.x, p.y).length
+    if (!danger.has(k) && c < cost) { cost = c; best = p }
+  }
   return best ?? { x: u.x, y: u.y }
 }
 

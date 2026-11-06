@@ -88,6 +88,8 @@ export interface Edition {
   counter?: { scale: number; decay: number }
   /** 적 최대 생명 배율 (모든 장, tune foeScale 과 곱). 없으면 1 */
   foeHp?: number
+  /** 통제 영역 (grid.ts reachable): 상대 옆 칸에 들어가면 이동이 멈춘다. 없으면 원작 통행 그대로. 개선판 = 제안 13 */
+  zoc?: boolean
   /** 장별 조정 (키 "장" 또는 "장-루트"). 개선판 = content/remake/tune.json */
   tune?: Record<string, StageTune>
   /** 판이 더하는 전투 (장 번호 → 배치). 개선판 숨은 장 */
