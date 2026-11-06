@@ -28,7 +28,7 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
       <span class="v${i === 3 && S.ed.id === 'remake' && v > 70 ? ' red' : ''}" style="left:${(W - NARROW) / 2 + 8 + i * 32}px">${String(v).padStart(2, '0')}</span>`).join('')
     + `<img class="ic face" alt="큰 창" src="${pieceUrl('icon.4.0')}" style="left:${(W - NARROW) / 2 + 12 + 4 * 32 + 2}px">`
     + (opts.extra ? `<div class="x"><b>${esc(u.type.name)}</b> Lv ${u.type.lv}${u.side === 'ally' && u.troop !== 0 ? ' · NPC' : ''}${statusTags(u)}
-        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y).replace(/ \(.*\)/, ''))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span>${next ? `<br>${next}` : ''}</div>` : '')
+        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span>${next ? `<br>${next}` : ''}</div>` : '')
   const face = el.querySelector<HTMLElement>('.face')!
   if (opts.onFace) { face.classList.add('btn'); face.onclick = e => { e.stopPropagation(); opts.onFace!() } }
   el.oncontextmenu = e => { e.preventDefault(); showBasic(null) }
@@ -45,10 +45,10 @@ export const hideBasic = () => showBasic(null)
 function nextTurn(u: Unit) {
   if (u.hp <= 0 || !(u.side === 'enemy' || isNpc(u))) return ''
   const st = S.troopState[u.troop]
-  if (st === 1) return '<span class="blue">경계 — 가까이 가거나 치면 깨어남</span>'
-  if (st === 2) return '<span class="dim">대기 — 움직이지 않음</span>'
+  if (st === 1) return '<span class="blue">경계</span>'
+  if (st === 2) return '<span class="dim">대기</span>'
   if (!S.ed.rules.aiRests(u)) return ''
-  return `<span class="blue">다음 차례 휴식 (${u.fatigue > 70 ? `피로 ${u.fatigue}` : '생명 ¼ 이하'})</span>`
+  return '<span class="blue">다음 차례 휴식</span>'
 }
 
 /** 개선판 줄: 상태 이상 (중독·혼수 남은 차례, 강화·약화) */

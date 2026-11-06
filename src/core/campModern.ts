@@ -5,13 +5,14 @@
 // 조작: 명단 클릭·Space = 출전 넣고 빼기, 끌기 = 순서·넣고 빼기, Alt+↑↓ = 순서. 소지품 클릭 = 고르기 (비교·[장착][버리기]),
 //   두 번 클릭·E = 장착, Del = 버리기, 끌어서 도구 칸·명단 인물에 놓기 = 장착, 도구 칸을 소지품으로 끌기 = 해제.
 //   ↑↓←→ = 목록 안 이동, Tab = 다음 무리, Enter = 출전 확인, Esc = 고른 것 풀기·창 닫기.
+import { josa } from 'es-hangul'
 import { STAT_NAMES, type Item, type UnitType } from './data'
 import { TEMPLE_ASK, canEquip, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
 import { SFX, play } from './sfx'
-import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
+import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 import { esc } from './ui'
 import { equippedStats, type Stats } from './unit'
 
@@ -42,13 +43,12 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     <header class="mc-head">
       <div class="mc-title"><b>${esc(o.header?.title ?? '정비')}</b>${o.header?.goal ? `<span>${esc(o.header.goal)}</span>` : ''}</div>
       <span class="mc-count"></span>
-      <button class="mc-go" title="출전 인물로 전투를 시작한다 (Enter)">출전 ▶</button>
+      <button class="mc-go">출전 ▶</button>
     </header>
     <main class="mc-main">
       <section class="mc-panel mc-roster" aria-label="부대 명단">
         <div class="mc-chips" role="tablist"></div>
         <div class="mc-list"></div>
-        <p class="mc-hint">클릭·Space = 출전 넣고 빼기 · 끌기·Alt+↑↓ = 순서</p>
       </section>
       <div class="mc-right">
         <section class="mc-panel mc-detail" aria-label="인물 정보"></section>
@@ -97,14 +97,14 @@ export function campModern(o: CampOptions): Promise<CampResult> {
   // ---------- 장비 ----------
   const equipTo = (k: number, i: number) => {
     const t = party[i], it = o.tables.items.get(items[k])
-    if (!canEquip(t, it)) { say(it && it.cat !== 2 ? '무기·방어구는 정비 화면에서 바꿀 수 없습니다.' : `${t.name} 은(는) 쓸 수 없는 도구입니다.`); return }
+    if (!canEquip(t, it)) { say(it && it.cat !== 2 ? '무기·방어구는 정비 화면에서 바꿀 수 없습니다.' : `${josa(t.name, '은/는')} 쓸 수 없는 도구입니다.`); return }
     const old = t.equip[2]
     t.equip[2] = items[k]
     if (old) items[k] = old   // 맞바꿈: 옛 도구가 그 자리로
     else items.splice(k, 1)
     picked = peek = null
     shown = i
-    say(`${t.name} — ${it!.name} 장착`)
+    say(`${josa(t.name, '이/가')} ${josa(it!.name, '을/를')} 장착했습니다.`)
     render()
   }
   const take = () => {
@@ -114,12 +114,12 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     items.push(t.equip[2])
     t.equip[2] = 0
     picked = peek = null
-    say(`${name} 해제`)
+    say(`${josa(name, '을/를')} 풀었습니다.`)
     render()
   }
   const trash = (k: number) => {
     const it = o.tables.items.get(items[k])
-    ask('버리기', `${esc(it?.name ?? '')} 을(를) 버립니다. 되돌릴 수 없습니다.`, [['버리기', () => { items.splice(k, 1); picked = peek = null; render() }], ['취소', () => {}]])
+    ask('버리기', `${esc(josa(it?.name ?? '', '을/를'))} 버립니다. 되돌릴 수 없습니다.`, [['버리기', () => { items.splice(k, 1); picked = peek = null; render() }], ['취소', () => {}]])
   }
 
   // ---------- 그리기 ----------
@@ -134,7 +134,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     const t = party[i], j = sel.indexOf(i), on = j >= 0, st = equippedStats(t, o.tables.items), p = profile(t, o.tables.labels)
     const blocked = !on && full()
     return `<button class="mc-row ${on ? 'in' : ''} ${i === shown ? 'shown' : ''} ${blocked ? 'blocked' : ''}" data-i="${i}" data-drop="unit"
-        role="checkbox" aria-checked="${on}" tabindex="-1" title="${i === 0 ? '선두 — 늘 출전' : on ? '눌러서 빼기' : blocked ? '출전 칸이 다 찼습니다' : '눌러서 출전'}">
+        role="checkbox" aria-checked="${on}" tabindex="-1">
       <span class="mc-check">${on ? '✓' : ''}</span>
       <span class="mc-spr">${sprite(t, false)}</span>
       <span class="mc-name"><b>${esc(t.name)}</b>${i === 0 ? '<em>선두</em>' : ''}<small>${esc(p.job || p.race)} · Lv ${t.lv}</small></span>
@@ -183,7 +183,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       const tool = c === 2
       return `<div class="mc-slot ${tool ? 'tool' : ''} ${tool && cand && after ? 'target' : ''}" ${tool ? 'data-drop="tool"' : ''}>
         <small>${CAT[c]}</small>${it ? `<span class="mc-ico">${icon(id)}</span><b>${esc(it.name)}</b><i>${effects(it)}</i>` : `<b class="mc-none">${tool ? '비어 있음' : '없음'}</b>`}
-        ${tool && it ? '<button class="mc-take" title="도구를 풀어 소지품에 넣는다 (소지품으로 끌어도 됨)">해제</button>' : ''}</div>`
+        ${tool && it ? '<button class="mc-take">해제</button>' : ''}</div>`
     }
     const magic = t.magic.map(id => o.tables.magic.get(id)).filter(Boolean)
     detail.innerHTML = `
@@ -201,7 +201,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
         <i style="background-position:-${m!.id * 16}px 0"></i>${esc(m!.name)}</button>`).join('') : '<span class="dim">마법 없음</span>'}</div>`
     detail.querySelectorAll<HTMLButtonElement>('.mc-mg').forEach(b => {   // 터치 기기엔 올리기가 없으니 누르면 아래 바에 설명
       const m = o.tables.magic.get(Number(b.dataset.id))!
-      b.onclick = () => say(`${m.name} — ${spellDesc(m)}`)
+      b.onclick = () => say(`${m.name} · ${spellDesc(m)}`)
     })
     detail.querySelector<HTMLButtonElement>('.mc-take')?.addEventListener('click', take)
     const toolSlot = detail.querySelector<HTMLElement>('.mc-slot.tool')!
@@ -236,11 +236,11 @@ export function campModern(o: CampOptions): Promise<CampResult> {
 
   const renderInfo = () => {
     const k = picked ?? peek, it = k === null ? undefined : o.tables.items.get(items[k])
-    if (!it) { info.innerHTML = '<span class="dim">도구를 누르면 비교·장착·버리기. 끌어서 도구 칸이나 명단 인물에 놓아도 장착됩니다</span>'; return }
+    if (!it) { info.innerHTML = ''; return }
     const t = party[shown], ok = canEquip(t, it)
     info.innerHTML = `<b>${esc(it.name)}</b> <span>${effects(it) || CAT[it.cat]}</span>
-      <span class="dim">${ok ? `${esc(t.name)} 장착 가능` : it.cat === 2 ? `${esc(t.name)} 은(는) 못 씀` : '무기·방어구는 바꿀 수 없음'}</span>
-      ${picked !== null ? `<span class="mc-acts"><button class="mc-eq" ${ok ? '' : 'disabled'}>장착 <kbd>E</kbd></button><button class="mc-trash">버리기 <kbd>Del</kbd></button></span>` : ''}`
+      <span class="dim">${ok ? `${esc(t.name)} 장착 가능` : it.cat === 2 ? `${esc(josa(t.name, '은/는'))} 못 씀` : '무기·방어구는 바꿀 수 없음'}</span>
+      ${picked !== null ? `<span class="mc-acts"><button class="mc-eq" ${ok ? '' : 'disabled'}>장착</button><button class="mc-trash">버리기</button></span>` : ''}`
     info.querySelector<HTMLButtonElement>('.mc-eq')?.addEventListener('click', () => equipTo(picked!, shown))
     info.querySelector<HTMLButtonElement>('.mc-trash')?.addEventListener('click', () => trash(picked!))
   }
@@ -364,9 +364,9 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     const dlg = modal!.querySelector('.mc-dlg')!
     const box = document.createElement('div')
     box.className = 'mc-opts'
-    box.innerHTML = SETTINGS.map((o, n) => `<button role="switch" aria-checked="${setting(o.k)}" data-n="${n}" title="${esc(o.title)}">
-      <span>${esc(o.label)}<small>${esc(o.title.replace(/^개선판: /, ''))}</small></span><i class="mc-switch" aria-hidden="true"></i></button>`).join('')
-      + `<button class="mc-diff" title="${esc(DIFF_TITLE)}"><span>난이도 · ${DIFFICULTIES[difficulty()]}<small>${esc(DIFF_TITLE.replace(/^개선판: /, ''))}</small></span></button>`
+    box.innerHTML = SETTINGS.map((o, n) => `<button role="switch" aria-checked="${setting(o.k)}" data-n="${n}">
+      <span>${esc(o.label)}${o.desc ? `<small>${esc(o.desc)}</small>` : ''}</span><i class="mc-switch" aria-hidden="true"></i></button>`).join('')
+      + `<button class="mc-diff"><span>난이도 · ${DIFFICULTIES[difficulty()]}<small>${esc(DIFF_DESC)}</small></span></button>`
     box.querySelector<HTMLButtonElement>('.mc-diff')!.onclick = () => { nextDifficulty(); openSettings(SETTINGS.length) }
     box.querySelectorAll<HTMLButtonElement>('button[data-n]').forEach(b => {
       const o = SETTINGS[Number(b.dataset.n)]

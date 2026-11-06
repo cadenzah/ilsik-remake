@@ -33,7 +33,7 @@ const pastSelf = (t: number) => [...GROWN.keys()].filter(k => k !== t && !PARTY.
 function inherit(to: number, old: UnitType, notes: Note[]) {
   const base = partyType(to).lv
   raise(to, old.lv, old.exp)
-  if (old.lv > base) notes.push({ text: `${josa(S.types[to].name, '이/가')} 쌓은 성장을 이어받았다 (Lv ${partyType(to).lv}).` })
+  if (old.lv > base) notes.push({ text: `${josa(S.types[to].name, '이/가')} 쌓은 성장을 이어받았다.` })
 }
 
 export function partyChange(e: { join: number } | { change: number; old: UnitType }, notes: Note[]) {
@@ -43,7 +43,7 @@ export function partyChange(e: { join: number } | { change: number; old: UnitTyp
   const want = Math.floor(deployedLevel(t)) - CATCH_UP, was = partyType(t).lv
   if (want > was) {
     raise(t, want)
-    notes.push({ text: `${josa(S.types[t].name, '은/는')} 일행에 맞춰 레벨을 올려 합류했다 (Lv ${partyType(t).lv}).` })
+    notes.push({ text: `${josa(S.types[t].name, '은/는')} 일행에 맞춰 레벨을 올려 합류했다.` })
   }
 }
 
@@ -86,7 +86,7 @@ function benchShare(notes: Note[]) {
   for (const t of bench) {
     const g = partyType(t), exp = g.exp + share, levels = Math.floor(exp / 100)
     raise(t, g.lv + levels, exp % 100)
-    if (levels) ups.push(`${S.types[t].name} Lv ${partyType(t).lv}`)
+    if (levels) ups.push(S.types[t].name)
   }
-  notes.push({ text: `대기 동료가 경험치를 받았다 (+${share}).${ups.length ? ` 레벨 업: ${ups.join(', ')}` : ''}` })
+  notes.push({ text: `대기 동료가 경험치를 ${share} 받았다.${ups.length ? ` ${ups.join(', ')}의 레벨이 올랐다.` : ''}` })
 }

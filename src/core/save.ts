@@ -195,7 +195,7 @@ export function applyBundle(b: SaveBundle) {
   try {
     localStorage.setItem(BACKUP, JSON.stringify(currentBundle()))
     replaceAll(b.data)
-  } catch { throw new Error('이 브라우저에 저장할 수 없습니다 (사생활 보호 모드 등).') }
+  } catch { throw new Error('이 브라우저에는 저장할 수 없습니다.') }
 }
 
 function replaceAll(data: Record<string, unknown>) {

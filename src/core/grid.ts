@@ -12,9 +12,9 @@ export function moveCost(map: StageMap, x: number, y: number, kind: number): num
 }
 
 // 레이어2 이름 [추정: 통행하는 이동방식으로 붙임] 0 평지 · 1 거친 땅 · 2 숲 · 3 물 · 4 절벽 · 5 벽
-const TERRAIN = ['평지', '거친 땅', '숲 (숲·비행 이동만)', '물 (물·비행 이동만)', '절벽 (비행 이동만)', '벽 (통행 불가)']
+const TERRAIN = ['평지', '거친 땅', '숲', '물', '절벽', '벽']
 export function terrainName(map: StageMap, x: number, y: number): string {
-  return TERRAIN[map.layer2[y * map.w + x]] ?? '벽 (통행 불가)'
+  return TERRAIN[map.layer2[y * map.w + x]] ?? '벽'
 }
 
 export const inside = (map: StageMap, x: number, y: number) => x >= 0 && y >= 0 && x < map.w && y < map.h

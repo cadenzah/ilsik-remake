@@ -81,13 +81,11 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
     Object.assign(btn.style, { left: `${q.x}px`, top: `${q.y}px` })
     const lab = placeLabel({ ...q, x: 0, y: 0 }, 'place on')
     btn.append(lab)
-    btn.title = `${q.name} — 이곳에서 치른 장`
     btn.onclick = () => showPopup(ns)
     labels.append(btn)
   }
   if (nextSpot) {
     const e = placeLabel(nextSpot, 'place next')
-    e.title = `다음 목적지: ${nextSpot.name}`
     labels.append(e)
   }
   // 아리크스: 지금 갈래 여정의 마지막 장소 (37장 뒤면 2차 모습)
@@ -99,7 +97,6 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
     const hx = q.x + q.w / 2 - 28, hy = q.y > 50 ? q.y - 42 : q.y + q.h - 6
     taken.push({ x: hx + 10, y: hy, w: 36, h: 44 })   // 숨은 장소 이름표가 덮지 않게
     Object.assign(hero.style, { left: `${hx}px`, top: `${hy}px` })
-    hero.title = `지금 여기: ${lastN}장 ${places[lastN - 1].name}`
     labels.append(hero)
   }
   // 진엔딩 표식: 숨은 장소 이름표 + 떠오른 해
@@ -110,7 +107,7 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
       const e = labels.lastElementChild as HTMLElement   // 실제 폭으로 지도 안에 들인다
       e.style.left = `${Math.max(4, Math.min(q.x, 636 - e.offsetWidth))}px`
     }
-    labels.insertAdjacentHTML('beforeend', '<span class="sun" title="일식이 걷히다"><i></i><b>일식이 걷히다</b></span>')
+    labels.insertAdjacentHTML('beforeend', '<span class="sun"><i></i><b>일식이 걷히다</b></span>')
   }
 
   // 오른쪽 목록: 시작(공통 앞) · 깬 갈래별 · 사바카 성(공통 뒤) · 기억 속의 장소

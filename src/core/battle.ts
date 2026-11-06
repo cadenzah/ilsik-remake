@@ -579,7 +579,7 @@ function cleared(ending: boolean) {
   }
   const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name)
   const goals = goalStates(aliveMember)
-  const lines = [`${S.turn}턴 만에 클리어${ending ? ' — 엔딩' : ''} · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료: ${fallen.join(', ')}` : '쓰러진 동료 없음',
+  const lines = [`${S.turn}턴 · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료 ${fallen.join(', ')}` : '쓰러진 동료 없음',
     ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
   const buttons: Btn[] = []
   if (onward) buttons.push(['다음 장', onward])
@@ -588,22 +588,15 @@ function cleared(ending: boolean) {
 }
 
 /** 진로선택 (원작 0aa2:0b0d [확정]: 화면 (280,220) 에 125×122 "comma" 창 「진로선택」 (DS:0x233d), 글자 버튼 암흑동굴·혼탁한호수·옛 신전 순 → 루트 B·A·C,
- *  왼쪽 클릭만 받고 취소 없음). 개선판은 버튼마다 그 길의 목적을 설명 칸에 보이고 결정·취소로 확인 */
+ *  왼쪽 클릭만 받고 취소 없음). 개선판은 고른 길의 목적을 확인창에 보이고 결정·취소로 확인 */
 export function chooseRoute(): Promise<number> {
   const order = S.ed.routeOrder ?? [0, 1, 2]
   const places = S.ed.routePlaces ?? S.ed.routeLabels
   return new Promise(ok => {
     const open = () => {
-      const hint = '어느 길로 갈까?'
-      const el = openWin({ title: '진로선택', kind: 'route', at: remake() ? 'center' : { x: 280, y: 220 }, btnW: remake() ? 112 : 101,
-        body: remake() ? `<span class="hint">${hint}</span>` : undefined, bodyH: remake() ? 40 : undefined, width: remake() ? Math.min(view.w - 160, 300) : 125,
+      openWin({ title: '진로선택', kind: 'route', at: remake() ? 'center' : { x: 280, y: 220 }, btnW: remake() ? 112 : 101,
+        width: remake() ? Math.min(view.w - 160, 300) : 125,
         buttons: order.map((r): Btn => [places[r], () => remake() ? confirmWin('진로선택', 'center', () => ok(r), open, esc(S.ed.routeLabels[r]), 260) : ok(r)]) })
-      if (!remake()) return
-      const box = el.querySelector<HTMLElement>('.hint')!
-      el.querySelectorAll<HTMLButtonElement>('.obtn').forEach((b, i) => {
-        b.onmouseenter = b.onfocus = () => { box.textContent = S.ed.routeLabels[order[i]] }
-        b.onmouseleave = () => { box.textContent = hint }
-      })
     }
     open()
   })
@@ -795,11 +788,11 @@ function setupScreen(ed: Edition, def: StageDef) {
   S.marks = true
   S.threat = false
   initBand(ed.id === 'remake', [
-    { id: 'goal', label: '목표', desc: '승리·실패 조건과 보조 목표', side: 'left', prio: 2, on: () => showGoalsWin() },
-    { id: 'end', label: '턴 종료', desc: '아군 차례를 마친다 (E)', side: 'right', prio: 0, on: confirmEnd },
-    { id: 'menu', label: '메뉴', desc: '시스템 메뉴 (설정·정비 화면·타이틀)', side: 'right', prio: 0, on: () => isOpen('system') ? closeWin('system') : systemMenu() },
-    { id: 'threat', label: '위험', desc: '적이 닿을 수 있는 범위 표시 (T)', side: 'right', prio: 1, on: toggleThreat },
-    { id: 'map', label: '지도', desc: '미니맵 켜고 끄기 (M)', side: 'right', prio: 3, on: toggleMinimap },
+    { id: 'goal', label: '목표', side: 'left', prio: 2, on: () => showGoalsWin() },
+    { id: 'end', label: '턴 종료', side: 'right', prio: 0, on: confirmEnd },
+    { id: 'menu', label: '메뉴', side: 'right', prio: 0, on: () => isOpen('system') ? closeWin('system') : systemMenu() },
+    { id: 'threat', label: '위험', side: 'right', prio: 1, on: toggleThreat },
+    { id: 'map', label: '지도', side: 'right', prio: 3, on: toggleMinimap },
   ])
   if (ed.id === 'remake') { initMinimap(); setOn('map', minimapOn()) } else removeMinimap()
 }
@@ -885,15 +878,15 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['열기', () => set?.(true)], ['닫기', () => set?.(false)]], onBack: () => closeWin('sub') })
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin()],
-    ['규칙', () => rulesWin(), { title: '게임이 알려 주지 않는 규칙 (피로·전투·직업·성장)' }],
-    ['기록', () => logWin(), { title: '턴마다 아군·적 차례에 일어난 일' }],
+    ['규칙', () => rulesWin()],
+    ['기록', () => logWin()],
     [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
-    [view.modern ? '원작 UI' : '개선된 UI', toggleScreenStyle, { title: view.modern ? '원작 창틀을 복각한 화면으로' : '창틀 없이 맵을 화면 가득, 다듬은 창' }],
+    [view.modern ? '원작 UI' : '개선된 UI', toggleScreenStyle],
     ['턴 종료', confirmEnd, { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['정비 화면', () => confirmWin('대기화면', 'center', toCamp)],
-    ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로.<br>지난흔적에서 이어 합니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
+    ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로 갑니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
   ] : [
     ['알림', onOff('알림전환', on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
@@ -1004,16 +997,6 @@ export function hoverTile(t: Pos | null) {
 }
 
 /** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸 */
-/** 공격자 피로 때문에 줄어든 피해 (피로 0 일 때와의 차). 상대가 받는 만큼 자르기 전 값끼리 비교 */
-function fatigueLoss(u: Unit, t: Unit, at: Pos) {
-  if (!u.fatigue) return 0
-  const now = S.ed.rules.damageRange(S.map, u, t, at)[0], f = u.fatigue, hp = t.hp
-  u.fatigue = 0; t.hp = 999
-  const fresh = Math.min(S.ed.rules.damageRange(S.map, u, t, at)[0], hp)
-  u.fatigue = f; t.hp = hp
-  return Math.max(0, fresh - now)
-}
-
 function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>) {
   const cp = target === u ? spot ?? u : target
   S.aim = { x: cp.x, y: cp.y }
@@ -1025,15 +1008,14 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
     const hit = strikeTargets(u, target, spot ?? u)
     if (hit.length === 1 && hit[0] === target) {
       const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
-      const kill = lo >= target.hp ? '<span class="red">확정 처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
-      const tired = fatigueLoss(u, target, spot ?? u)   // B1 제안 4: 피로 때문에 덜 들어가는 몫
+      const kill = lo >= target.hp ? '<span class="red">처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
       const back = counterDamage(u, target, spot ?? u)   // 제안 3: 되받는 피해
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, tired ? `<span class="red">피로로 −${tired}</span>` : '', `남는 생명 ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}/${target.maxHp}`, back ? `<span class="red">반격 −${back}${back >= u.hp ? ' (쓰러짐)' : ''}</span>` : '', kill].filter(Boolean).join('<br>')
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {
         const [lo] = S.ed.rules.damageRange(S.map, u, t, spot ?? u)
-        const name = t.side === u.side ? `<span class="red">${esc(t.type.name)} (아군)</span>` : esc(t.type.name)
+        const name = t.side === u.side ? `<span class="red">${esc(t.type.name)}</span>` : esc(t.type.name)
         return `${name} −${lo}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
       }).join('<br>')
       lines = hit.length

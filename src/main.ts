@@ -83,5 +83,5 @@ async function main() {
 }
 
 main().catch(err => {
-  document.body.innerHTML = `<pre style="color:#f88;padding:20px">${err}\n\n자원이 없으면: .venv/bin/python -I tools/export_web.py</pre>`
+  document.body.innerHTML = `<pre style="color:#f88;padding:20px">게임을 불러오지 못했습니다.\n\n${err}</pre>`
 })

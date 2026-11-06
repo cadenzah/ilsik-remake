@@ -1,15 +1,14 @@
 // 위·아래 띠 (ux-proposal.md 30). 원작 띠 = 가운데 크림색 제목 칸 + 양옆 장식.
 // 원작판: 제목 칸에 장 제목만. 개선판: 제목 칸 왼쪽에 턴 패, 양옆 장식 위에 원작 글자 버튼,
-//   버튼에 마우스를 올리면 제목 칸 글자가 그 버튼 설명으로 (정비 화면 도구설명 칸 방식). 자리가 모자라면 순위 낮은 버튼부터 숨기고 메뉴에서 쓴다.
+//   자리가 모자라면 순위 낮은 버튼부터 숨기고 메뉴에서 쓴다.
 //   아래 띠 왼쪽 = 가리킨 칸 지형 패. '뒤로' 는 맵·창 바깥을 누르면 된다 (input.ts)
-// 현대식 화면 (view.modern): 창틀 대신 위 바 한 줄 = [턴 패][제목 (버튼 설명)] … [버튼들], 지형 패는 맵 아래 모서리에 떠 있게
+// 현대식 화면 (view.modern): 창틀 대신 위 바 한 줄 = [턴 패][제목] … [버튼들], 지형 패는 맵 아래 모서리에 떠 있게
 import { cartouche, FRAME, hud, onLayout, TOP_BAR, view } from './screen'
 import { button, esc, textWidth } from './ui'
 
 export interface BandButton {
   id: string
   label: string
-  desc: string
   side: 'left' | 'right'
   prio: number        // 0 = 늘 보임, 클수록 먼저 숨김
   on: () => void
@@ -17,7 +16,7 @@ export interface BandButton {
 
 let root: HTMLElement | null = null
 let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null
-let title = '', buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
+let buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
 const hiddenIds = new Set<string>()
 const BTN_Y = 14, GAP = 4, EDGE = 14
 
@@ -46,8 +45,6 @@ export function initBand(remake: boolean, btns: BandButton[] = []) {
     root.append(terrain)
     for (const b of buttons) {
       const e = button([b.label, b.on])
-      e.onmouseenter = e.onfocus = () => say(b.desc)
-      e.onmouseleave = e.onblur = () => say()
       els.set(b.id, e)
       root.append(e)
     }
@@ -55,13 +52,7 @@ export function initBand(remake: boolean, btns: BandButton[] = []) {
   place()
 }
 
-/** 제목 칸 글자 (없으면 장 제목) */
-function say(text?: string) {
-  titleEl.textContent = text ?? title
-  titleEl.classList.toggle('desc', !!text)
-}
-
-export function setTitle(t: string) { title = t; say() }
+export function setTitle(t: string) { titleEl.textContent = t }
 
 /** 턴 패: "4턴" + 차례 (아군 파랑·적 빨강·NPC 초록). 적·NPC 차례엔 제목 칸이 붉은 빛 */
 export function setTurn(turn: number, side: 'ally' | 'enemy' | 'npc' | null, who = '') {

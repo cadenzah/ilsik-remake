@@ -71,9 +71,9 @@ export function hitText(h: SpellHit, side: Unit['side']): { text: string; color:
   }
 }
 
-/** 예측 줄 (개선판 확인창): "이름 −12 (남는 생명 30/42)" 식 */
+/** 예측 줄 (개선판 확인창): "이름 −12" 식, 쓰러뜨리면 "처치" */
 export function hitLine(t: Unit, h: SpellHit): string {
-  if (h.kind === 'hp') return `${t.type.name} 피해 ${h.value} (남는 생명 ${t.hp - h.value}/${t.maxHp})${h.value >= t.hp ? ' · 처치' : ''}`
+  if (h.kind === 'hp') return `${t.type.name} −${h.value}${h.value >= t.hp ? ' 처치' : ''}`
   if (h.kind === 'heal') return `${t.type.name} 생명 +${h.value}${h.fatigue ? ` · 피로 −${h.fatigue}` : ''}`
   return `${t.type.name} ${hitText(h, t.side).text}`
 }

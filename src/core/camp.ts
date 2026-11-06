@@ -16,7 +16,7 @@ import { equippedStats } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
 import { SFX, play } from './sfx'
-import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
+import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
 export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][]; temple?: boolean } | { go: 'title' } | { go: 'load'; slot: number }
@@ -53,13 +53,13 @@ const MINI = 29   // BS 얼굴 수 (유닛 0~28). 그 밖의 유닛은 이동 �
 const PAGE_HELP = {
   intro: '대기인물 클릭: 출전\n출전인물 클릭: 빼기\n행동·Enter: 출발',
   read: '기록한 정비 화면을 불러온다.',
-  write: '지금 정비 화면을 기록한다 (3칸).',
+  write: '지금 정비 화면을 기록한다.',
   music: '배경음악을 켜고 끈다.',
   swap: '출전 편성: 대기인물을 눌러 출전에 넣는다.',
   swapRemake: '앞에서부터 다시 채운다.',
   act: '출전인물로 전투를 시작한다.',
-  quit: '타이틀(주화면)로 돌아간다.',
-  settings: '글꼴·화면·편의 기능을 바꾼다.',
+  quit: '타이틀로 돌아간다.',
+  settings: '설정을 바꾼다.',
   trash: '고른 도구를 버린다.',
   put: '고른 도구를 지금 보이는 인물에게 장착한다.',
   take: '지금 보이는 인물의 도구를 풀어 소지품에 넣는다.',
@@ -396,11 +396,11 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelectorAll<HTMLButtonElement>('.opt[data-i]').forEach(b => {
       const s = SETTINGS[Number(b.dataset.i)]
       b.onclick = () => { setSetting(s.k, !setting(s.k)); if (s.k === 'bitmapFont') applyFont(); settingsWin(onClose, Number(b.dataset.i)) }
-      b.onmouseenter = b.onfocus = () => say(s.title.replace(/^개선판: /, ''))
+      b.onmouseenter = b.onfocus = () => say(s.desc)
     })
     const diff = dialog.querySelector<HTMLButtonElement>('.diff')!
     diff.onclick = () => { nextDifficulty(); settingsWin(onClose, n - 1) }
-    diff.onmouseenter = diff.onfocus = () => say(DIFF_TITLE.replace(/^개선판: /, ''))
+    diff.onmouseenter = diff.onfocus = () => say(DIFF_DESC)
     dialog.querySelector<HTMLButtonElement>('.no')!.onclick = () => { dialog?.remove(); dialog = null; onClose() }
     dialog.querySelectorAll<HTMLButtonElement>('.obtn')[focus]?.focus()
   }

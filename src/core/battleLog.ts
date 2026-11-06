@@ -48,7 +48,7 @@ export function diff(m: Mark, side: 'ally' | 'enemy'): string {
     ...fell.length ? [`<span class="red">쓰러짐 ${names(fell)}</span>`] : [],
     ...poisoned.length ? [`중독 ${names(poisoned)}`] : [],
     ...comaed.length ? [`혼수 ${names(comaed)}`] : [],
-    ...foesDown ? [`적 ${foesDown}명 쓰러뜨림${side === 'enemy' ? ' (반격·동료)' : ''}`] : [],
+    ...foesDown ? [`적 ${foesDown}명 쓰러뜨림`] : [],
     ...woke ? [`<span class="blue">적 ${woke}명 깨어남</span>`] : [],
     ...came ? [`<span class="red">적 증원 ${came}명</span>`] : [],
   ]
@@ -66,7 +66,7 @@ export function record(turn: number, side: 'ally' | 'enemy', html: string) {
 export function logWin() {
   const rows = [...battleLog].reverse().map(e =>
     `<div><span class="${e.side === 'enemy' ? 'red' : 'blue'}">${e.turn}턴 ${e.side === 'enemy' ? '적' : '아군'}</span> ${e.html}</div>`)
-  const body = `<div class="rules battlelog">${rows.join('') || '<div class="dim">아직 기록이 없다.</div>'}</div>`
+  const body = `<div class="rules battlelog">${rows.join('') || '<div class="dim">기록 없음</div>'}</div>`
   const width = Math.min(mapRect().w - 16, 520)
   const open = (bodyH?: number) => openWin({ title: '전투 기록', kind: 'log', at: 'center', width, dir: 'row', bodyH,
     body, buttons: [['닫기', () => {}]], onBack: () => closeWin('log') })

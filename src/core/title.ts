@@ -13,14 +13,14 @@ import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
 import { SONG, playMusic, stopMusic } from './music'
-import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, type Difficulty } from './settings'
+import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, type Difficulty } from './settings'
 import { stageDef, type StageDef } from './stage'
 
 export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
 
-const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
-  { id: 'original', name: '원작판', desc: '원작 규칙·조작 그대로' },
-  { id: 'remake', name: '개선판', desc: '편의 기능, 다듬은 이야기' },
+const EDITIONS: { id: EditionId; name: string }[] = [
+  { id: 'original', name: '원작판' },
+  { id: 'remake', name: '개선판' },
 ]
 const ROUTE = ['A', 'B', 'C']
 const chapterName = (n: number, route: number) => stageDef(n, route).title + (n >= 10 ? ` (${ROUTE[route]} 길)` : '')
@@ -61,9 +61,9 @@ const NOTICE = `
   <p>권리자께서 문제를 제기하시면<br>즉시 배포를 중단하겠습니다.</p>`
 const REPO = 'https://github.com/cadenzah/ilsik-remake'
 const FEEDBACK = `
-  <p>버그를 찾으셨거나 바라는 기능이 있으면<br>아래 저장소의 이슈(Issues)로 남겨 주세요.</p>
+  <p>버그나 바라는 기능은<br>아래 저장소의 이슈로 남겨 주세요.</p>
   <p><a href="${REPO}/issues" target="_blank" rel="noopener">github.com/cadenzah/ilsik-remake</a></p>
-  <p class="dim">어느 판(원작판·개선판)·몇 장에서 무엇을 했을 때인지,<br>가능하면 화면 갈무리를 함께 적어 주시면 큰 도움이 됩니다.</p>
+  <p class="dim">판, 장, 상황과 화면 갈무리를 함께 적어 주시면<br>도움이 됩니다.</p>
   <p class="dim">버전 ${__VERSION__}</p>`
 
 export function showTitle(): Promise<Launch> {
@@ -135,16 +135,16 @@ export function showTitle(): Promise<Launch> {
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하', title: '새로 시작', on: () => ed === 'remake' ? pickDifficulty() : newGame() },
-        { label: '지난흔적', title: '이어하기·기록 불러오기·기록 옮기기', on: () => loadMenu() },
+        { label: '유랑천하', on: () => ed === 'remake' ? pickDifficulty() : newGame() },
+        { label: '지난흔적', on: () => loadMenu() },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
-          { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
-          ...p?.endings?.length && p.branch ? [{ label: '다른 길로', title: '진로 선택 직전에서 다른 길로 (장비·도감 이어받기)', on: otherRoad }] : [],
-          { label: '도    감', on: p?.seen ? () => void openCodex() : undefined, title: p?.seen ? '만난 인물·손에 넣은 도구·규칙' : '기록 없음' },
-          { label: '설 정', title: '글꼴·화면·편의 기능·기록 옮기기', on: () => settings() },
+          { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined },
+          ...p?.endings?.length && p.branch ? [{ label: '다른 길로', on: otherRoad }] : [],
+          { label: '도    감', on: p?.seen ? () => void openCodex() : undefined },
+          { label: '설 정', on: () => settings() },
         ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },
-        ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`, title: e.desc,
+        ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`,
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
       body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
@@ -152,10 +152,9 @@ export function showTitle(): Promise<Launch> {
 
     const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) }
     // 개선판 새로 시작: 난이도부터 (설정에서 언제든 바꿀 수 있다)
-    const DIFF_SUB = ['적이 주는 피해가 적다', '원작판 수준', '적이 주는 피해가 크다']
     const pickDifficulty = () => {
       win.classList.add('wide')
-      rows([...([0, 1, 2] as Difficulty[]).map(d => ({ label: DIFFICULTIES[d], sub: DIFF_SUB[d], title: '나중에 설정에서 바꿀 수 있습니다',
+      rows([...([0, 1, 2] as Difficulty[]).map(d => ({ label: DIFFICULTIES[d],
         on: () => { setDifficulty(d); newGame() } })),
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('button')[difficulty()]?.focus()
@@ -166,10 +165,10 @@ export function showTitle(): Promise<Launch> {
     // 설정 (개선판 메뉴): 켬/끔 스위치들 + 난이도 + 기록 옮기기. 바꾸면 그 자리에 초점을 둔 채 다시 그린다
     const settings = (focus = 0) => {
       win.classList.add('wide')
-      rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.title,
+      rows([...SETTINGS.map(o => ({ label: o.label, cls: 'opt', toggle: setting(o.k), title: o.desc,
         on: () => { setSetting(o.k, !setting(o.k)); applyFont(); settings(SETTINGS.indexOf(o)) } })),
-        { label: `난이도 · ${DIFFICULTIES[difficulty()]}`, cls: 'opt', title: DIFF_TITLE, on: () => { nextDifficulty(); settings(SETTINGS.length) } },
-        { label: '기록 옮기기', sub: '다른 브라우저·기기로', title: '코드·파일로 진행을 보내고 받는다', on: () => void openTransfer() },
+        { label: `난이도 · ${DIFFICULTIES[difficulty()]}`, cls: 'opt', title: DIFF_DESC, on: () => { nextDifficulty(); settings(SETTINGS.length) } },
+        { label: '기록 옮기기', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
     }
@@ -181,7 +180,7 @@ export function showTitle(): Promise<Launch> {
       rows([
         ...sus ? [{ label: '중단한 전투', sub: `${sus.title} · ${sus.turn}턴`, title: new Date(sus.saved).toLocaleString(),
           on: () => launch(sus.def, sus.at, sus) }] : [],
-        { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) + lowest(p.flags) : '없음', title: '장을 마칠 때마다 자동 기록',
+        { label: '이어하기', sub: p ? chapterName(p.next.n, p.next.route) + lowest(p.flags) : '없음',
           on: p ? () => launch(stageDef(p.next.n, p.next.route, true), progressCamp(p)) : undefined },
         ...loadSlots(ed).map((s, i) => ({ label: `기록 ${i + 1}`, sub: s ? s.title + lowest(s.camp.flags) : '무기록', title: s ? `${s.title}\n${new Date(s.at).toLocaleString()}` : '',
           on: s ? () => launch(stageDef(s.n, s.route, true), s.camp) : undefined })),
@@ -201,17 +200,17 @@ export function showTitle(): Promise<Launch> {
       const code = has ? await bundleCode(mine) : ''
       page.innerHTML = `<div class="transfer">
           <h2>기록 옮기기</h2>
-          <p class="lead">두 판의 이어하기·기록 3칸·중단한 전투·장 지도·도감을 다른 브라우저나 기기로 옮깁니다. 설정은 옮기지 않습니다.</p>
+          <p class="lead">진행 기록을 다른 브라우저나 기기로 옮깁니다.</p>
           <section><h3>보내기</h3><ul>${summary(mine)}</ul>
             <textarea class="out" readonly spellcheck="false" placeholder="옮길 기록이 없습니다"></textarea>
             <div class="btns"><button data-act="copy" ${has ? '' : 'disabled'}>코드 복사</button><button data-act="save" ${has ? '' : 'disabled'}>파일로 저장</button></div>
             <p class="msg out-msg"></p></section>
           <section><h3>받기</h3>
-            <textarea class="in" spellcheck="false" placeholder="다른 기기에서 복사한 코드를 여기에 붙여 넣거나 기록 파일을 여세요"></textarea>
+            <textarea class="in" spellcheck="false" placeholder="코드를 붙여 넣거나 파일을 여세요"></textarea>
             <div class="btns"><button data-act="open">파일 열기</button><button data-act="read">가져오기</button></div>
             <p class="msg in-msg"></p></section>
         </div>
-        <nav>${hasImportBackup() ? '<button data-act="undo" title="마지막으로 가져오기 바로 전 기록으로">가져오기 전으로</button>' : ''}
+        <nav>${hasImportBackup() ? '<button data-act="undo">가져오기 전으로</button>' : ''}
           <button data-act="close" class="close">돌아가기</button></nav>`
       const $ = <T extends HTMLElement>(q: string) => page.querySelector<T>(q)!
       const out = $<HTMLTextAreaElement>('.out'), inp = $<HTMLTextAreaElement>('.in'), outMsg = $('.out-msg'), inMsg = $('.in-msg'), read = $<HTMLButtonElement>('[data-act="read"]')
@@ -222,7 +221,7 @@ export function showTitle(): Promise<Launch> {
       const check = async () => {
         try {
           pending = await parseTransfer(inp.value)
-          inMsg.innerHTML = `<ul>${summary(pending)}</ul>${new Date(pending.at).toLocaleString()} 기록. 이 기기의 기록을 이것으로 바꿉니다.`
+          inMsg.innerHTML = `<ul>${summary(pending)}</ul>${new Date(pending.at).toLocaleString()} 기록으로 덮어씁니다.`
           read.textContent = '덮어쓰기'
           read.classList.add('warn')
         } catch (err) { reset(); inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
@@ -235,7 +234,7 @@ export function showTitle(): Promise<Launch> {
       const acts: Record<string, () => void | Promise<void>> = {
         copy: async () => {
           try { await navigator.clipboard.writeText(code) } catch { out.select(); document.execCommand('copy') }
-          outMsg.textContent = '복사했습니다. 다른 기기의 「받기」 칸에 붙여 넣으세요.'
+          outMsg.textContent = '복사했습니다.'
         },
         save: () => {
           const a = document.createElement('a'), d = new Date(), pad = (n: number) => String(n).padStart(2, '0')
@@ -248,7 +247,7 @@ export function showTitle(): Promise<Launch> {
         open: () => file.click(),
         read: async () => {
           if (!pending) { await check(); return }
-          try { applyBundle(pending); await openTransfer('가져왔습니다. 지난흔적에서 이어 하세요.') } catch (err) { inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
+          try { applyBundle(pending); await openTransfer('가져왔습니다.') } catch (err) { inMsg.innerHTML = `<span class="err">${(err as Error).message}</span>` }
         },
         undo: async () => { undoImport(); await openTransfer('가져오기 전 기록으로 되돌렸습니다.') },
         close: () => closeCredits(pageBack),
@@ -261,7 +260,6 @@ export function showTitle(): Promise<Launch> {
       const p = loadProgress(ed)!
       win.classList.add('wide')
       rows([...[0, 1, 2].map(r => ({ label: `${ROUTE[r]} · ${ROUTE_NAMES[r]}${p.endings?.includes(r) ? ' ✓' : ''}`,
-        title: p.endings?.includes(r) ? '엔딩을 본 길' : '아직 엔딩을 보지 못한 길',
         on: () => { const camp = withCarry(p.branch!, p.carry); const next = startOtherRoad(ed, r, camp); if (next) launch(stageDef(next.n, r, true), camp) } })),
         { label: '돌아가기', cls: 'back', on: menu }])
     }
