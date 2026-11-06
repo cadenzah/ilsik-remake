@@ -7,7 +7,7 @@ import { S } from './state'
 export interface Camp { flags: string[]; party: number[]; items: number[]; equip?: Record<number, Equip>; grown?: Record<number, Grown> }
 type Equip = UnitType['equip']
 /** 레벨업으로 바뀐 일행 대원 값 (PAD 값 대신, 장비 보정 전). 없으면 PAD 그대로 */
-export type Grown = Pick<UnitType, 'lv' | 'exp' | 'hp' | 'atk' | 'def' | 'spi' | 'agi' | 'magic'>
+export type Grown = Pick<UnitType, 'lv' | 'exp' | 'hp' | 'atk' | 'def' | 'spi' | 'agi' | 'magic' | 'lag'>
 
 // 캠페인 플래그 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류, black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
 export const FLAGS = new Set<string>()
@@ -24,7 +24,7 @@ export const partyType = (t: number): UnitType => {
 
 /** 전투 중 레벨업·경험치를 장 사이 상태에 옮긴다 (승급한 장비 포함) */
 export function keepGrowth(t: UnitType) {
-  GROWN.set(t.id, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic] })
+  GROWN.set(t.id, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic], ...t.lag ? { lag: [...t.lag] } : {} })
   if (t.equip.join() !== S.types[t.id].equip.join() || EQUIP.has(t.id)) EQUIP.set(t.id, [...t.equip])
 }
 

@@ -168,6 +168,7 @@ async function start(resume?: Suspended) {
   restore(atStart)   // 전투 중 켠 플래그 (27장 black27 등) 를 버린다
   if (resume?.grown) restore({ ...atStart, grown: resume.grown, equip: resume.equip })   // 중단 전에 레벨업한 값으로
   S.ed.beginBattle?.()   // 개선판 난이도 (장 사이 상태를 되돌린 뒤라 다시 하기마다)
+  atStart = { ...atStart, flags: snapshot().flags }   // 거기서 켠 판 플래그 (개선판 성장 난수 씨앗 — 다시 하기도 같은 레벨업) 를 장 시작 상태에
   const all = freshBattle()
   resetLog()
   resetTalkLog()

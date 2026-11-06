@@ -434,6 +434,7 @@ export async function main(argv: string[]) {
   if (argv.includes('--mind')) mindOpts.all = arg('mind', 'charge') as Mind
   if (arg('retreat', 'yes') === 'no') mindOpts.retreat = false
   if (argv.includes('--backer')) mindOpts.backer = Number(arg('backer', '1'))
+  if (arg('lag', 'yes') === 'no' && remakeTuning.grow) remakeTuning.grow.lag = Infinity   // 성장 난수 처짐 보정 (N4) 끔
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
   const out: Record<string, Row[]> = {}

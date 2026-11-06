@@ -22,7 +22,10 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'> }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow }
+/** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
+ *  lag = 기대치보다 이만큼 넘게 처진 능력치는 그 레벨업에 +1 (처진 양은 t.lag 에 쌓는다). 없으면 원작대로 Math.random */
+export interface Grow { roll(t: UnitType, stat: number, n: number): number; lag: number }
 export const ORIGINAL: Tuning = { form: 'orig', coef: 0 }
 const forSide = (a: Unit, all: Tuning) => a.side === 'enemy' && all.enemy ? all.enemy : all
 
@@ -103,7 +106,7 @@ function expGain(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cu
  *  2) 레벨이 weapon[id] 의 배수면 무기 Item id +1, armor[id] 의 배수면 방어구 +1 (cap[세부] 미만일 때). 장비 해제 → 승급 → 다시 장착 (현재치 채우기 없음)
  *  3) 레벨이 magic[id] 의 배수이고 마법 < 8 이면 마지막 마법 id + 1. 레이몬 (초상 16) 만 raymond[루트][마법 수], 마법 7개면 배우지 않음
  *  4) 피로 0 */
-function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, items: Map<number, Item>) => [number, number]): LevelUp {
+function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, items: Map<number, Item>) => [number, number], grow?: Grow): LevelUp {
   const t = u.type, G = tables.growth
   let n = 2
   const bonus = [2, 0, 0, 0, 1]
@@ -119,10 +122,18 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
   }
   const cap = G.stat[t.por] ?? [], keys = ['atk', 'def', 'spi', 'agi'] as const
   const cur = [u.maxHp, ...keys.map(k => u.base[k])]
+  const lag = grow && [...t.lag ?? [0, 0, 0, 0, 0]]
   const gains = cur.map((v, i) => {
-    const r = Math.floor(Math.random() * n)
-    return v < (cap[i] ?? Infinity) ? r + bonus[i] : 0   // 표 밖 인물 (일행이 아닌 종류) 은 상한 없음 [근사: 원작은 표 너머를 읽음]
+    const r = grow ? grow.roll(t, i, n) : Math.floor(Math.random() * n)
+    if (!(v < (cap[i] ?? Infinity))) return 0   // 표 밖 인물 (일행이 아닌 종류) 은 상한 없음 [근사: 원작은 표 너머를 읽음]
+    let extra = 0
+    if (lag) {   // 개선판 N4: 지난 레벨업들에서 기대치 ((n−1)/2) 보다 grow.lag 넘게 처졌으면 +1
+      if (lag[i] > grow.lag) { extra = 1; lag[i] -= 1 }
+      lag[i] += (n - 1) / 2 - r
+    }
+    return r + bonus[i] + extra
   }) as LevelUp['gains']
+  if (lag) t.lag = lag
   u.maxHp += gains[0]; t.hp += gains[0]
   keys.forEach((k, i) => { u.base[k] += gains[i + 1]; t[k] += gains[i + 1] })
   const out: LevelUp = { gains }
@@ -209,7 +220,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
     return { poison, coma }
   },
   expGain,
-  levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange) },
+  levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow) },
 } }
 
 /** 효과 7~13·15 = 상대편 (124e:c1b6 대상편) */

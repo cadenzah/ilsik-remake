@@ -4,9 +4,11 @@
 // - 성장 이어받기: 같은 인물이 새 종류가 되면 (애슬 → SM여왕, 수호자·아티스 2차, 아리크스 2차, 떠났다 돌아온 페니 2차)
 //   전 종류 레벨이 새 종류 기본 레벨보다 높으면 그 차이만큼 새 종류 성장식으로 레벨업 (Q10), 경험치 끝수는 넘긴다
 // - 쓰러진 대가 (제안 12, Q3): 이긴 장에서 쓰러진 출전 대원은 그 장 성장을 잃고 (전투 중 오른 레벨 포함), 다음 장을 피로 30 으로 시작
+// - 성장 난수 (N4, Q12): 레벨업 난수 = 판 씨앗 × 인물 × 레벨 × 능력치 (다시 하기로 다시 굴릴 수 없다). 기대치보다 2 넘게 처진 능력치는 다음 레벨업에 +1 (original/rules.ts levelUp)
 import { EQUIP, FLAGS, GROWN, PARTY, keepGrowth, partyType, type Camp, type Note } from '../../core/campaign'
 import { gained, growParty } from '../../core/battleCore'
 import type { UnitType } from '../../core/data'
+import type { Grow } from '../original/rules'
 import { S } from '../../core/state'
 import { josa } from 'es-hangul'
 
@@ -89,4 +91,23 @@ function benchShare(notes: Note[]) {
     if (levels) ups.push(S.types[t].name)
   }
   notes.push({ text: `대기 동료가 경험치를 ${share} 받았다.${ups.length ? ` ${ups.join(', ')}의 레벨이 올랐다.` : ''}` })
+}
+
+// ---------- 성장 난수 (N4) ----------
+
+const SEED = 'seed:'   // 판 플래그 seed:N — 새 판의 첫 전투 때 정해 장 시작 상태에 남는다 (battle.ts start)
+/** 판 씨앗이 없으면 정한다 (beginBattle). 시뮬레이터는 부르지 않아 씨앗 없이 Math.random */
+export function ensureSeed() {
+  if (![...FLAGS].some(f => f.startsWith(SEED))) FLAGS.add(SEED + Math.floor(Math.random() * 2 ** 31))
+}
+const seedOf = () => { const f = [...FLAGS].find(f => f.startsWith(SEED)); return f ? Number(f.slice(SEED.length)) : undefined }
+/** 정수 몇 개 → [0, 1) (murmur3 마무리 섞기) */
+function hash(...xs: number[]) {
+  let h = 0x9e3779b9
+  for (const x of xs) { h = Math.imul(h ^ x, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16 }
+  return (h >>> 0) / 2 ** 32
+}
+export const grow: Grow = {
+  lag: 2,
+  roll(t, stat, n) { const s = seedOf(); return Math.floor((s === undefined ? Math.random() : hash(s, t.id, t.lv, stat)) * n) },
 }
