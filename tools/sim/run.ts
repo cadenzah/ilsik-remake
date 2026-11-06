@@ -21,7 +21,7 @@ import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/ru
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
-interface Opts { until?: number; ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; dmg: string; careful: 'lead' | 'all' | 'none' }
+interface Opts { until?: number; ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; par?: string; dmg: string; careful: 'lead' | 'all' | 'none' }
 let careful: Opts['careful'] = 'all'
 
 /** 장 하나의 기록 */
@@ -418,7 +418,7 @@ export async function main(argv: string[]) {
     routes: route === 'all' ? [0, 1, 2] : [Number(route)],
     seed: Number(arg('seed', '1')), pick: arg('pick', 'level') === 'front' ? 'front' : 'level', book: arg('book', 'yes') !== 'no', tools: arg('tools', 'yes') !== 'no',
     until: Number(arg('until', '0')) || undefined,
-    turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'),
+    turns: Number(arg('turns', '60')), retry: Number(arg('retry', '2')), push: arg('push', 'yes') !== 'no', dmg, json: argv.includes('--json'), par: arg('par', '') || undefined,
     careful: (['lead', 'all', 'none'].includes(arg('careful', 'all')) ? arg('careful', 'all') : 'all') as Opts['careful'],
   }
   careful = o.careful
@@ -450,12 +450,16 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
   const [a, b] = seeds.split('-').map(Number), list = Array.from({ length: (b ?? a) - a + 1 }, (_, i) => a + i)
   const q = { ...o, json: true }
   const med = (xs: number[]) => { const v = [...xs].sort((x, y) => x - y); return v.length ? v[v.length >> 1] : 0 }
+  const wins = new Map<string, number[]>()   // --par: 장-루트 → 이긴 판의 턴
   for (const r of o.routes) {
     countered.ally = countered.foe = counterMade.ally = counterMade.foe = 0
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
-      for (const w of await runRoute(q, r, { battles })) by.set(w.n, [...by.get(w.n) ?? [], w])
+      for (const w of await runRoute(q, r, { battles })) {
+        by.set(w.n, [...by.get(w.n) ?? [], w])
+        if (w.result === 'win' || w.result === 'ending') wins.set(`${w.n}-${w.route}`, [...wins.get(`${w.n}-${w.route}`) ?? [], w.turns])
+      }
     }
     console.log(`\n== ${o.ed.name} 루트 ${'ABC'[r]} — 씨앗 ${list.length}개 (출전 ${o.pick}, 조심 ${o.careful}, 도구 ${o.tools ? '끼움' : '그대로'}${o.dmg ? `, 피해식 ${o.dmg}` : ''}) ==`)
     console.log('장 | 첫판 승 | 다시 하기 포함 | 턴 (중앙) | 일행 Lv | 적 Lv (최고) | 차이 | 쓰러진 아군 | 선두 최저 HP | 적 휴식 | 첫 차례 전 선두 쓰러짐 | 일행 전체 Lv (최저) | 진 까닭')
@@ -483,5 +487,14 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
         `${Math.round(rests / Math.max(1, acts) * 1000) / 10}%`, pct(ws.filter(w => w.leadEarly).length), `${avg(ws.map(w => w.allLv))} (${avg(ws.map(w => w.minLv))})`,
         [...ws.reduce((m, w) => w.lostBy ? m.set(w.lostBy, (m.get(w.lostBy) ?? 0) + 1) : m, new Map<string, number>())].map(([k, v]) => `${k} ${v}`).join(', ') || '-'].join(' | '))
     }
+  }
+  // --par 파일: 장 평가 (B1 제안 11·34) 의 "N턴 안에 이긴다" 기준 = 이긴 판의 턴 중앙값 (content/remake/par.json)
+  const parFile = o.par
+  if (parFile) {
+    const keys = [...wins.keys()].sort((a, b) => a.split('-').map(Number).reduce((x, v, i) => x || v - Number(b.split('-')[i]), 0))
+    const fsMod = 'node:fs/promises'   // tools/sim 의 tsconfig 에는 node 형이 없다
+    const { writeFile } = await import(/* @vite-ignore */ fsMod) as { writeFile: (f: string, s: string) => Promise<void> }
+    await writeFile(parFile, `{\n${keys.map(k => `  "${k}": ${med(wins.get(k)!)}`).join(',\n')}\n}\n`)
+    console.log(`\n턴 기준 ${keys.length}개 → ${parFile}`)
   }
 }

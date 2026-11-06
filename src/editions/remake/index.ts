@@ -11,6 +11,7 @@ import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
 import tune from '../../../content/remake/tune.json'            // 장별 조정 (B1 제안 6)
+import par from '../../../content/remake/par.json'              // 장 평가 턴 기준 (제안 11·34, tools/sim.mjs --par 로 다시 만든다)
 
 // 개선판 대본 (content/remake/chapters/NN.ecs, 저장소에 커밋). 원문 그대로 받아 core/script.ts 가 해석한다
 const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs', { query: '?raw', import: 'default', eager: true })
@@ -42,6 +43,7 @@ export const edition: Edition = {
   counter: { scale: 1, decay: 1 },
   foeHp: 1.15,
   zoc: true,
+  par,
   tune: tune as unknown as Edition['tune'],
   afterWin,      // 대기 동료 경험치·쓰러진 대가 (B1 제안 5·12, growth.ts)
   startFatigue,  // 지난 장에 쓰러진 대원 피로 30 (제안 12)

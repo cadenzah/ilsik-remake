@@ -4,6 +4,7 @@ import { A, loadBattles, loadTables, portraitUrl } from './data'
 import { FOUND, HIDDEN, trueEndingOpen } from './replay'
 import { loadPlaces, placeLabel, type Place } from './worldmap'
 import type { Progress } from './save'
+import { starText } from './grade'
 
 type Cleared = Progress['cleared'][number]
 
@@ -111,9 +112,13 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
   }
 
   // 오른쪽 목록: 시작(공통 앞) · 깬 갈래별 · 사바카 성(공통 뒤) · 기억 속의 장소
+  // 장 평가 (제안 11·34): 그 장의 최고 별. 갈래를 안 가린 줄 (공통 장) 은 갈래 중 가장 좋은 것
+  const best = (n: number, route?: number) => [0, 1, 2].filter(r => route === undefined || r === route).map(r => p?.stars?.[`${n}-${r}`])
+    .reduce<[number, number] | undefined>((a, b) => !b ? a : !a || b[0] / b[1] > a[0] / a[1] ? b : a, undefined)
+  const stars = (n: number, route?: number) => { const b = best(n, route); return b ? `<i class="stars" title="장 평가">${starText(...b)}</i>` : '' }
   const row = (n: number, route: number | undefined, extra = '') =>
     `<button class="crow${n === next ? ' next' : ''}" data-n="${n}"${route === undefined ? '' : ` data-route="${route}"`}>
-      <b>${n}</b><span>${places[n - 1]?.name ?? ''}<small>${places[n - 1]?.title ?? ''}</small></span>${extra}</button>`
+      <b>${n}</b><span>${places[n - 1]?.name ?? ''}<small>${places[n - 1]?.title ?? ''}</small></span>${extra || stars(n, route)}</button>`
   const nextRow = (seq: number[]) => next && seq.includes(next) ? row(next, undefined, '<em>다음</em>') : ''
   const pre = routes[0].filter(n => n <= 9), post = routes[0].filter(n => n >= 36)
   const sec = (title: string, body: string) => body ? `<section><h4>${title}</h4>${body}</section>` : ''
@@ -157,7 +162,7 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
     const flat = recs.flat()
     const found = FOUND.filter(f => ns.includes(f.n) && p?.found?.includes(f.id))
     popup.innerHTML = `<h3>${[...new Set(ns.map(n => places[n - 1].name))].join(' · ')}</h3>
-      ${ns2.map((n, k) => `<div class="prow"><b>${n}장</b><span>「${places[n - 1].title}」<small>${places[n - 1].name}${common(n) || recs[k].length > 1 ? '' : ` · ${ROUTE_TRAIL[recs[k][0].route]}`}</small></span>
+      ${ns2.map((n, k) => `<div class="prow"><b>${n}장</b><span>「${places[n - 1].title}」${stars(n, recs[k].length === 1 ? recs[k][0].route : route)}<small>${places[n - 1].name}${common(n) || recs[k].length > 1 ? '' : ` · ${ROUTE_TRAIL[recs[k][0].route]}`}</small></span>
         ${recs[k].length === 1 ? `<button data-i="${flat.indexOf(recs[k][0])}">다시 하기</button>`
           : `<div class="via"><span>다시 하기</span>${recs[k].map(c => `<button data-i="${flat.indexOf(c)}" class="${c.route === route ? 'pri' : ''}">${ROUTE_TRAIL[c.route]}</button>`).join('')}</div>`}
         </div>`).join('')}

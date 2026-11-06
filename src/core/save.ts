@@ -21,6 +21,7 @@ export interface Progress {
   seen?: { units: number[]; items: number[] }   // 도감
   carry?: { equip: Camp['equip']; items: number[] }   // 마지막 엔딩 때 장비 ("다른 길로" 이어받기)
   hidden?: number[]                      // 깬 숨은 장 (44·45, 45 = 진엔딩)
+  stars?: Record<string, [got: number, max: number]>   // 장 평가 최고 기록 (키 "장-루트", 개선판 grade.ts)
 }
 
 /** 이어하기 상태 */
@@ -83,6 +84,15 @@ export function startOtherRoad(ed: EditionId, route: number, camp: Camp): { n: n
   Object.assign(p, { next }, camp)
   store(ed, p)
   return next
+}
+
+/** 장 평가 기록: 그 장·루트의 별이 지난 기록보다 많을 때만 바꾼다 (진행 저장과 따로, 장 지도에 보인다) */
+export function recordStars(ed: EditionId, n: number, route: number, got: number, max: number) {
+  const p = loadProgress(ed) ?? { next: { n: 1, route: 0 }, cleared: [], flags: [] }
+  const k = `${n}-${route}`, old = p.stars?.[k]
+  if (old && old[0] >= got && old[1] === max) return
+  p.stars = { ...p.stars, [k]: [Math.max(got, old?.[1] === max ? old[0] : 0), max] }
+  store(ed, p)
 }
 
 /** 숨은 장 클리어 (진행 저장과 따로, 장 지도의 기억 속의 장소·진엔딩 표식) */

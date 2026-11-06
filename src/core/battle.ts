@@ -23,7 +23,8 @@ import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './b
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
 import { playDialogue, resetTalkLog } from './dialogue'
-import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, writeSlot, writeSuspended, type Suspended } from './save'
+import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
+import { stageMarks, starText } from './grade'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { DIFFICULTIES, difficulty, setSetting, setting } from './settings'
@@ -545,7 +546,7 @@ function bossHit() {
 function showGoalsWin(onClose?: () => void, button?: string) {
   const card = chapter()?.card
   showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined,
-    goals: remake() ? goalStates(aliveMember) : undefined, orig: !remake(), onClose, button })
+    goals: remake() ? goalStates(aliveMember) : undefined, marks: remake() ? stageMarks() : undefined, orig: !remake(), onClose, button })
 }
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
@@ -585,7 +586,10 @@ function cleared(ending: boolean) {
   }
   const fallen = S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).map(u => u.type.name)
   const goals = goalStates(aliveMember)
-  const lines = [`${S.turn}턴 · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료 ${fallen.join(', ')}` : '쓰러진 동료 없음',
+  const marks = stageMarks(true), got = marks.filter(m => m.state === 'done').length   // 장 평가 (제안 11·34)
+  if (marks.length) recordStars(S.ed.id, def.n, def.route, got, marks.length)
+  const lines = [...marks.length ? [`평가 ${starText(got, marks.length)}`, ...marks.map(m => `${m.state === 'done' ? '✓' : '✗'} ${m.text}`), ''] : [],
+    `${S.turn}턴 · 난이도 ${DIFFICULTIES[difficulty()]}`, fallen.length ? `쓰러진 동료 ${fallen.join(', ')}` : '쓰러진 동료 없음',
     ...goals.length ? [`보조 목표 ${goals.filter(g => g.state === 'done').length} / ${goals.length}`] : []]
   const buttons: Btn[] = []
   if (onward) buttons.push(['다음 장', onward])
