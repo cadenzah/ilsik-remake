@@ -29,7 +29,9 @@ export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
 const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
 // 피로를 쓰는 명령 (B1 제안 27): 전력 공격 = 피해 ×1.3·공격 피로 ×2, 방어 태세 = 물리 방어 ×1.2·제자리면 피로 −15 — balance-proposal.md "27 피로 명령"
 const stance = { dmg: 1.3, tire: 2, def: 1.2, rest: 15 }
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance }   // grow = 성장 난수 (N4, growth.ts)
+// 포위·협공 (B1 제안 30): 대상 옆에 붙은 아군 1명마다 물리 피해 +10%, 최대 +30%. 일행·NPC 만 (enemyHit 에 없음) — balance-proposal.md "30 협공"
+const flank = { per: 0.1, max: 0.3 }
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank }   // grow = 성장 난수 (N4, growth.ts)
 
 export const edition: Edition = {
   ...original,

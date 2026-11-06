@@ -82,7 +82,7 @@ function choose(map: StageMap, units: Unit[], u: Unit): AiPlan {
       if (back >= u.hp) continue
       let score = -dist(spot, u) * 0.01 - back * 0.5, own = 0   // 같으면 이동이 적은 칸
       for (const t of strikeTargets(u, c, spot, units)) {
-        const [lo, hi] = rules().damageRange(map, u, t, spot)
+        const [lo, hi] = rules().damageRange(map, u, t, spot, units)
         const v = (lo >= t.hp ? 1000 : 0) + (lo + hi) / 2 - t.def * 0.1
         if (t.side === u.side) { own++; score -= 1.5 * Math.max(1, v) } else score += v * backer(t)
       }

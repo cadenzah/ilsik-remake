@@ -1063,17 +1063,18 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
   if (S.ed.features.forecast) {
     const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
     const hit = strikeTargets(u, target, spot ?? u)
+    const flank = (t: Unit) => { const b = S.ed.rules.flank?.(u, t, S.units) ?? 0; return b ? ` <span class="green">협공 +${Math.round(b * 100)}%</span>` : '' }   // 제안 30
     if (hit.length === 1 && hit[0] === target) {
-      const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
+      const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u, S.units)
       const kill = lo >= target.hp ? '<span class="red">처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
       const back = counterDamage(u, target, spot ?? u)   // 제안 3: 되받는 피해
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}${S.ed.rules.bane?.(u, target) ? ' <span class="green">특효</span>' : ''}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}${S.ed.rules.bane?.(u, target) ? ' <span class="green">특효</span>' : ''}${flank(target)}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {
-        const [lo] = S.ed.rules.damageRange(S.map, u, t, spot ?? u)
+        const [lo] = S.ed.rules.damageRange(S.map, u, t, spot ?? u, S.units)
         const name = t.side === u.side ? `<span class="red">${esc(t.type.name)}</span>` : esc(t.type.name)
-        return `${name} −${lo}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
+        return `${name} −${lo}${flank(t)}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
       }).join('<br>')
       lines = hit.length
     }

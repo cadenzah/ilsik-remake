@@ -124,7 +124,7 @@ function danger(u: Unit, at: { x: number; y: number }, gone?: Unit) {
     const moves = reachable(S.map, S.units, e)
     let can = false
     for (const k of moves.keys()) if (inReach(e, { x: k % 1000, y: Math.floor(k / 1000) }, at)) { can = true; break }
-    let worst = can ? S.ed.rules.damageRange(S.map, e, u)[1] : 0
+    let worst = can ? S.ed.rules.damageRange(S.map, e, u, undefined, S.units)[1] : 0
     if (aiCaster(e)) for (const m of spellsOf(e)) {   // 걸어 가서 마법: 이동력 + 마법 거리 + 범위 안이면 그 마법 피해
       if (S.ed.rules.spellSide(m) !== 'foe' || !S.ed.rules.canCast(e, m) || dist(e, at) > e.mov + S.ed.rules.spellRange(m)[1] + m.area) continue
       const h = S.ed.rules.spell(e, u, m)
@@ -142,7 +142,7 @@ function danger(u: Unit, at: { x: number; y: number }, gone?: Unit) {
 function safer(u: Unit, p: AiPlan): AiPlan {
   const lead = u.troop === 0 && u.member === 0
   const safe = (risk: number) => risk * (lead ? LEAD_CARE : 1.5) < u.hp   // 선두가 쓰러지면 패배라 사람은 더 뒤에 둔다
-  const kill = p.target && S.ed.rules.damageRange(S.map, u, p.target, p.dest)[0] >= p.target.hp ? p.target : undefined
+  const kill = p.target && S.ed.rules.damageRange(S.map, u, p.target, p.dest, S.units)[0] >= p.target.hp ? p.target : undefined
   const low = u.hp < u.maxHp * 0.5
   if (process.env.SIM_DEBUG && S.turn <= Number(process.env.SIM_DEBUG) && (!process.env.SIM_CH || S.def.n === Number(process.env.SIM_CH))) console.log('  wary', S.turn, u.type.name, u.hp, '/', u.maxHp, 'dest', [p.dest.x, p.dest.y], 'danger', danger(u, p.dest, kill), 'fat', u.fatigue)
   if (p.rest || ((!low || kill) && safe(danger(u, p.dest, kill)))) return p
@@ -153,7 +153,7 @@ function safer(u: Unit, p: AiPlan): AiPlan {
     if (!calm || risk < calm.risk || (risk === calm.risk && spot.x === u.x && spot.y === u.y)) calm = { plan: { unit: u, dest: spot }, risk }
     if (!safe(risk) || low) continue
     for (const c of aimsFrom(u, spot)) {
-      const dmg = strikeTargets(u, c, spot).reduce((a, t) => a + (t.side !== u.side ? S.ed.rules.damageRange(S.map, u, t, spot)[0] : 0), 0)
+      const dmg = strikeTargets(u, c, spot).reduce((a, t) => a + (t.side !== u.side ? S.ed.rules.damageRange(S.map, u, t, spot, S.units)[0] : 0), 0)
       if (!best || dmg > best.dmg || (dmg === best.dmg && risk < best.risk)) best = { plan: { unit: u, dest: spot, target: c }, dmg, risk }
     }
   }
@@ -211,12 +211,13 @@ let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 /** --stance no = 쓰지 않음, power = 전력 공격을 쓰는 피로 한도 (그 공격 뒤 피로), guard = 방어 태세를 쓰나 */
 const stanceUse = { power: 40, guard: true }
 const stanceMade = { power: 0, guard: 0 }
+const flankMade = { ally: [0, 0], foe: [0, 0] }   // 협공 (제안 30): 물리 공격 수 · 그중 협공 보정이 붙은 수
 /** 전력 공격: 보통으로는 못 쓰러뜨리는데 전력이면 쓰러뜨리거나, 못 쓰러뜨려도 공격 뒤 피로가 한도 안이면. 보통으로 쓰러뜨리면 안 씀 (u 는 이미 칠 칸에) */
 function wantPower(u: Unit, target: Unit) {
   if (!S.ed.rules.stance || stanceUse.power < 0) return false
-  if (S.ed.rules.damageRange(S.map, u, target)[0] >= target.hp) return false
+  if (S.ed.rules.damageRange(S.map, u, target, undefined, S.units)[0] >= target.hp) return false
   u.power = true
-  const kill = S.ed.rules.damageRange(S.map, u, target)[0] >= target.hp, f = S.ed.rules.fatigueAfter(u, true)
+  const kill = S.ed.rules.damageRange(S.map, u, target, undefined, S.units)[0] >= target.hp, f = S.ed.rules.fatigueAfter(u, true)
   u.power = false
   return kill || f <= stanceUse.power
 }
@@ -254,6 +255,9 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
   } else if (plan.target && plan.target.hp > 0) {
     const before = new Map(S.units.map(o => [o, o.hp]))
     if (party && wantPower(u, plan.target)) { u.power = true; stanceMade.power++ }
+    const fm = flankMade[u.side === 'enemy' ? 'foe' : 'ally']
+    fm[0]++
+    if (S.ed.rules.flank?.(u, plan.target, S.units)) fm[1]++
     const back = counterDamage(u, plan.target)   // battle.ts attack 와 같은 차례
     const r = strike(u, plan.target)
     tallyHits(u.side === 'enemy' ? t.hits.foe : t.hits.ally, u, r.hits, before)
@@ -428,6 +432,14 @@ export async function main(argv: string[]) {
   //   --dmg-enemy·--spell-enemy·--heal-enemy = 적이 칠 때만
   const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as Tuning['form'], coef: Number(coef ?? 0) } }
   const base = arg('ed', 'remake') === 'original' ? original : remake
+  // 협공 (제안 30): --flank no | per:0.1 · max:0.3 · foe (적도 협공, 같은 값) (쉼표로 여럿). 규칙을 다시 만들기 전에 바꾼다
+  for (const kv of arg('flank', '').split(',').filter(Boolean)) {
+    const [k, v] = kv.split(':'), f = remakeTuning.flank
+    if (!f) break
+    if (k === 'no') f.per = 0
+    else if (k === 'per' || k === 'max') f[k] = Number(v)
+    else if (k === 'foe' && remakeTuning.enemy) remakeTuning.enemy.flank = f
+  }
   const keys = ['dmg', 'spell', 'heal', 'dmg-enemy', 'spell-enemy', 'heal-enemy'].filter(k => argv.includes(`--${k}`))
   const dmg = keys.map(k => `${k} ${arg(k, '')}`).join(' ')
   const tuned = (): Tuning => {
@@ -487,6 +499,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
   for (const r of o.routes) {
     countered.ally = countered.foe = counterMade.ally = counterMade.foe = 0
     stanceMade.power = stanceMade.guard = 0
+    flankMade.ally = [0, 0]; flankMade.foe = [0, 0]
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
@@ -514,6 +527,10 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     if (S.ed.rules.stance) {
       const turns = [...by.values()].flat().reduce((x, w) => x + w.turns * w.tries, 0)
       console.log(`피로 명령 — 턴당 전력 공격 ${(stanceMade.power / Math.max(1, turns)).toFixed(2)}번 · 방어 태세 ${(stanceMade.guard / Math.max(1, turns)).toFixed(2)}번`)
+    }
+    if (S.ed.rules.flank) {
+      const pc = ([n, k]: number[]) => `${Math.round(100 * k / Math.max(1, n))}%`
+      console.log(`협공 — 물리 공격 중 보정이 붙은 비율 아군 ${pc(flankMade.ally)} · 적 ${pc(flankMade.foe)}`)
     }
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'

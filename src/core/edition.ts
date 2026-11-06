@@ -5,9 +5,9 @@ import type { BuffStat, Pos, Unit } from './unit'
 import type { Camp, Note } from './campaign'
 
 export interface Rules {
-  /** 피해 범위 [최소, 최대]. at = 공격자가 칠 자리 (없으면 지금 자리, 지형 보정용) */
-  damageRange(map: StageMap, a: Unit, d: Unit, at?: Pos): [number, number]
-  rollDamage(map: StageMap, a: Unit, d: Unit): number
+  /** 피해 범위 [최소, 최대]. at = 공격자가 칠 자리 (없으면 지금 자리, 지형 보정용), units = 맵의 유닛 (협공 보정용, 없으면 협공 없음 — 반격) */
+  damageRange(map: StageMap, a: Unit, d: Unit, at?: Pos, units?: Unit[]): [number, number]
+  rollDamage(map: StageMap, a: Unit, d: Unit, units?: Unit[]): number
   /** 사거리 [최소, 최대] */
   weaponRange(t: UnitType, items: Map<number, Item>): [number, number]
   /** 휴식 회복량 (최대HP 를 넘지 않게는 엔진이 자른다) */
@@ -28,6 +28,8 @@ export interface Rules {
   aiRests(u: Unit): boolean
   /** 공격자가 대상에게 특효 (방어를 덜 봄, 개선판 B1 제안 24) 인가. 확인창 표시용. 없으면 특효 없음 */
   bane?(a: Unit, d: Unit): boolean
+  /** 협공 보정 (개선판 B1 제안 30): 대상 옆에 붙은 공격자 편 수만큼 오르는 물리 피해 비율 (0.2 = +20%). 확인창 표시용. 없으면 협공 없음 */
+  flank?(a: Unit, d: Unit, units: Unit[]): number
   /** 전력 공격·방어 태세 (개선판 B1 제안 27). 없으면 두 명령이 없다 */
   stance?: Stance
   /** 이 유닛이 한 차례에 두 번 행동하나 (차례를 마칠 때 검사) */

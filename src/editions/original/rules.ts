@@ -22,7 +22,7 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank }
 /** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
 export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
@@ -37,14 +37,22 @@ export function baneCut(a: Unit, d: Unit, b?: Bane) {
   return Math.max(0, 1 - b.cut * a.type.equip.filter(e => b.items.includes(e)).length)
 }
 
+/** 협공 (개선판 B1 제안 30): 대상 옆 (상하좌우) 에 붙은 공격자 편 1명마다 물리 피해 +per, 최대 +max. 혼수인 유닛은 안 친다 */
+export interface Flank { per: number; max: number }
+export function flankBonus(a: Unit, d: Unit, units?: Unit[], f?: Flank) {
+  if (!f || !units || d.side === a.side) return 0
+  const n = units.filter(o => o !== a && o.hp > 0 && !o.coma && o.side === a.side && Math.abs(o.x - d.x) + Math.abs(o.y - d.y) === 1).length
+  return Math.min(f.max, f.per * n)
+}
+
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
-function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL) {
+function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL, units?: Unit[]) {
   const p = forSide(a, all)
   const st = all.stance   // 전력 공격·방어 태세 (개선판 B1 제안 27)
   const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d) * baneCut(a, d, all.bane) * (st && d.guard ? st.def : 1)
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
-  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1))
+  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1) * (1 + flankBonus(a, d, units, p.flank)))   // 협공은 편마다 (적 조정에 없으면 적은 협공 없음)
   return Math.min(clamp(v, 1, 99), d.hp)
 }
 
@@ -179,11 +187,11 @@ const HYEYU = 17, GALE_SHOES = 165   // 두 번 행동 특례 (초상·도구 It
 
 /** 판 규칙 (원작 규칙). tuning = 피해 조정 (개선판·tools/sim 이 바꾼다) */
 export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
-  damageRange(map, a, d, at) {
-    const v = damage(map, a, d, at, tuning)
+  damageRange(map, a, d, at, units) {
+    const v = damage(map, a, d, at, tuning, units)
     return [v, v]
   },
-  rollDamage: (map, a, d) => damage(map, a, d, a, tuning),
+  rollDamage: (map, a, d, units) => damage(map, a, d, a, tuning, units),
   // 무기 EAD f2 = 사거리, f3 = 범위 (0aa2:17dd → +0x44/+0x46, 무기 없으면 1/0). 사거리 범람 모양은 [추정] 마름모.
   // 사거리 칸은 자기 칸을 포함하고 (f2 = 0 이면 자기 칸만, 20ec:d9b0) 자기 칸은 같은 편 표시라 상대를 노리는 공격에선 빠진다 → 최소 1.
   // 기사 (직업 15, 공격 유형 2) 는 같은 편을 중심으로 고르므로 자기 칸부터 (core/attack.ts). 그 밖의 f2 = 0 (지팡이·부적 등) 은 [근사] 1
@@ -234,6 +242,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow) },
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
   stance: tuning.stance,
+  ...tuning.flank || tuning.enemy?.flank ? { flank: (a: Unit, d: Unit, units: Unit[]) => flankBonus(a, d, units, forSide(a, tuning).flank) } : {},
 } }
 
 /** 효과 7~13·15 = 상대편 (124e:c1b6 대상편) */

@@ -105,7 +105,7 @@ export function strike(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
   const hits: { target: Unit; value: number }[] = []
   for (const t of targets) {
-    const dmg = S.ed.rules.rollDamage(S.map, a, t)
+    const dmg = S.ed.rules.rollDamage(S.map, a, t, S.units)   // 협공 (제안 30) 은 맵의 유닛으로
     t.hp = Math.max(0, t.hp - dmg)
     t.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
     wake(t)
@@ -126,7 +126,7 @@ let counterTurn: Unit['side'] | undefined   // 그 상대 차례의 공격 쪽
 export function counterDamage(a: Unit, c: Unit, from: Pos = a): number {
   const cfg = S.ed.counter
   if (!cfg || c.side === a.side || attackKind(a) >= 2 || c.coma > 0 || S.troopState[c.troop] === 2 || !inReach(c, c, from)) return 0
-  const dealt = S.ed.rules.damageRange(S.map, a, c, from)[0], hp = c.hp
+  const dealt = S.ed.rules.damageRange(S.map, a, c, from, S.units)[0], hp = c.hp   // 협공으로 쓰러지면 못 되받는다 (되받는 피해에는 협공 없음)
   if (dealt >= hp) return 0
   c.hp = hp - dealt
   const tired = S.ed.rules.aiRests(c)
