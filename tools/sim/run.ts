@@ -7,7 +7,7 @@ import type { AiPlan, Edition } from '../../src/core/edition'
 import { EQUIP, GOLD, ITEMS, PARTY, finishStage, giveGold, nextStage, partyType, promoteDeployed, restore, snapshot, takePromo, type Camp } from '../../src/core/campaign'
 import { addExp, again, applyCounter, brace, counterDamage, takePromos, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable } from '../../src/core/grid'
-import { aimsFrom, inReach, strikeTargets } from '../../src/core/attack'
+import { aimsFrom, attackKind, inReach, strikeTargets } from '../../src/core/attack'
 import { aiCaster, spellsOf } from '../../src/core/magic'
 import { blocksAt, chapter, initScript, ownsSteps, runSteps } from '../../src/core/script'
 import { canEquip } from '../../src/core/camp'
@@ -213,6 +213,7 @@ let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 const stanceUse = { power: 40, guard: true }
 const stanceMade = { power: 0, guard: 0 }
 const affMade = { ally: [0, 0, 0], foe: [0, 0, 0] }   // 상성 (제안 25): 생명상해 마법이 맞힌 대상 수 · 그중 약점 · 내성
+const evadeMade = { ally: { n: 0, miss: 0, p: 0, lost: 0, diff: [] as number[] }, foe: { n: 0, miss: 0, p: 0, lost: 0, diff: [] as number[] } }   // 명중·회피 실험 (--evade): 막는 쪽 기준
 const bowMade = { ally: 0, foe: 0 }   // 상성 (제안 25-2): 활로 비행을 친 물리 공격 수
 const flankMade = { ally: [0, 0], foe: [0, 0] }   // 협공 (제안 30): 물리 공격 수 · 그중 협공 보정이 붙은 수
 /** 전력 공격: 보통으로는 못 쓰러뜨리는데 전력이면 쓰러뜨리거나, 못 쓰러뜨려도 공격 뒤 피로가 한도 안이면. 보통으로 쓰러뜨리면 안 씀 (u 는 이미 칠 칸에) */
@@ -503,6 +504,33 @@ export async function main(argv: string[]) {
     else if (remakeTuning.stance && k in remakeTuning.stance) remakeTuning.stance[k as keyof typeof remakeTuning.stance] = Number(v)
   }
   if (argv.includes('--bane') && remakeTuning.bane) remakeTuning.bane.cut = arg('bane', 'no') === 'no' ? 0 : Number(arg('bane', '0.15'))   // 고대 병기 특효 (제안 24) 세기
+  // 명중·회피 (실험, 2026-11-07 — 규칙에는 없음): 물리 피해 (반격 포함) 를 확률로 막는다. 계획 (damageRange) 은 그대로 다 맞는다고 본다.
+  //   --evade flat:0.1 | agi:0.1,0.01,0.3 (기본 + 계수 × (막는 쪽 민첩 − 치는 쪽 민첩), 0~상한) · cut:0.5 (막으면 피해 배율, 기본 0) · who:ally|foe (막는 쪽) · melee (근접만) · terr:0.02 (막는 칸 L3 방어 지형 1 당)
+  if (argv.includes('--evade')) {
+    const ev = { base: 0, k: 0, cap: 1, cut: 0, who: '', melee: false, terr: 0 }
+    for (const kv of arg('evade', '').split(';').filter(Boolean)) {
+      const [k, v = ''] = kv.split(':'), n = v.split(',').map(Number)
+      if (k === 'flat') { ev.base = n[0]; ev.cap = 1 }
+      else if (k === 'agi') { ev.base = n[0]; ev.k = n[1]; ev.cap = n[2] ?? 1 }
+      else if (k === 'cut') ev.cut = n[0]
+      else if (k === 'who') ev.who = v
+      else if (k === 'melee') ev.melee = true
+      else if (k === 'terr') ev.terr = n[0]
+    }
+    const inner = o.ed.rules
+    o.ed = { ...o.ed, rules: { ...inner, rollDamage(map, a, d, units) {
+      const full = inner.rollDamage(map, a, d, units), side = d.side === 'enemy' ? 'foe' : 'ally'
+      if ((ev.who && ev.who !== side) || (ev.melee && attackKind(a) >= 3)) return full
+      const L3 = map.layer3?.[d.y * map.w + d.x] ?? 3
+      const p = Math.min(ev.cap, Math.max(0, ev.base + ev.k * (d.agi - a.agi) + ev.terr * (L3 - 3)))
+      const s = evadeMade[side]
+      s.n++; s.p += p; s.diff.push(d.agi - a.agi)
+      if (Math.random() >= p) return full
+      s.miss++; s.lost += full - Math.floor(full * ev.cut)
+      return Math.max(ev.cut ? 1 : 0, Math.floor(full * ev.cut))
+    } } }
+    S.ed = o.ed
+  }
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
   const out: Record<string, Row[]> = {}
@@ -525,6 +553,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     stanceMade.power = stanceMade.guard = 0
     flankMade.ally = [0, 0]; flankMade.foe = [0, 0]
     affMade.ally = [0, 0, 0]; affMade.foe = [0, 0, 0]; bowMade.ally = bowMade.foe = 0
+    for (const e of Object.values(evadeMade)) { e.n = e.miss = e.p = e.lost = 0; e.diff = [] }
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
@@ -560,6 +589,11 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     {
       const pc = ([n, w, r]: number[]) => `${n}명 중 약점 ${Math.round(100 * w / Math.max(1, n))}% · 내성 ${Math.round(100 * r / Math.max(1, n))}%`
       console.log(`상성 — 생명상해 마법 맞은 대상 아군이 칠 때 ${pc(affMade.ally)} / 적이 칠 때 ${pc(affMade.foe)} · 활로 비행 아군 ${bowMade.ally}번 적 ${bowMade.foe}번 (물리 공격 아군 ${flankMade.ally[0]} 적 ${flankMade.foe[0]})`)
+    }
+    if (evadeMade.ally.n + evadeMade.foe.n) {
+      const q = (xs: number[], f: number) => { const v = [...xs].sort((x, y) => x - y); return v.length ? v[Math.floor(f * (v.length - 1))] : 0 }
+      const e = (k: 'ally' | 'foe') => { const m = evadeMade[k]; return `${m.n}번 중 막음 ${pct(m.miss, m.n)}% (평균 확률 ${pct(m.p, m.n)}%) · 막은 피해 ${pct(m.lost, k === 'ally' ? tot.foe.pts + m.lost : tot.ally.pts + m.lost)}% · 민첩 차 10/50/90% ${q(m.diff, 0.1)}/${q(m.diff, 0.5)}/${q(m.diff, 0.9)}` }
+      console.log(`회피 — 아군이 막을 때 ${e('ally')} / 적이 막을 때 ${e('foe')}`)
     }
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'

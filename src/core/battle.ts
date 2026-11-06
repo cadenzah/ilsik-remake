@@ -286,23 +286,54 @@ async function arrowHit(a: Unit, t: Unit, archer: boolean) {
   const dir = a.facing, face = OPPOSITE[dir]
   const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0, dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0
   t.frame = FACE_WALK[face]
-  S.spark = { name: 'mark.2', x: t.x, y: t.y, ox: 0, oy: 0 }
+  S.sparks = [{ name: 'mark.2', x: t.x, y: t.y, ox: 0, oy: 0 }]
   await sleep(TICK * 3 * pace())
   t.px = t.x + dx / 4; t.py = t.y + dy / 4
   t.frame = FACE_POSE[face]
-  S.spark = { name: 'mark.3', x: t.px, y: t.py, ox: 0, oy: 0 }
+  S.sparks = [{ name: 'mark.3', x: t.px, y: t.py, ox: 0, oy: 0 }]
   await sleep(TICK * 3 * pace())
   if (archer) {
     const base = { down: 0, up: 3, left: 6, right: 9 }[dir]
     const [ox, oy] = { down: [0, 0], up: [20, TW / 2 - 5], right: [TW / 2 - 10, 17], left: [TW / 2 - 5, 17] }[dir]
     for (let i = 0; i < 3; i++) {
-      S.spark = { name: `arrow.${base + i}`, x: t.px, y: t.py, ox, oy }
+      S.sparks = [{ name: `arrow.${base + i}`, x: t.px, y: t.py, ox, oy }]
       await sleep(TICK * pace())
     }
   }
-  S.spark = null
+  S.sparks = []
   t.frame = undefined
   t.px = t.x; t.py = t.y
+}
+
+/** 근접 피격 쪽 (원작 20ec:39c9·1990 과 같은 식): 같은 행 3칸 안이면 왼쪽·오른쪽, 아니면 위·아래 — 맞는 유닛 t 가 공격자 a 를 보는 쪽 */
+function faceTo(t: Pos, a: Pos): Unit['facing'] {
+  return a.y === t.y && Math.abs(a.x - t.x) <= 3 ? (a.x > t.x ? 'right' : 'left') : a.y > t.y ? 'down' : 'up'
+}
+
+/** 근접 공격 앞: 맞을 유닛이 공격자 쪽 걷기 칸으로 돌아선다 (원작 39c9 bp−0x116, 기사 4b7a 도 같음) */
+function faceAttacker(a: Unit, targets: Unit[]) {
+  for (const t of targets) if (t !== a) t.frame = FACE_WALK[faceTo(t, a)]
+}
+
+/** 근접 피격 (원작 단일 근접 20ec:39c9~4b43, 기사 4b7a~5bc0 [확정 2026-11-07]). 공격자가 타격 칸에 닿은 뒤 부른다.
+ *  단일: 무기 든 자세 (9~12) + MAR 6 프레임 0 → 공격자 반대쪽으로 1/4 칸 밀리며 프레임 1, 각 3틱.
+ *  기사: 맞는 유닛 모두 같은 자세로 두 번 1/4 칸씩 밀림 (54b8~), MAR 6 은 4·5 또는 6·7 (+0x1d58 로 고름, 뜻 미상) — 웹은 4·5 [근사] */
+async function meleeHit(a: Unit, targets: Unit[]) {
+  const hit = targets.filter(t => t !== a)
+  if (!hit.length) return
+  const knight = attackKind(a) === 2, mark = knight ? 4 : 0
+  const steps = knight ? 2 : 1
+  const away = hit.map(t => { const f = faceTo(t, a); return { t, f, dx: f === 'left' ? 1 : f === 'right' ? -1 : 0, dy: f === 'up' ? 1 : f === 'down' ? -1 : 0 } })
+  for (const { t, f } of away) t.frame = FACE_POSE[f]
+  S.sparks = knight ? [] : away.map(({ t }) => ({ name: `mark.${mark}`, x: t.x, y: t.y, ox: 0, oy: 0 }))
+  if (!knight) await sleep(TICK * 3 * pace())
+  for (let i = 1; i <= steps; i++) {
+    for (const { t, dx, dy } of away) { t.px = t.x + dx * i / 4; t.py = t.y + dy * i / 4 }
+    S.sparks = away.map(({ t }) => ({ name: `mark.${mark + 1}`, x: t.px, y: t.py, ox: 0, oy: 0 }))
+    await sleep(TICK * 3 * pace())
+  }
+  S.sparks = []
+  for (const { t } of away) { t.frame = undefined; t.px = t.x; t.py = t.y }
 }
 
 /** 물리 공격. c = 중심 유닛 (보통 상대, 기사는 같은 편·자신). 맞는 유닛은 공격 유형대로 (core/attack.ts) — 피해식은 대상마다 같은 식 */
@@ -310,6 +341,8 @@ async function attack(a: Unit, c: Unit) {
   const targets = strikeTargets(a, c)
   const d = c === a ? targets[0] ?? c : c   // 바라볼 쪽
   if (d !== a) a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
+  const melee = attackKind(a) <= 2
+  if (melee) faceAttacker(a, targets)
   // 원작 공격 동작 (FIG 준비 → 타격). 그림이 없으면 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
   // 효과음: 공격자 초상 번호의 소리 (원작 20ec:1897·3ab5·4c67, 타격 프레임 무렵 [근사])
   if (!await playPose(a, 280)) {
@@ -326,7 +359,8 @@ async function attack(a: Unit, c: Unit) {
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const back = counterDamage(a, c)   // 타격 전 상태로 판단 (맞으면 혼수가 풀린다)
   const { hits } = strike(a, c)
-  await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
+  if (melee) await meleeHit(a, targets)   // 맞는 자세·밀림 (원작 39c9·4b7a) 이 타격 프레임을 보이는 동안
+  else await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
   a.pose = undefined
   await sleep(220 * pace())
   S.fx = null
@@ -339,6 +373,7 @@ async function attack(a: Unit, c: Unit) {
 async function counterAct(a: Unit, c: Unit, value: number) {
   c.facing = a.x > c.x ? 'right' : a.x < c.x ? 'left' : a.y > c.y ? 'down' : 'up'
   S.floats.push({ x: c.x, y: c.y, text: '반격', t0: performance.now(), color: '#ffd24a' })
+  faceAttacker(c, [a])
   if (!await playPose(c, 280)) {
     c.px += Math.sign(a.x - c.x) * 0.25; c.py += Math.sign(a.y - c.y) * 0.25
     play('e1', c.type.por)
@@ -346,7 +381,7 @@ async function counterAct(a: Unit, c: Unit, value: number) {
     c.px = c.x; c.py = c.y
   } else play('e1', c.type.por)
   const r = applyCounter(a, c, value)
-  await sleep(320 * pace())
+  await meleeHit(c, [a])
   c.pose = undefined
   await sleep(220 * pace())
   await fadeDead([a])
