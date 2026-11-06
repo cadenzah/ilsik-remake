@@ -60,6 +60,8 @@ export interface Edition {
   order(units: Unit[], round: number): Unit[][]
   /** 컴퓨터 조종 유닛의 행동. troopState 를 바꿀 수 있다 (경계 → 행동) */
   planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan
+  /** 컴퓨터 유닛 성향 한 줄 (개선판 카드, B1 제안 10). 없으면 '' */
+  mindNote?(u: Unit): string
   /** 편의 기능: 적 위협 범위, 피해 예측, 적 클릭 한 번에 이동+공격.
    *  commandFirst = 유닛을 눌러 명령(이동/전투)을 먼저 고른다 (원작), 아니면 차례가 오면 이동 범위를 바로 보인다.
    *  autoRest = 이동·공격 없이 차례를 마치면 휴식, 아니면 휴식은 "휴식?" 확인으로만 (원작)

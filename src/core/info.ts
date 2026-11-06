@@ -47,8 +47,9 @@ function nextTurn(u: Unit) {
   const st = S.troopState[u.troop]
   if (st === 1) return '<span class="blue">경계</span>'
   if (st === 2) return '<span class="dim">대기</span>'
-  if (!S.ed.rules.aiRests(u)) return ''
-  return '<span class="blue">다음 차례 휴식</span>'
+  const mind = S.ed.mindNote?.(u) ?? ''   // 개선판 성향 (B1 제안 10)
+  if (!S.ed.rules.aiRests(u)) return mind ? `<span class="dim">${mind}</span>` : ''
+  return `<span class="blue">다음 차례 ${S.ed.mindNote && mind !== '자리 지킴' && st !== 3 ? '물러나 ' : ''}휴식</span>`
 }
 
 /** 개선판 줄: 상태 이상 (중독·혼수 남은 차례, 강화·약화) */

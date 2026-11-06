@@ -2,7 +2,7 @@
 import type { ExtraBattle } from '../../core/data'
 import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
-import { planFor } from './ai'
+import { mindNote, planFor } from './ai'
 import { afterWin, partyChange, startFatigue } from './growth'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
@@ -43,6 +43,7 @@ export const edition: Edition = {
   afterWin,      // 대기 동료 경험치·쓰러진 대가 (B1 제안 5·12, growth.ts)
   startFatigue,  // 지난 장에 쓰러진 대원 피로 30 (제안 12)
   partyChange,   // 늦은 합류 맞춤·전직·교체 성장 이어받기 (제안 5·N2)
+  mindNote,  // 성향 카드 줄 (제안 10)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

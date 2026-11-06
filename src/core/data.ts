@@ -108,7 +108,8 @@ export interface ExtraBattle {
  *  부대 번호: 0 일행, NPC 가 있으면 1, 적 무리는 그다음부터 (NPC 없는 장은 1부터).
  *  foeScale = 적 생명·역량·방어·정신·민첩 배율, remove = 빼는 적 [부대, 번호] (번호는 원작 그대로라 승패 조건이 맞는다),
  *  npcHp = 함께 싸우는 NPC 생명 배율 (1 비율식에 호위 NPC 가 약해진 몫), troop = 부대 초기 상태 바꾸기 (부대 번호 → 상태 0~4, ai.ts), note = 까닭 */
-export interface StageTune { foeScale?: number; npcHp?: number; remove?: Member[]; troop?: Record<string, number>; note?: string }
+/** ai = 성향 덮어쓰기 (개선판 B1 제안 10, remake/ai.ts mindOf): 키 "부대" 또는 "부대.대원" */
+export interface StageTune { foeScale?: number; npcHp?: number; remove?: Member[]; troop?: Record<string, number>; ai?: Record<string, 'charge' | 'hold' | 'pack'>; note?: string }
 export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
 /** 전투 시작 처리 (tools/cond.py START, 원작 124e:c3da): 전투 전 장면 뒤 순서대로. hpScale = [부대, 비율] HP × 비율 (버림),
  *  absent = 일행 중 그 초상 대원 HP 0 (맵에서 지움), state = 부대 상태 */

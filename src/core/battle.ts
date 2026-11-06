@@ -731,7 +731,12 @@ async function aiSteps(units: Unit[]): Promise<boolean> {
 /** 컴퓨터 유닛 행동 하나. 전투가 끝나면 true */
 async function aiAct(u: Unit, alone: boolean): Promise<boolean> {
   const plan = S.ed.planFor(S.map, S.units, u, S.troopState)
-  if (plan.rest) { rest(u); return false }
+  if (plan.rest) {   // 개선판은 물러난 뒤 쉬기도 한다 (B1 제안 10)
+    const back = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
+    if (back.length > 1) { if (alone) updatePhase(phase.side, u.type.name); centerOnIfOff(u); await walk(u, back) }
+    rest(u)
+    return false
+  }
   const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
   const acts = path.length > 1 || (plan.target && plan.target.hp > 0) || !!plan.magic
   if (acts && alone) updatePhase(phase.side, u.type.name)

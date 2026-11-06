@@ -16,7 +16,7 @@ import { S, member } from '../../src/core/state'
 import type { Unit } from '../../src/core/unit'
 import { edition as original } from '../../src/editions/original'
 import { edition as remake, tuning as remakeTuning } from '../../src/editions/remake'
-import { planFor as smartPlan } from '../../src/editions/remake/ai'
+import { mindOpts, planFor as smartPlan, type Mind } from '../../src/editions/remake/ai'
 import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/rules'
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
@@ -212,6 +212,7 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
   if (plan.rest) {
     if (party) t.allyRests++
     else if (u.fatigue > 70 || u.hp <= u.maxHp * 0.25) t.foeRests++   // 원작 AI 휴식선 (aiGate). 경계·대기 부대의 제자리는 세지 않는다
+    if (!party && (plan.dest.x !== u.x || plan.dest.y !== u.y)) { u.x = plan.dest.x; u.y = plan.dest.y }   // 개선판: 물러난 뒤 휴식 (제안 10)
     rest(u)
     if (party && !S.ed.features.autoRest) tire(u, false)   // 원작판 「휴식」: rest 뒤 finishUnit → tire
     return judge().result
@@ -429,6 +430,10 @@ export async function main(argv: string[]) {
   S.scenes = scenes
   S.routeTable = battles.route
   initScript(o.ed.script, tables.types)
+  // 성향 (제안 10) 비교: --mind charge|hold|pack (모든 컴퓨터 유닛을 하나로), --retreat no (제자리 휴식), --backer 1 (회복 담당 가중 끔)
+  if (argv.includes('--mind')) mindOpts.all = arg('mind', 'charge') as Mind
+  if (arg('retreat', 'yes') === 'no') mindOpts.retreat = false
+  if (argv.includes('--backer')) mindOpts.backer = Number(arg('backer', '1'))
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
   const out: Record<string, Row[]> = {}
