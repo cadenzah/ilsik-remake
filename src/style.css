@@ -615,3 +615,31 @@ html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; posi
 /* 개선판 전투 기록 (battleLog.ts, B1 N6) */
 .owin.log .b { overflow-y: auto; }
 .owin .b .battlelog div { margin-bottom: 3px; word-break: keep-all; }
+
+/* 설정의 음량 줄 (volumeUi.ts): 「음량 ─○─ 80」. 배경음악·효과음 스위치 바로 아래 */
+.vol, .mc-vol, .ovol { display: flex; align-items: center; gap: 8px; box-sizing: border-box; }
+.vol input, .mc-vol input, .ovol input { flex: 1; min-width: 0; margin: 0; height: 14px; cursor: pointer; }
+.vol input:disabled, .mc-vol input:disabled, .ovol input:disabled { cursor: default; }
+.vol b, .mc-vol b, .ovol b { width: 24px; text-align: right; font-weight: 400; }
+.vol.off, .mc-vol.off, .ovol.off { opacity: .45; }
+#titlescreen .row.vol { display: flex; align-items: center; gap: 8px; cursor: default; height: 20px; line-height: 20px; padding: 0 8px 0 24px;
+  font-size: 12px; font-weight: 400; color: #9c9c90; margin-top: 0; }
+#titlescreen .row.vol.off { opacity: .45; }
+#titlescreen .row.vol input { accent-color: #6c846c; }
+#mcamp .mc-vol { padding: 0 12px 0 28px; font-size: 13px; color: var(--ec-text-2); }
+#mcamp .mc-vol input { accent-color: var(--ec-green); }
+#camp .dlg .ovol { position: absolute; height: 25px; padding: 0 2px 0 14px; font-size: 13px; color: #7a6a58; }
+#camp .dlg .ovol input { accent-color: #a00000; }
+/* 개선판 전투 메뉴 「소리」 창 (volumeUi.ts soundWin) */
+.owin .b .snd { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; text-shadow: none; }
+.owin .snd .obtn.opt { position: relative; width: 100%; display: flex; justify-content: space-between; padding: 0 4px; text-align: left; cursor: pointer; }
+.owin .snd .obtn.opt b { font-weight: 400; color: #7a6a58; }
+.owin .snd .obtn.opt[aria-checked=true] b { color: #a00000; text-shadow: -1px 0 #ffb080; }
+.owin .snd .ovol { height: 25px; padding: 0 4px 0 16px; text-align: left; font-size: 13px; color: #7a6a58; }
+.owin .snd .ovol input { accent-color: #a00000; }
+html.ui-modern .owin .snd .obtn.opt[aria-checked=true] b { color: var(--ec-green); text-shadow: none; }
+html.ui-modern .owin .snd .ovol { color: var(--ec-text-2); }
+html.ui-modern .owin .snd .ovol input { accent-color: var(--ec-green); }
+/* 정비 화면 「음악」 창 ✕ (camp.ts withVolume): #camp button 의 all: unset 을 되돌린다 */
+#camp .dlg .oclose { position: absolute; left: auto; right: 2px; top: 1px; width: 24px; height: 24px; cursor: pointer; }
+#camp .dlg .obtn.on { color: #a00000; text-shadow: -1px 0 #ffb080; }   /* 「음악」 창의 지금 상태 쪽 */

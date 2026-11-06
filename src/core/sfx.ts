@@ -2,7 +2,7 @@
 // 버퍼가 하나라 새 소리가 앞 소리를 끊는다 — 웹도 한 번에 하나. 설정 sound (원작 시스템 창 '음향' +0x1cb4) 가 꺼져 있으면 내지 않는다.
 // 자원: export_web.py sfx → sfx/e1 (ECLIPSE1.FVT), sfx/e2 (ECLIPSE2.FVT, 마법 id 별), sfx/ani (ECPANI.FVT, 컷신·전직)
 import { A } from './data'
-import { setSetting, setting } from './settings'
+import { onVolume, setSetting, setting, volumeGain } from './settings'
 
 export type Bank = 'e1' | 'e2' | 'ani'
 /** ECLIPSE1.FVT 고정 번호. 0~110 은 유닛 초상 번호별 공격·시전음 */
@@ -17,7 +17,7 @@ const bufs = new Map<string, Promise<AudioBuffer | null>>()
 /** 효과음·배경음악 (music.ts) 이 같이 쓰는 AudioContext */
 export function audio() {
   if (!ctx) {
-    try { ctx = new AudioContext(); out = ctx.createGain(); out.gain.value = VOLUME; out.connect(ctx.destination) } catch { return null }
+    try { ctx = new AudioContext(); out = ctx.createGain(); out.gain.value = VOLUME * volumeGain('sound'); out.connect(ctx.destination) } catch { return null }
   }
   return ctx
 }
@@ -27,8 +27,7 @@ export function audio() {
  *  audioSession 'playback' = iOS 무음 스위치를 켜 둬도 소리를 낸다 (Safari 17+, 없으면 무시) */
 let unlocked = false
 export function unlock() {
-  if (!setting('sound') && !setting('music')) return
-  const c = audio()
+  const c = audio()   // 둘 다 꺼 두어도 푼다 (개선판 음악은 꺼도 소리만 0 으로 흐르고, 나중에 켜면 바로 들려야 한다)
   if (!c || unlocked && c.state === 'running') return
   unlocked = true
   try { (navigator as Navigator & { audioSession?: { type: string } }).audioSession!.type = 'playback' } catch { /* 지원 안 함 */ }
@@ -85,6 +84,11 @@ export function play(bank: Bank, n: number) {
     cur = s
   })
 }
+
+onVolume('sound', g => { if (out) out.gain.value = VOLUME * g })
+
+/** 설정 화면에서 효과음 크기를 바꾸면 들려 주는 소리 */
+export const sample = () => play('e1', SFX.gotItem)
 
 export function stop() {
   try { cur?.stop() } catch { /* 이미 끝남 */ }

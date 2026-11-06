@@ -98,6 +98,7 @@ export function bindInput() {
 
   addEventListener('keydown', e => {
     if (!S.map || dialogueOpen() || document.querySelector('#camp, #titlescreen:not([hidden]), #worldmap')) return
+    if (e.target instanceof HTMLInputElement && e.key !== 'Escape') return   // 「소리」 창 음량: 방향키로 값을 바꾼다
     const k = e.key.toLowerCase()
     const pan = 48 / S.cam.scale
     if (k === 'escape') goBack()

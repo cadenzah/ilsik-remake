@@ -12,6 +12,7 @@ import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
 import { SFX, play } from './sfx'
+import { VOLUME_KINDS, volumeRow } from './volumeUi'
 import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 import { esc } from './ui'
 import { equippedStats, type Stats } from './unit'
@@ -372,6 +373,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       const o = SETTINGS[Number(b.dataset.n)]
       b.onclick = () => { setSetting(o.k, !setting(o.k)); if (o.k === 'bitmapFont') applyFont(); openSettings(Number(b.dataset.n)) }
     })
+    for (const k of VOLUME_KINDS) box.querySelector(`button[data-n="${SETTINGS.findIndex(o => o.k === k)}"]`)!.after(volumeRow(k, 'mc-vol'))
     dlg.insertBefore(box, dlg.querySelector('.mc-btns'))
     box.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
   }
@@ -384,7 +386,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     const a = document.activeElement as HTMLElement | null
     if (modal) {
       if (e.key === 'Escape') { e.preventDefault(); dismissModal() }
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(a instanceof HTMLInputElement)) {   // 음량 슬라이더는 좌우로 값을 바꾼다
         const bs = [...modal.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')], i = bs.indexOf(a as HTMLButtonElement)
         bs[(i + (e.key === 'ArrowRight' ? 1 : -1) + bs.length) % bs.length]?.focus(); e.preventDefault()
       }

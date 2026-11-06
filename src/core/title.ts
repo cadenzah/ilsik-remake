@@ -13,7 +13,8 @@ import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
 import { applyFont } from './font'
 import { SONG, playMusic, stopMusic } from './music'
-import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, type Difficulty } from './settings'
+import { VOLUME_KINDS, volumeRow } from './volumeUi'
+import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, volumeGain, type Difficulty } from './settings'
 import { stageDef, type StageDef } from './stage'
 
 export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
@@ -32,7 +33,7 @@ const THUNDER_VOLUME = 0.5
 // 메인 메뉴에서 이만큼 입력이 없으면 오프닝을 다시 튼다 (원작에는 없는 웹 추가 기능)
 const IDLE_MS = 60_000
 const IDLE_INPUTS = ['pointerdown', 'pointermove', 'keydown', 'wheel']
-const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
+const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME * volumeGain('sound'); return a }
 
 /** 브라우저가 소리 자동 재생을 막는 상태인가. 사용자 입력 전 페이지는 대개 막힌다 (AudioContext 가 suspended 로 시작) */
 function autoplayBlocked() {
@@ -170,7 +171,9 @@ export function showTitle(): Promise<Launch> {
         { label: `난이도 · ${DIFFICULTIES[difficulty()]}`, cls: 'opt', title: DIFF_DESC, on: () => { nextDifficulty(); settings(SETTINGS.length) } },
         { label: '기록 옮기기', on: () => void openTransfer() },
         { label: '돌아가기', cls: 'back', on: menu }])
-      body.querySelectorAll<HTMLButtonElement>('button')[focus]?.focus()
+      const bs = body.querySelectorAll<HTMLButtonElement>('button')
+      for (const k of VOLUME_KINDS) bs[SETTINGS.findIndex(o => o.k === k)].after(volumeRow(k, 'row opt vol'))
+      bs[focus]?.focus()
     }
 
     // 지난흔적: 자동 기록 (장을 마칠 때마다) + 정비 화면 기록 3칸 (원작 「불러오기」)
@@ -314,8 +317,8 @@ export function showTitle(): Promise<Launch> {
         return
       }
       if (win.hidden) return
-      const bs = [...body.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
-      const i = bs.indexOf(document.activeElement as HTMLButtonElement)
+      const bs = [...body.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')]   // input = 설정의 음량 (좌우로 바꾼다)
+      const i = bs.indexOf(document.activeElement as HTMLElement)
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
         bs[(i + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length]?.focus()

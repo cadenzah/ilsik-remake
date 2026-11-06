@@ -1,6 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
+import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
@@ -9,8 +10,8 @@ import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, str
 import { campScreen, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
 import { clearCut } from './cutscene'
-import { SFX, play, preload, setSoundOn, soundMs } from './sfx'
-import { SONG, playMusic, setMusicOn, stageSong, stopMusic } from './music'
+import { SFX, play, preload, soundMs } from './sfx'
+import { SONG, playMusic, stageSong, stopMusic } from './music'
 import { endingMovie } from './movie'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
@@ -881,12 +882,16 @@ function toCamp() {
 
 /** 시스템 창. 원작: 알림·표기·음악·음향·조건·종료. 개선판: 목표·규칙·위험 범위·지도·표기·턴 종료·정비 화면·타이틀로 */
 function systemMenu(at?: { x: number; y: number }, from?: Unit) {
-  const onOff = (title: string, set?: (on: boolean) => void) => () =>
-    openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['열기', () => set?.(true)], ['닫기', () => set?.(false)]], onBack: () => closeWin('sub') })
+  // 원작 [열기][닫기] (0aa2:0c58 모드 1) = 켜기·끄기 (開/關 를 글자대로 옮긴 번역으로 보고 고침). 지금 상태 쪽 버튼을 붉게, 닫기는 제목 ✕·Esc
+  const onOff = (title: string, cur: () => boolean, set: (on: boolean) => void) => () => {
+    const el = openWin({ title, dir: 'row', btnW: 54, kind: 'sub', at: 'center', buttons: [['켜기', () => set(true)], ['끄기', () => set(false)]], onBack: () => closeWin('sub') })
+    el.querySelectorAll('.obtn').forEach((b, i) => b.classList.toggle('on', cur() === (i === 0)))
+  }
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin()],
     ['규칙', () => rulesWin()],
     ['기록', () => logWin()],
+    ['소리', () => soundWin()],
     [`위험 ${S.threat ? '끄기' : '켜기'}`, toggleThreat],
     [`지도 ${minimapOn() ? '끄기' : '켜기'}`, toggleMinimap],
     [`표기 ${S.marks ? '끄기' : '켜기'}`, () => { S.marks = !S.marks }],
@@ -896,10 +901,10 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
     ['중단', () => confirmWin('중단', 'center', suspend, () => {}, '지금 상태를 저장하고 타이틀로 갑니다.', 200), { disabled: !stepDone || S.mode.kind === 'busy' }],
     ['타이틀로', () => confirmWin('주화면', 'center', toTitle)],
   ] : [
-    ['알림', onOff('알림전환', on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
+    ['알림', onOff('알림전환', () => S.notice, on => { S.notice = on })],   // 공격·마법 확인창 켜기/끄기 (20ec:e911 → +0x1e6e, DOSBox 확인)
     ['표기', () => { S.marks = !S.marks; closeWin('system') }],
-    ['음악', onOff('음악전환', setMusicOn)],   // 원작 +0x1cb3: 닫기 = 멈춤, 열기 = 그 곡 처음부터 (20ec:e969)
-    ['음향', onOff('음향전환', setSoundOn)],   // 원작 +0x1cb4 (효과음 전부). 웹은 설정 sound 로 기억
+    ['음악', () => onOffVolumeWin('music', '음악전환')],   // 원작 +0x1cb3: 닫기 = 멈춤, 열기 = 그 곡 처음부터 (20ec:e969). 웹은 켜기·끄기, 소리만 끄고 켠다 (곡은 계속)
+    ['음향', () => onOffVolumeWin('sound', '음향전환')],   // 원작 +0x1cb4 (효과음 전부). 웹은 설정 sound 로 기억
     ['조건', () => showGoalsWin()],
     ['종료', () => confirmWin('대기화면', 'center', toCamp)],
   ]

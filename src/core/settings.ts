@@ -66,3 +66,24 @@ export const SETTINGS: { k: Setting; label: string; desc: string }[] = [   // de
   { k: 'shortAnim', label: '전투 연출 짧게', desc: '' },
   { k: 'quickAttack', label: '공격 확인 생략', desc: '대상을 누르면 바로 공격' },
 ]
+
+// ---------- 음량 (배경음악·효과음, 웹 추가). 0~100, 10 단위, 기본 100 = 예전 크기. 원작판도 따른다 ----------
+// 소리 크기는 (값/100)² 로 곱한다 (사람 귀에 고르게 들리도록). 설정 화면에서 켬/끔 스위치 바로 아래 줄
+export type VolumeKind = 'music' | 'sound'
+const VOL_KEYS: Record<VolumeKind, string> = { music: 'eclipse.musicVolume', sound: 'eclipse.soundVolume' }
+const volMem = new Map<VolumeKind, number>()
+const volWatchers = new Map<VolumeKind, (gain: number) => void>()
+export function volume(k: VolumeKind): number {
+  try { const v = Number(localStorage.getItem(VOL_KEYS[k]) ?? NaN); if (v >= 0 && v <= 100) return Math.round(v / 10) * 10 } catch { /* 저장 불가 */ }
+  return volMem.get(k) ?? 100
+}
+/** 소리에 곱할 값 (0~1) */
+export const volumeGain = (k: VolumeKind) => (volume(k) / 100) ** 2
+export function setVolume(k: VolumeKind, v: number) {
+  v = Math.max(0, Math.min(100, Math.round(v / 10) * 10))
+  volMem.set(k, v)
+  try { localStorage.setItem(VOL_KEYS[k], String(v)) } catch { /* 저장 불가 */ }
+  volWatchers.get(k)?.(volumeGain(k))
+}
+/** 음량이 바뀌면 부른다 (재생 중인 소리에도 바로) */
+export const onVolume = (k: VolumeKind, fn: (gain: number) => void) => { volWatchers.set(k, fn) }

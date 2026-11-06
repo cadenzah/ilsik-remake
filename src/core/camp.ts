@@ -16,7 +16,8 @@ import { equippedStats } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
 import { SFX, play } from './sfx'
-import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
+import { VOLUME_KINDS, markOnOff, volumeRow } from './volumeUi'
+import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting, type VolumeKind } from './settings'
 
 /** battle: 출전 목록과 정비 화면에서 바꾼 소지품·일행 장비 (일행 인덱스 순) */
 export type CampResult = { go: 'battle'; deploy: number[]; items: number[]; equip: UnitType['equip'][]; temple?: boolean } | { go: 'title' } | { go: 'load'; slot: number }
@@ -351,6 +352,27 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     dialog.querySelector<HTMLButtonElement>('.ok')!.focus()
   }
 
+  /** 「음악」 확인창 웹 보탬: 창을 29 늘려 제목 아래 음량 한 줄 (꺼 둔 동안에도 바꿀 수 있다) + 지금 상태 쪽 버튼을 붉게 + 제목 ✕ (= Esc·오른쪽 클릭, 고르지 않고 닫기) */
+  const withVolume = () => {
+    if (!dialog) return
+    markOnOff(dialog, musicOn())
+    const x = document.createElement('button')
+    x.className = 'oclose'
+    x.innerHTML = '<i></i>'
+    x.setAttribute('aria-label', '닫기')
+    x.tabIndex = -1
+    x.onclick = () => { dialog?.remove(); dialog = null }
+    dialog.append(x)
+    dialog.classList.add('hasx')
+    const h = 66 + 29
+    dialog.style.height = `${h}px`
+    dialog.style.backgroundImage = `url(${winUrl('comma', 136, h)})`
+    dialog.querySelectorAll<HTMLElement>('.obtn').forEach(b => { b.style.top = `${32 + 29}px` })
+    const v = volumeRow('music', 'ovol', true)
+    v.style.cssText = px(6, 32, 124) + ';padding:0 2px;gap:6px'
+    dialog.append(v)
+  }
+
   /** 「탐험계속?」 (원작 0aa2:12f2 모드 4 → 0aa2:0c58): ECPLEV "level" 창 (172,100) 185×110, 안쪽 (0,8) 에 ECLIPSE.OTH 5 (양피지 지도 68×78, 0aa2:1369),
    *  (70, 0·20·…·80) 에 글 다섯 조각 (웹은 줄 간격 17 — 20 이면 아래 테두리에 걸림), 효과음 110, 이어서 확인창 「선택하세요」 (245,238) [결정][취소]. 오른쪽 클릭·Esc = 취소 */
   const templeWin = (answer: (go: boolean) => void) => {
@@ -382,16 +404,24 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
   }
 
   /** 개선판 「설정」 창 (원작 창틀·글자 버튼, slotWin 과 같은 모양): 항목마다 켬/끔, 올리면 도구설명 칸에 설명. 닫기 (현대식 설정 창과 같은 이름)·Esc·오른쪽 클릭 = 닫기 */
-  const settingsWin = (onClose: () => void, focus = 0) => {
-    const w = 184, bw = 160, n = SETTINGS.length + 1, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9   // + 난이도
+  const settingsWin = (onClose: () => void, focus = 0) => {   // focus = SETTINGS 번호, SETTINGS.length = 난이도
+    // 줄: 설정 스위치 (배경음악·효과음 아래엔 음량) → 난이도 → 닫기
+    const lines: (number | VolumeKind)[] = SETTINGS.flatMap((s, i) => VOLUME_KINDS.includes(s.k as VolumeKind) ? [i, s.k as VolumeKind] : [i])
+    const w = 184, bw = 160, n = lines.length + 1, h = 25 + 5 + (n + 1) * 29 - 4 + 5 + 9   // + 난이도
+    const at = (j: number) => px((w - bw) / 2, 30 + j * 29, bw)
     dialog?.remove()
     dialog = document.createElement('div')
     dialog.className = 'dlg owin slots opts'
-    dialog.style.cssText = px((640 - w) / 2, 110, w, h) + `;background-image:url(${winUrl('comma', w, h)})`
-    dialog.innerHTML = `<div class="t">설 정</div>` + SETTINGS.map((s, i) =>
-      `<button class="obtn sl opt" data-i="${i}" role="switch" aria-checked="${setting(s.k)}" style="${px((w - bw) / 2, 30 + i * 29, bw)}">${esc(s.label)}<b>${setting(s.k) ? '켬' : '끔'}</b></button>`).join('')
-      + `<button class="obtn sl opt diff" style="${px((w - bw) / 2, 30 + (n - 1) * 29, bw)}">난이도<b>${DIFFICULTIES[difficulty()]}</b></button>`
-      + `<button class="obtn no" style="${px((w - bw) / 2, 30 + n * 29, bw)}">닫기</button>`
+    dialog.style.cssText = px((640 - w) / 2, Math.max(8, Math.min(110, (480 - h) / 2)), w, h) + `;background-image:url(${winUrl('comma', w, h)})`
+    dialog.innerHTML = `<div class="t">설 정</div>` + lines.map((l, j) => typeof l !== 'number' ? `<i data-vol="${l}" data-j="${j}"></i>` :
+      `<button class="obtn sl opt" data-i="${l}" role="switch" aria-checked="${setting(SETTINGS[l].k)}" style="${at(j)}">${esc(SETTINGS[l].label)}<b>${setting(SETTINGS[l].k) ? '켬' : '끔'}</b></button>`).join('')
+      + `<button class="obtn sl opt diff" style="${at(n - 1)}">난이도<b>${DIFFICULTIES[difficulty()]}</b></button>`
+      + `<button class="obtn no" style="${at(n)}">닫기</button>`
+    dialog.querySelectorAll<HTMLElement>('[data-vol]').forEach(m => {
+      const v = volumeRow(m.dataset.vol as VolumeKind, 'ovol')
+      v.style.cssText = at(Number(m.dataset.j))
+      m.replaceWith(v)
+    })
     stage.append(dialog)
     dialog.querySelectorAll<HTMLButtonElement>('.opt[data-i]').forEach(b => {
       const s = SETTINGS[Number(b.dataset.i)]
@@ -399,10 +429,10 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       b.onmouseenter = b.onfocus = () => say(s.desc)
     })
     const diff = dialog.querySelector<HTMLButtonElement>('.diff')!
-    diff.onclick = () => { nextDifficulty(); settingsWin(onClose, n - 1) }
+    diff.onclick = () => { nextDifficulty(); settingsWin(onClose, SETTINGS.length) }
     diff.onmouseenter = diff.onfocus = () => say(DIFF_DESC)
     dialog.querySelector<HTMLButtonElement>('.no')!.onclick = () => { dialog?.remove(); dialog = null; onClose() }
-    dialog.querySelectorAll<HTMLButtonElement>('.obtn')[focus]?.focus()
+    dialog.querySelector<HTMLButtonElement>(focus < SETTINGS.length ? `.opt[data-i="${focus}"]` : '.diff')?.focus()
   }
 
   return new Promise(done => {
@@ -433,9 +463,8 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
         o.slots?.save(i, [...items], party.map(t => t.equip))
         say('기록했습니다.')
       })),
-      // 원작 124e:9267: 「음악」 (500,120) [열기][닫기] → 지금과 다를 때만 켜고 끔. 개선판은 누를 때마다 바꾸고 알림
-      music: () => o.remake ? (setMusicOn(!musicOn()), say(musicOn() ? '음악을 켰습니다.' : '음악을 껐습니다.'))
-        : confirm('음악', 120, () => { if (!musicOn()) setMusicOn(true) }, 500, () => { if (musicOn()) setMusicOn(false) }, ['열기', '닫기'], true),
+      // 원작 124e:9267: 「음악」 (500,120) [열기][닫기] → 지금과 다를 때만 켜고 끔. 웹은 두 판 모두 [켜기][끄기] + 음량 + ✕ (withVolume)
+      music: () => { confirm('음악', 120, () => { if (!musicOn()) setMusicOn(true) }, 500, () => { if (musicOn()) setMusicOn(false) }, ['켜기', '끄기'], true); withVolume() },
       quit: () => confirm('주화면', 155, () => finish({ go: 'title' })),
       settings: () => {
         const modern0 = setting('modernUi')
