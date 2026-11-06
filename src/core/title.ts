@@ -1,11 +1,12 @@
 // 타이틀·메인 메뉴 — 원작 124e:e404 재현 (formats.md "메인 메뉴")
-// 원작: 돌판 로고(ECPMARK 0)가 세 번 번쩍(세 번째에 천둥) → 밝아져 4초 → 어두워지고 두루마리 노인(ECPMARK 1) 위
+// 원작: 켜면 창세 프롤로그 (2ff8:04dc, movie.ts) → 돌판 로고(ECPMARK 0)가 세 번 번쩍(세 번째에 천둥) → 밝아져 4초 → 어두워지고 두루마리 노인(ECPMARK 1) 위
 // (460,0) 돌 창틀에 유랑천하·지난흔적·게임종료. 게임종료는 제작진·발행 화면(ECPPLANE)을 보여 주고 끝난다.
 // 웹: 버튼은 글자 (원작 버튼 그림은 저해상도라 쓰지 않음). 게임종료 자리에 제작진(팬 게임 고지 포함)·판 선택. 개선판만 장 지도·도감·설정 (글꼴·화면·편의·기록 옮기기).
 // 화면은 640×480 을 통째로 확대
 import type { Camp } from './campaign'
 import { A } from './data'
-import { fadeOut } from './fade'
+import { fadeIn, fadeOut } from './fade'
+import { prologue } from './movie'
 import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
   setLastEdition, startOtherRoad, undoImport, type EditionId, type Progress, type SaveBundle, type SaveSlot, type Suspended } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
@@ -15,7 +16,7 @@ import { SONG, playMusic, stopMusic } from './music'
 import { DIFFICULTIES, DIFF_TITLE, SETTINGS, difficulty, lowestDifficulty, nextDifficulty, setDifficulty, setSetting, setting, type Difficulty } from './settings'
 import { stageDef, type StageDef } from './stage'
 
-export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended; prologue?: boolean }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투, prologue = 새 게임 (창세 프롤로그부터)
+export interface Launch { ed: EditionId; def: StageDef; camp?: Camp; resume?: Suspended }  // camp 없음 = 캠페인 밖 기본 상태, resume = 중단한 전투
 
 const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
   { id: 'original', name: '원작판', desc: '원작 규칙·조작 그대로' },
@@ -24,10 +25,13 @@ const EDITIONS: { id: EditionId; name: string; desc: string }[] = [
 const ROUTE = ['A', 'B', 'C']
 const chapterName = (n: number, route: number) => stageDef(n, route).title + (n >= 10 ? ` (${ROUTE[route]} 길)` : '')
 
-// 로고 연출은 페이지를 열 때마다. 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
+// 창세 프롤로그·로고 연출은 페이지를 열 때마다 (원작은 프로그램을 켤 때). 게임 중 "타이틀로" 로 돌아올 때만 한 번 건너뛴다 (battle.toTitle 이 남김)
 export const SKIP_INTRO = 'eclipse.skipIntro'
 // 로고 효과음 (천둥, 설정 logoSound): 켜면 원본 음량의 1/2
 const THUNDER_VOLUME = 0.5
+// 메인 메뉴에서 이만큼 입력이 없으면 오프닝을 다시 튼다 (원작에는 없는 웹 추가 기능)
+const IDLE_MS = 60_000
+const IDLE_INPUTS = ['pointerdown', 'pointermove', 'keydown', 'wheel']
 const thunderAudio = () => { const a = new Audio(`${A}/ui/thunder.wav`); a.volume = THUNDER_VOLUME; return a }
 
 /** 브라우저가 소리 자동 재생을 막는 상태인가. 사용자 입력 전 페이지는 대개 막힌다 (AudioContext 가 suspended 로 시작) */
@@ -36,7 +40,7 @@ function autoplayBlocked() {
   try { const c = new AudioContext(), blocked = c.state !== 'running'; void c.close(); return blocked } catch { return false }
 }
 
-/** 클릭·키 입력을 기다린다 (소리를 켰는데 자동 재생이 막혔을 때 로고 연출 전에) */
+/** 클릭·키 입력을 기다린다 (소리를 켰는데 자동 재생이 막혔을 때 프롤로그·로고 연출 전에) */
 function waitGesture(stage: HTMLElement) {
   return new Promise<void>(ok => {
     const g = document.createElement('div')
@@ -84,14 +88,16 @@ export function showTitle(): Promise<Launch> {
   let ed = lastEdition()
 
   return new Promise(done => {
-    const launch = (def: StageDef, camp?: Camp, resume?: Suspended, prologue = false) => {
+    const launch = (def: StageDef, camp?: Camp, resume?: Suspended) => {
       setLastEdition(ed)
       removeEventListener('resize', fit)
       removeEventListener('keydown', onKey)
+      clearTimeout(idleTimer)
+      for (const t of IDLE_INPUTS) removeEventListener(t, armIdle, true)
       void fadeOut().then(() => {   // 원작처럼 어두워진 뒤 다음 화면 (boot·정비 화면이 밝힌다)
         root.hidden = true
         root.innerHTML = ''
-        done({ ed, def, camp, resume, prologue })
+        done({ ed, def, camp, resume })
       })
     }
 
@@ -129,7 +135,7 @@ export function showTitle(): Promise<Launch> {
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
       win.classList.remove('wide')
       rows([
-        { label: '유랑천하', title: '새로 시작', on: () => ed === 'remake' ? pickDifficulty() : newGame() },   // 원작 2ff8:04dc: 새 게임은 창세 프롤로그부터
+        { label: '유랑천하', title: '새로 시작', on: () => ed === 'remake' ? pickDifficulty() : newGame() },
         { label: '지난흔적', title: '이어하기·기록 불러오기·기록 옮기기', on: () => loadMenu() },
         ...ed === 'remake' ? [   // 개선판: 장 지도·다른 길로·도감 (replay-design.md)
           { label: '장 지도', on: p?.cleared.length ? () => void openMap() : undefined, title: p?.cleared.length ? '가 본 장과 찾은 사건, 다시 하기' : '클리어한 장이 없음' },
@@ -144,7 +150,7 @@ export function showTitle(): Promise<Launch> {
       body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
     }
 
-    const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }, undefined, true) }
+    const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) }
     // 개선판 새로 시작: 난이도부터 (설정에서 언제든 바꿀 수 있다)
     const DIFF_SUB = ['적이 주는 피해가 적다', '원작판 수준', '적이 주는 피해가 크다']
     const pickDifficulty = () => {
@@ -326,12 +332,45 @@ export function showTitle(): Promise<Launch> {
       stage.classList.remove('dark')
     }
 
+    // 대기 화면: 메인 메뉴 첫 화면 (하위 창·제작진·장 지도 제외) 에서 입력이 없으면 프롤로그 → 로고 → 메뉴. 다시 대기하면 또 튼다.
+    // 프롤로그 중 누르면 로고 없이 바로 메뉴로. 숨은 탭에서는 틀지 않는다 (받을 것이 크다)
+    let idleTimer = 0, attracting = false
+    const armIdle = () => {
+      clearTimeout(idleTimer)
+      if (!attracting) idleTimer = window.setTimeout(() => void attract(), IDLE_MS)
+    }
+    const attract = async () => {
+      if (document.hidden || win.hidden || win.classList.contains('wide') || pageAt !== -1) { armIdle(); return }
+      attracting = true
+      win.inert = true   // 어두워지는 동안 초점 단추에 키가 들어가지 않게
+      await fadeOut()
+      win.hidden = true
+      const skipped = await prologue()
+      stage.classList.add('cut', 'dark')
+      await fadeIn(0)
+      if (skipped) { void stage.offsetWidth; stage.classList.remove('cut') }
+      else await intro(stage, bg)
+      win.inert = false
+      attracting = false
+      showMenu()
+      armIdle()
+    }
+    for (const t of IDLE_INPUTS) addEventListener(t, armIdle, true)   // 캡처: 프롤로그가 입력을 막아도 먼저 받는다 (재생 중이면 attracting 이 거른다)
+
     void (async () => {
       let skip = false
       try { skip = sessionStorage.getItem(SKIP_INTRO) === '1'; sessionStorage.removeItem(SKIP_INTRO) } catch { /* 무시 */ }
-      if (!skip) await intro(stage, bg)
+      if (!skip) {
+        // 소리를 켰는데 자동 재생이 막혔으면 맨 앞에서 입력을 받는다 (막힌 채 재생하면 천둥이 소리 없이 지나간다)
+        if (setting('logoSound') && autoplayBlocked()) await waitGesture(stage)
+        await prologue()   // 어둡게 끝난다 → 로고가 어두운 데서 시작하도록 무대를 먼저 가리고 막을 걷는다
+        stage.classList.add('cut', 'dark')
+        await fadeIn(0)
+        await intro(stage, bg)
+      }
       else { stage.classList.add('cut', 'dark'); void stage.offsetWidth; stage.classList.remove('cut') }   // 타이틀로 돌아올 때도 밝아지며
       showMenu()
+      armIdle()
     })()
   })
 }
@@ -339,7 +378,6 @@ export function showTitle(): Promise<Launch> {
 /** 로고 연출. 클릭·키를 누르면 바로 끝낸다 */
 async function intro(stage: HTMLElement, bg: HTMLImageElement) {
   const thunder = setting('logoSound') ? thunderAudio() : null
-  if (thunder && autoplayBlocked()) await waitGesture(stage)   // 막힌 채 재생하면 소리 없이 지나간다
   let skip = false, skipNow = () => {}
   const skipped = new Promise<void>(ok => { skipNow = ok })
   const onSkip = () => { skip = true; skipNow() }

@@ -1,4 +1,4 @@
-// 창세 프롤로그 (원작 0aa2:37f5, 새 게임 시작 2ff8:04dc) 와 엔딩 (0aa2:3982, 43장 뒤 2ff8:39f4) — formats.md "프롤로그·엔딩".
+// 창세 프롤로그 (원작 0aa2:37f5, 프로그램을 켤 때 메뉴 앞 2ff8:04dc — 웹은 title.ts 가 페이지를 열 때) 와 엔딩 (0aa2:3982, 43장 뒤 2ff8:39f4) — formats.md "프롤로그·엔딩".
 // 화면 전체 640×480 을 창에 맞춰 키운다 (promote.ts 와 같은 방식). 묶음 풀기·흰 막은 cutscene.ts. 자원 movie/ (export_web.py movies)
 import { A } from './data'
 import { PAL_MS, apply, biosMs, dropClip, dropWhite, loadClip, palette, type Clip } from './cutscene'
@@ -58,9 +58,13 @@ function napper() {
 }
 
 /** 창세 프롤로그: ECPTIT.FAT 10묶음을 차례로, 프레임 0..N (고리 프레임까지 — 다음 묶음의 조각난 첫 화면으로 이어진다).
- *  프레임 타이머 = 21번째 앞까지 70ms (조각이 모이는 부분), 그 뒤 150ms (자막이 한 글자씩). 키 하나 (kbhit) 면 통째로 건너뜀 → 검게.
+ *  원작 프레임 타이머 = 21번째 앞까지 70ms (조각이 모이는 부분), 그 뒤 150ms (자막이 한 글자씩). 키 하나 (kbhit) 면 통째로 건너뜀 → 검게.
+ *  웹은 조각 모임·장면 사이를 원작 타이머보다 늘린다 (아래 상수). 원작은 큰 그림을 그리는 시간이 더 걸리는데 웹은 그 시간이 없어 지나치게 빨리 지나간다.
  *  화면이 어두운 상태에서 불러 어둡게 끝낸다 */
+const PROLOGUE_MOSAIC_MS = 90   // 조각이 모이는 프레임 하나 (타이머 그대로면 biosMs(70) = 27.5ms, 묶음당 0.6초)
+const PROLOGUE_HOLD_MS = 2000   // 자막까지 다 나온 장면을 다음 장면 전에 보여 주는 시간
 export async function prologue() {
+  if (typeof DecompressionStream === 'undefined') return false   // 묶음이 gzip 이라 못 푸는 옛 브라우저: 받지 않고 넘어간다
   stopMusic()   // 0aa2:392a
   const st = stage(), z = napper()
   let skip = false
@@ -77,13 +81,15 @@ export async function prologue() {
     st.clear()   // 48e1:130a
     const p = player(st.g, c, 0, 0)
     for (let f = 0; f <= c.frames.length && !skip; f++) {
-      const t = performance.now() + biosMs(f < 0x15 ? 0x46 : 0x96)
+      const t = performance.now() + (f < 0x15 ? PROLOGUE_MOSAIC_MS : biosMs(0x96))
       p.show(f)
       await z.nap(t - performance.now())
+      if (f === p.last && !skip) await z.nap(PROLOGUE_HOLD_MS)   // 다음이 고리 프레임 (다시 조각남)
     }
   }
   await fadeOut(PAL_MS)
   st.close()
+  return skip   // 건너뛰었는가
 }
 
 /** 원작 엔딩 순서 (0aa2:3982). variant = 마지막 전투 일행에 채스 (초상 6) 가 있으면 +1, 소피아 (초상 28) 가 있으면 +2 (2ff8:39a7),

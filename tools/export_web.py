@@ -412,11 +412,14 @@ def export_cuts():
 def export_movies():
     """창세 프롤로그 (ECPTIT.FAT 10묶음 640×480) 와 엔딩 (ECLIPSE2.FAT 사바카 부활 504×384, ECLIPSE3.FAT 16묶음 640×480) 을 원본 묶음 바이트 그대로
     movie/tit/NN.bin · movie/e2.bin · movie/e3/NN.bin 으로. 웹 src/core/movie.ts 가 cutscene.ts 의 풀기로 그린다 (순서는 formats.md 「프롤로그·엔딩」)"""
-    import fat
+    import fat, gzip
     n = 0
     for src, dst in (('ECPTIT.FAT', 'tit'), ('ECLIPSE3.FAT', 'e3')):
         d = mkdir('movie', dst)
         for k, raw in fat.raw(open(os.path.join(ROOT, 'original', src), 'rb').read()):
+            # 프롤로그는 페이지를 열 때 받으므로 gzip (12.5MB → 5.5MB, cutscene.ts loadClip 이 머리 글자로 알아보고 푼다).
+            # 이름은 .bin 그대로: .gz 면 서버가 Content-Encoding 을 붙여 브라우저가 먼저 풀 수 있다. mtime=0 = 다시 내보내도 같은 바이트
+            if dst == 'tit': raw = gzip.compress(raw, 9, mtime=0)
             open(os.path.join(d, f'{k:02}.bin'), 'wb').write(raw); n += len(raw)
     for k, raw in fat.raw(open(os.path.join(ROOT, 'original', 'ECLIPSE2.FAT'), 'rb').read()):
         open(os.path.join(mkdir('movie'), 'e2.bin'), 'wb').write(raw); n += len(raw)

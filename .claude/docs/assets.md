@@ -25,7 +25,7 @@
 - `ECLIPSE1/2.SLI` 5 × 568×99 — 슬라이드/컷인 추정
 - `ECPFINAL.ECP` 28 × 62×64
 - `ECPMARK.MAR` 2 × 640×480 — 0 = 타이틀 돌판 로고 「日蝕 Eclipse」+ 발행 문구, 1 = 두루마리 읽는 노인 (확인)
-- `ECPTIT.FAT` 12MB — 원작 타이틀 애니메이션 추정 (FAT 형식 미분석)
+- `ECPTIT.FAT` 12MB — 창세 프롤로그 10묶음, 프로그램을 켤 때 메뉴 앞 (formats.md "프롤로그·엔딩"). FLC 프레임 변화 묶음, 12.54MB 중 조각 모임 19프레임×10 = 12.18MB, 웹 자원은 gzip 5.47MB
 
 ## 웹 자원 (`tools/export_web.py` → public/assets/, gitignore)
 - `stages/NN.png` 타일 아틀라스 (11열, 56×48), `stages/NN.json` {w,h,tiles,layer2,layer3,atlasCols}
@@ -44,5 +44,5 @@
 - 데이터만 다시 만들기: `.venv/bin/python tools/export_web.py data`
 - 효과음: `sfx/e1` (ECLIPSE1.FVT 112) · `sfx/e2` (ECLIPSE2.FVT 74, 마법 id) · `sfx/ani` (ECPANI.FVT 15) — `export_web.py sfx`. 번호 뜻은 formats.md "효과음 호출부"
 - 배경음악: `music/NN.cmf` (ECLIPSE.FMT 50곡, CMF 그대로) — `export_web.py music`. 곡 번호 뜻은 formats.md "배경음악"
-- 프롤로그·엔딩: `movie/tit/NN.bin` (ECPTIT.FAT 10), `movie/e2.bin` (ECLIPSE2.FAT), `movie/e3/NN.bin` (ECLIPSE3.FAT 16) — 원본 묶음 바이트, `export_web.py movies`
+- 프롤로그·엔딩: `movie/tit/NN.bin` (ECPTIT.FAT 10, gzip, `loadClip` 이 풂), `movie/e2.bin` (ECLIPSE2.FAT), `movie/e3/NN.bin` (ECLIPSE3.FAT 16) — 원본 묶음 바이트, `export_web.py movies`
 - `FULLSOFT.FNT` — 한글 16×15 · 영문 8×15 비트맵 글꼴, KS 완성형 (formats.md). 웹 글꼴 `ui/eclipse-font.woff`, 설정 '원작 글꼴'

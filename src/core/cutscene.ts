@@ -74,11 +74,17 @@ export interface Clip { w: number; h: number; pal: Uint32Array; px: Uint8Array; 
 
 const clips = new Map<string, Promise<Clip | null>>()
 /** 묶음 하나 (path = assets 아래, 확장자 없이). 프롤로그·엔딩 (movie.ts) 도 쓴다 */
+/** gzip 으로 내보낸 묶음 (프롤로그, export_web.py movies) 이면 푼다. 묶음은 6비트 팔레트로 시작해 첫 바이트가 64 미만이라 0x8b 와 겹치지 않는다 */
+async function gunzip(b: ArrayBuffer): Promise<ArrayBuffer> {
+  const h = new Uint8Array(b, 0, 2)
+  if (h[0] !== 0x1f || h[1] !== 0x8b) return b
+  return new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+}
 export function loadClip(path: string) {
   let p = clips.get(path)
   if (!p) {
     p = fetch(`${A}/${path}.bin`).then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
-      .then(b => parse(new Uint8Array(b))).catch(() => null)
+      .then(gunzip).then(b => parse(new Uint8Array(b))).catch(() => null)
     clips.set(path, p)
   }
   return p
