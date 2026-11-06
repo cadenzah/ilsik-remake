@@ -380,9 +380,9 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   const got = [...item('무기 승급', r.weapon), ...item('방어구 승급', r.armor), ...offers,
     ...r.magic === undefined ? [] : [`<figure><i class="mg" style="background-position:-${r.magic * 32}px 0"></i><figcaption>마법 습득<br><span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span></figcaption></figure>`]]
   if (!lines.length && !got.length) return
-  const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '') + (offers.length ? '<div class="dim">나중에 받으려면 정비 화면에서</div>' : '')
+  const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '')
   if (got.length) play('e1', SFX.upgrade)   // 원작 알림 창 0aa2:12f2 모드 1~3 (승급·습득) = 110
-  await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + (offers.length ? 32 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
+  await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + (offers.length ? 16 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
 }
