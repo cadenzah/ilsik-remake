@@ -1,13 +1,14 @@
 // 캠페인: 장 사이에 이어지는 상태 (플래그·일행·소지품)와 원작 장면 재생 목록
 import { josa } from 'es-hangul'
 import type { PostStep, UnitType } from './data'
+import { nextUpgrade } from './unit'
 import { S } from './state'
 
 /** 장 사이 상태. 진행 저장(save.ts)에 그대로 들어간다 */
 export interface Camp { flags: string[]; party: number[]; items: number[]; equip?: Record<number, Equip>; grown?: Record<number, Grown> }
 type Equip = UnitType['equip']
 /** 레벨업으로 바뀐 일행 대원 값 (PAD 값 대신, 장비 보정 전). 없으면 PAD 그대로 */
-export type Grown = Pick<UnitType, 'lv' | 'exp' | 'hp' | 'atk' | 'def' | 'spi' | 'agi' | 'magic' | 'lag'>
+export type Grown = Pick<UnitType, 'lv' | 'exp' | 'hp' | 'atk' | 'def' | 'spi' | 'agi' | 'magic' | 'lag' | 'promo'>
 
 // 캠페인 플래그 (npc19 = 19장 용왕 생존 → 36장 루이스 출현·합류, black27 = 27장 흑기사 출현 → 27장 후 아보라한 합류·장면)
 export const FLAGS = new Set<string>()
@@ -22,9 +23,20 @@ export const partyType = (t: number): UnitType => {
   return { ...b, ...g, equip: [...EQUIP.get(t) ?? b.equip], magic: [...g?.magic ?? b.magic] }
 }
 
+/** 받지 않은 장비 승급 (개선판 B1 제안 36) 한 단계를 정비 화면에서 받는다. 받은 장비 Item id, 못 받으면 undefined (상한이면 남은 단계를 지운다) */
+export function takePromo(t: number, slot: 0 | 1): number | undefined {
+  const pt = partyType(t), p = pt.promo
+  if (!p?.[slot]) return undefined
+  const next = nextUpgrade(pt, slot, S.tables)
+  pt.promo = slot ? [p[0], next === undefined ? 0 : p[1] - 1] : [next === undefined ? 0 : p[0] - 1, p[1]]
+  if (next !== undefined) pt.equip[slot] = next
+  keepGrowth(pt)
+  return next
+}
+
 /** 전투 중 레벨업·경험치를 장 사이 상태에 옮긴다 (승급한 장비 포함) */
 export function keepGrowth(t: UnitType) {
-  GROWN.set(t.id, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic], ...t.lag ? { lag: [...t.lag] } : {} })
+  GROWN.set(t.id, { lv: t.lv, exp: t.exp, hp: t.hp, atk: t.atk, def: t.def, spi: t.spi, agi: t.agi, magic: [...t.magic], ...t.lag ? { lag: [...t.lag] } : {}, ...t.promo?.some(Boolean) ? { promo: [...t.promo] as UnitType['promo'] } : {} })
   if (t.equip.join() !== S.types[t.id].equip.join() || EQUIP.has(t.id)) EQUIP.set(t.id, [...t.equip])
 }
 

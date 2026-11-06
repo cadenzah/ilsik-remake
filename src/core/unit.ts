@@ -1,5 +1,5 @@
 // 유닛과 능력치 — 두 판 공통. 원작에서 확정된 부분만 둔다.
-import type { Item, UnitType } from './data'
+import type { Item, Tables, UnitType } from './data'
 
 export type Side = 'ally' | 'enemy'
 
@@ -59,4 +59,21 @@ export function equippedStats(t: UnitType, items: Map<number, Item>): Stats {
 /** 강화·약화를 반영한 현재 능력치로 맞춘다 */
 export function applyMods(u: Unit) {
   for (const k of ['atk', 'def', 'spi', 'agi'] as const) u[k] = Math.max(0, u.base[k] + u.mods[k])
+}
+
+/** 장비 승급으로 받을 다음 장비 Item id (원작 승급 표: 지금 장비 id + 1, 세부마다 상한 growth.cap). slot 0 무기 · 1 방어구, ahead = 그보다 먼저 받을 단계 수. 없으면 undefined */
+export function nextUpgrade(t: UnitType, slot: 0 | 1, tables: Tables, ahead = 0): number | undefined {
+  const it = tables.items.get(t.equip[slot])
+  if (!it || it.id + ahead >= (tables.growth.cap[it.sub] ?? 0)) return undefined
+  return it.id + ahead + 1
+}
+
+/** 장비가 바뀐 뒤 (승급) 유닛 능력치를 장비 차이만큼 고친다. before = 바꾸기 전 equippedStats. 사거리는 부르는 쪽이 */
+export function refit(u: Unit, before: Stats, items: Map<number, Item>) {
+  const after = equippedStats(u.type, items)
+  u.maxHp += after.maxHp - before.maxHp
+  u.hp = Math.max(1, u.hp + after.maxHp - before.maxHp)
+  for (const k of ['atk', 'def', 'spi', 'agi'] as const) u.base[k] += after[k] - before[k]
+  u.mov += after.mov - before.mov
+  applyMods(u)
 }

@@ -4,8 +4,8 @@
 // 웹과 다른 점 (근사): 정비 화면에서 장비를 갈아 끼우지 않는다 (레벨업 승급만), 숨은 장 없음, 대사·연출 없음, 진로는 --route
 import { loadBattles, loadDialogue, loadScenes, loadTables, type Battles, type Magic, type StageMap } from '../../src/core/data'
 import type { AiPlan, Edition } from '../../src/core/edition'
-import { EQUIP, GOLD, ITEMS, PARTY, finishStage, giveGold, nextStage, partyType, promoteDeployed, restore, snapshot, type Camp } from '../../src/core/campaign'
-import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
+import { EQUIP, GOLD, ITEMS, PARTY, finishStage, giveGold, nextStage, partyType, promoteDeployed, restore, snapshot, takePromo, type Camp } from '../../src/core/campaign'
+import { addExp, again, applyCounter, brace, counterDamage, takePromos, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable } from '../../src/core/grid'
 import { aimsFrom, inReach, strikeTargets } from '../../src/core/attack'
 import { aiCaster, spellsOf } from '../../src/core/magic'
@@ -276,6 +276,7 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
   else if (party && S.ed.features.autoRest && !attacked && !magic && !u.moved) { rest(u); t.allyRests++ }
   else tire(u, attacked, magic)
   if (party && u.hp > 0) for (const [i] of treasureAt(u)) takeTreasure(i)
+  for (const p of S.units) if (p.troop === 0 && p.hp > 0 && p.type.promo?.some(Boolean)) takePromos(p)   // 승급 고르기 (제안 36): 플레이어는 늘 바로 받는다 (원작과 같은 장비)
   S.floats.length = 0
   return judge().result
 }
@@ -361,6 +362,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
     if (o.book) equipBook()
     S.deploy = pickDeploy(max, o.pick)
     promoteDeployed(S.deploy)
+    for (const t of PARTY) for (const s of [0, 1] as const) while (takePromo(t, s) !== undefined) { /* 늦은 합류 맞춤 등 전투 밖 레벨업의 승급을 정비 화면에서 받는다 */ }
     if (o.tools) equipTools()
     const map = await (await fetch(`/assets/stages/${String(n).padStart(2, '0')}.json`)).json() as StageMap
     S.map = map

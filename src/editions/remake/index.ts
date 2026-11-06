@@ -33,7 +33,8 @@ const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
 const stance = { dmg: 1.3, tire: 2, def: 1.2, rest: 15 }
 // 포위·협공 (B1 제안 30): 대상 옆에 붙은 아군 1명마다 물리 피해 +10%, 최대 +30%. 일행·NPC 는 늘, 적은 어려움에서만 (applyDifficulty) — balance-proposal.md "30 협공"
 const flank = { per: 0.1, max: 0.3 }
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank }
+// 승급 고르기 (B1 제안 36): 레벨업 때 장비 승급을 바로 쓰지 않고 「승급 / 나중에」, 받지 않은 승급은 정비 화면에서 (core/campaign.ts takePromo)
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true }
 /** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
 export function applyDifficulty(d: number, hardFlank = true) {
   enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]

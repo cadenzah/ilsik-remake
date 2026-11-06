@@ -3,11 +3,11 @@ import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loa
 import { rulesWin } from './help'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
-import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, type Camp } from './campaign'
+import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, takePromo, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
 import { dist, key, pathTo, reachable, terrainName } from './grid'
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
-import { campScreen, icon, type CampResult } from './camp'
+import { campScreen, equipDiff, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
 import { clearCut } from './cutscene'
 import { SFX, play, preload, soundMs } from './sfx'
@@ -33,8 +33,8 @@ import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, setOutsideCloses, showMenu, showResult, type Btn } from './ui'
-import { applyMods, type Pos, type Unit } from './unit'
-import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
+import { applyMods, nextUpgrade, type Pos, type Unit } from './unit'
+import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takePromos, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
 import { SCHOOL_COLOR, SCHOOL_NAME, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
@@ -105,6 +105,7 @@ export async function boot(ed: Edition, def: StageDef, camp?: Partial<Camp> | nu
     for (;;) {   // restyle = 현대식 정비 화면 설정에서 화면 모양을 바꿈 → 같은 편성으로 다시
       r = await campScreen({ party: PARTY.map(partyType), items: [...ITEMS], tables, max, remake: !ed.features.originalCamp, initial, modern: ed.id === 'remake' && setting('modernUi'), header: { title: chapterTitle(), goal },
         temple: def.campaign && def.n === TEMPLE && !extra ? allMaps : undefined,
+        promote: ed.id === 'remake' ? (i, slot) => takePromo(PARTY[i], slot) : undefined,   // 승급 고르기 (B1 제안 36)
         preview: ed.id === 'remake' ? `${chapterTitle()}${goal ? `\n${goal}` : ''}` : undefined,
         slots: { list: () => loadSlots(ed.id).map(s => s?.title ?? null), save: (i, items, equip) => {
           const base = snapshot(), rec = { ...base.equip }
@@ -359,6 +360,13 @@ async function gainExp(a: Unit, hits: { target: Unit; value: number }[], m?: Mag
   if (r) await showLevelUp(a, r)
 }
 
+/** 레벨업 창의 받을 수 있는 승급 한 칸: 쌓인 단계를 모두 받았을 때의 장비와 능력치 차 */
+function offerFig(t: UnitType, slot: 0 | 1) {
+  const n = t.promo?.[slot] ?? 0, to = n ? nextUpgrade(t, slot, S.tables, n - 1) : undefined
+  if (to === undefined) return []
+  return [`<figure class="offer">${icon(to)}<figcaption>${slot ? '방어구' : '무기'} 승급${n > 1 ? ` ×${n}` : ''}<br><span class="blue">${esc(S.tables.items.get(to)?.name ?? '')}</span><br><small>${equipDiff(t, slot, to, S.tables.items) || '능력치 그대로'}</small></figcaption></figure>`]
+}
+
 /** 레벨업 연출: 머리 위 「Level Up」. 원작판은 승급·습득만 알림 (원작 0aa2:12f2), 개선판은 오른 능력치까지 */
 async function showLevelUp(u: Unit, r: LevelUp) {
   const { sx, sy } = toScreen(u.x, u.y)
@@ -368,14 +376,15 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   const lines = remake() ? [`${esc(u.type.name)} <span class="blue">Lv ${u.type.lv}</span>`, r.gains.map((g, i) => g ? `${STAT[i]} +${g}` : '').filter(Boolean).join(' ') || '능력치 그대로'] : []
   // 새로 얻은 것: 장비 = 정비 화면과 같은 EQU 그림, 마법 = 마법 아이콘 (MAR)
   const item = (label: string, id?: number) => id === undefined ? [] : [`<figure>${icon(id)}<figcaption>${label}<br><span class="blue">${esc(S.tables.items.get(id)?.name ?? '')}</span></figcaption></figure>`]
-  const got = [...item('무기 승급', r.weapon), ...item('방어구 승급', r.armor),
+  const offers = ([0, 1] as const).filter(s => r.offer?.[s]).flatMap(s => offerFig(u.type, s))   // 개선판 승급 고르기 (B1 제안 36)
+  const got = [...item('무기 승급', r.weapon), ...item('방어구 승급', r.armor), ...offers,
     ...r.magic === undefined ? [] : [`<figure><i class="mg" style="background-position:-${r.magic * 32}px 0"></i><figcaption>마법 습득<br><span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span></figcaption></figure>`]]
   if (!lines.length && !got.length) return
-  const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '')
+  const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '') + (offers.length ? '<div class="dim">나중에 받으려면 정비 화면에서</div>' : '')
   if (got.length) play('e1', SFX.upgrade)   // 원작 알림 창 0aa2:12f2 모드 1~3 (승급·습득) = 110
-  await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
-    width: Math.max(180, got.length * 100 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
-    buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
+  await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + (offers.length ? 32 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
+    width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
+    buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */

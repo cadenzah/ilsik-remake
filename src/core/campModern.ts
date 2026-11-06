@@ -7,7 +7,7 @@
 //   ↑↓←→ = 목록 안 이동, Tab = 다음 무리, Enter = 출전 확인, Esc = 고른 것 풀기·창 닫기.
 import { josa } from 'es-hangul'
 import { STAT_NAMES, type Item, type UnitType } from './data'
-import { TEMPLE_ASK, canEquip, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
+import { TEMPLE_ASK, canEquip, equipDiff, icon, profile, sprite, type CampOptions, type CampResult } from './camp'
 import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
@@ -15,7 +15,7 @@ import { SFX, play } from './sfx'
 import { VOLUME_KINDS, volumeRow } from './volumeUi'
 import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
 import { esc } from './ui'
-import { equippedStats, type Stats } from './unit'
+import { equippedStats, nextUpgrade, type Stats } from './unit'
 
 const STAT_LABEL: [keyof Stats, string][] = [['maxHp', '생명'], ['atk', '역량'], ['def', '방어'], ['spi', '정신'], ['agi', '민첩'], ['mov', '이동력']]
 const CAT = ['무기', '방어', '도구']
@@ -131,6 +131,16 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     box.querySelectorAll<HTMLButtonElement>('.mc-chip').forEach(b => { b.onclick = () => set(b.dataset.v!) })
   }
 
+  /** 받지 않은 승급 (개선판 B1 제안 36) 으로 받을 다음 장비, 없으면 undefined */
+  const upNext = (t: UnitType, c: 0 | 1) => o.promote && t.promo?.[c] ? nextUpgrade(t, c, o.tables) : undefined
+  const promote = (c: 0 | 1) => {
+    const t = party[shown], from = o.tables.items.get(t.equip[c])?.name, got = o.promote!(shown, c), p = t.promo ?? [0, 0]
+    if (got !== undefined) t.equip[c] = got
+    const left = got === undefined ? 0 : p[c] - 1
+    t.promo = c ? [p[0], left] : [left, p[1]]
+    if (got !== undefined) { play('e1', SFX.upgrade); say(`${t.name}: ${from} → ${o.tables.items.get(got)?.name}${left ? ` (승급 ${left}단계 남음)` : ''}`) }
+    render()
+  }
   const row = (i: number) => {
     const t = party[i], j = sel.indexOf(i), on = j >= 0, st = equippedStats(t, o.tables.items), p = profile(t, o.tables.labels)
     const blocked = !on && full()
@@ -138,7 +148,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
         role="checkbox" aria-checked="${on}" tabindex="-1">
       <span class="mc-check">${on ? '✓' : ''}</span>
       <span class="mc-spr">${sprite(t, false)}</span>
-      <span class="mc-name"><b>${esc(t.name)}</b>${i === 0 ? '<em>선두</em>' : ''}<small>${esc(p.job || p.race)} · Lv ${t.lv}</small></span>
+      <span class="mc-name"><b>${esc(t.name)}</b>${i === 0 ? '<em>선두</em>' : ''}${upNext(t, 0) !== undefined || upNext(t, 1) !== undefined ? '<em class="mc-upmark">승급</em>' : ''}<small>${esc(p.job || p.race)} · Lv ${t.lv}</small></span>
       <span class="mc-hp">생명 ${st.maxHp}</span>
       <span class="mc-ord">${on ? j + 1 : ''}</span>
     </button>`
@@ -182,9 +192,12 @@ export function campModern(o: CampOptions): Promise<CampResult> {
     const slot = (c: number) => {
       const id = t.equip[c], it = o.tables.items.get(id)
       const tool = c === 2
-      return `<div class="mc-slot ${tool ? 'tool' : ''} ${tool && cand && after ? 'target' : ''}" ${tool ? 'data-drop="tool"' : ''}>
+      const to = tool ? undefined : upNext(t, c as 0 | 1), n = to === undefined ? 0 : t.promo![c]
+      const up = to === undefined ? '' : `<span class="mc-up">→ ${esc(o.tables.items.get(to)?.name ?? '')} ${equipDiff(t, c, to, o.tables.items, ['up', 'down']) || '능력치 그대로'}</span>
+        <button class="mc-take mc-promo" data-slot="${c}" title="받지 않은 승급${n > 1 ? ` ${n}단계` : ''} — 한 단계 받는다">승급${n > 1 ? ` ×${n}` : ''}</button>`
+      return `<div class="mc-slot ${tool ? 'tool' : ''} ${tool && cand && after ? 'target' : ''} ${to !== undefined ? 'promo' : ''}" ${tool ? 'data-drop="tool"' : ''}>
         <small>${CAT[c]}</small>${it ? `<span class="mc-ico">${icon(id)}</span><b>${esc(it.name)}</b><i>${effects(it)}</i>` : `<b class="mc-none">${tool ? '비어 있음' : '없음'}</b>`}
-        ${tool && it ? '<button class="mc-take">해제</button>' : ''}</div>`
+        ${tool && it ? '<button class="mc-take">해제</button>' : ''}${up}</div>`
     }
     const magic = t.magic.map(id => o.tables.magic.get(id)).filter(Boolean)
     detail.innerHTML = `
@@ -204,7 +217,8 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       const m = o.tables.magic.get(Number(b.dataset.id))!
       b.onclick = () => say(`${m.name} · ${spellDesc(m)}`)
     })
-    detail.querySelector<HTMLButtonElement>('.mc-take')?.addEventListener('click', take)
+    detail.querySelector<HTMLButtonElement>('.tool .mc-take')?.addEventListener('click', take)
+    detail.querySelectorAll<HTMLButtonElement>('.mc-promo').forEach(b => { b.onclick = () => promote(Number(b.dataset.slot) as 0 | 1) })
     const toolSlot = detail.querySelector<HTMLElement>('.mc-slot.tool')!
     if (t.equip[2]) draggable(toolSlot, () => ({ kind: 'tool' }))
   }

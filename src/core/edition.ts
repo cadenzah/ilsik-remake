@@ -47,8 +47,9 @@ export interface Rules {
  *  방어 태세 = 움직이지 않은 차례에 휴식 대신. 다음 제 차례까지 물리 방어 (피해식의 D) ×def, 피로 −rest (생명은 회복 없음, 휴식보다 덜) */
 export interface Stance { dmg: number; tire: number; def: number; rest: number }
 
-/** 레벨업 결과. gains = 생명(최대)·역량·방어·정신·민첩 증가, weapon·armor = 승급한 장비 Item id, magic = 배운 마법 id */
-export interface LevelUp { gains: [number, number, number, number, number]; weapon?: number; armor?: number; magic?: number }
+/** 레벨업 결과. gains = 생명(최대)·역량·방어·정신·민첩 증가, weapon·armor = 승급한 장비 Item id, magic = 배운 마법 id.
+ *  offer = 무기·방어구 승급을 받을 수 있게 됨 (개선판 B1 제안 36, 바로 쓰지 않고 UnitType.promo 에 쌓는다) */
+export interface LevelUp { gains: [number, number, number, number, number]; weapon?: number; armor?: number; magic?: number; offer?: [boolean, boolean] }
 
 /** 마법 한 대상의 결과. hp = 피해, heal = 회복 (fatigue = 줄일 피로), stat = 강화·약화 (value 부호), tire = 피로 증가,
  *  poison·coma = 걸림 (3 차례), cure = 풀기 (what), miss = 듣지 않음 (혼수 실패·면역) */

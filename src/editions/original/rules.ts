@@ -2,7 +2,7 @@
 // 전투 계산에 난수가 없다: 명중 판정·치명타·피해 흔들림·반격 모두 없음. 정수화는 0 쪽 절사, 중간값 일부는 float32
 import type { Item, Magic, StageMap, Tables, UnitType } from '../../core/data'
 import type { LevelUp, Rules, SpellHit, Stance } from '../../core/edition'
-import { applyMods, equippedStats, type BuffStat, type Pos, type Unit } from '../../core/unit'
+import { applyMods, equippedStats, nextUpgrade, refit, type BuffStat, type Pos, type Unit } from '../../core/unit'
 
 const f32 = Math.fround
 const tr = Math.trunc
@@ -22,7 +22,7 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank; promoChoice?: boolean }
 /** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
 export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
@@ -123,7 +123,7 @@ function expGain(a: Unit, hits: { target: Unit; value: number }[], m?: Magic, cu
  *  2) 레벨이 weapon[id] 의 배수면 무기 Item id +1, armor[id] 의 배수면 방어구 +1 (cap[세부] 미만일 때). 장비 해제 → 승급 → 다시 장착 (현재치 채우기 없음)
  *  3) 레벨이 magic[id] 의 배수이고 마법 < 8 이면 마지막 마법 id + 1. 레이몬 (초상 16) 만 raymond[루트][마법 수], 마법 7개면 배우지 않음
  *  4) 피로 0 */
-function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, items: Map<number, Item>) => [number, number], grow?: Grow): LevelUp {
+function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, items: Map<number, Item>) => [number, number], grow?: Grow, choose = false): LevelUp {
   const t = u.type, G = tables.growth
   let n = 2
   const bonus = [2, 0, 0, 0, 1]
@@ -156,21 +156,25 @@ function levelUp(u: Unit, tables: Tables, route: number, range: (t: UnitType, it
   const out: LevelUp = { gains }
   // 장비 승급. 원작은 세부만 남은 빈 칸 (id 0) 도 올려 id 1 이 되지만 웹은 빈 칸을 건너뛴다 [근사]
   const W = G.weapon[t.id] ?? 100, Ar = G.armor[t.id] ?? 100
-  if (t.lv % W === 0 || t.lv % Ar === 0) {
+  if (choose) {   // 개선판 (B1 제안 36): 승급을 쌓아 두고 레벨업 창·정비 화면에서 받는다. 이미 쌓인 단계 다음이 상한을 넘지 않을 때만
+    const offer = (slot: 0 | 1, every: number) => {
+      const p = t.promo ?? [0, 0]
+      if (t.lv % every || nextUpgrade(t, slot, tables, p[slot]) === undefined) return false
+      t.promo = slot ? [p[0], p[1] + 1] : [p[0] + 1, p[1]]   // 새 배열 (장 시작 기록과 나눠 쓰지 않게)
+      return true
+    }
+    const o: [boolean, boolean] = [offer(0, W), offer(1, Ar)]
+    if (o[0] || o[1]) out.offer = o
+  } else if (t.lv % W === 0 || t.lv % Ar === 0) {
     const before = equippedStats(t, tables.items)
     const up = (slot: 0 | 1, every: number) => {
-      const it = tables.items.get(t.equip[slot])
-      if (!it || t.lv % every || it.id >= (G.cap[it.sub] ?? 0)) return undefined
-      t.equip[slot] = it.id + 1
-      return it.id + 1
+      const next = t.lv % every ? undefined : nextUpgrade(t, slot, tables)
+      if (next !== undefined) t.equip[slot] = next
+      return next
     }
     out.weapon = up(0, W)
     out.armor = up(1, Ar)
-    const after = equippedStats(t, tables.items)
-    u.maxHp += after.maxHp - before.maxHp
-    u.hp = Math.max(1, u.hp + after.maxHp - before.maxHp)
-    keys.forEach(k => { u.base[k] += after[k] - before[k] })
-    u.mov += after.mov - before.mov
+    refit(u, before, tables.items)
     u.range = range(t, tables.items)
   }
   applyMods(u)
@@ -239,7 +243,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
     return { poison, coma }
   },
   expGain,
-  levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow) },
+  levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow, tuning.promoChoice) },
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
   stance: tuning.stance,
   ...tuning.flank || tuning.enemy?.flank ? { flank: (a: Unit, d: Unit, units: Unit[]) => flankBonus(a, d, units, forSide(a, tuning).flank) } : {},

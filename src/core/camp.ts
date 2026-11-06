@@ -12,7 +12,7 @@ import { S } from './state'
 import { hud, mapRect, view } from './screen'
 import { pieceUrl, winUrl } from './skin'
 import { fadeIn, fadeOut } from './fade'
-import { equippedStats } from './unit'
+import { equippedStats, nextUpgrade } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
 import { SFX, play } from './sfx'
@@ -37,6 +37,8 @@ export interface CampOptions {
   header?: { title: string; goal?: string }   // 현대식 위 바: 장 이름·목표
   /** 출발을 정한 뒤 그때 소지품으로 true 면 「탐험계속?」 을 묻고 답을 결과 temple 로 (battle.ts 환의 성전: 다음 장 40장 + 지도 넷) */
   temple?: (items: number[]) => boolean
+  /** 개선판 승급 고르기 (B1 제안 36): 일행 i 번이 받지 않은 장비 승급 한 단계를 받는다 (장 사이 상태에 바로). 받은 장비 Item id */
+  promote?: (i: number, slot: 0 | 1) => number | undefined
 }
 
 /** 원작 알림 창 0aa2:12f2 모드 4 의 글 (DS 0xaf5~0xb22, 다섯 조각 = 다섯 줄, 이으면 한 문장). 뒤이어 확인창 「선택하세요」 [결정][취소], 효과음 ECLIPSE1 110 */
@@ -98,7 +100,7 @@ export function statusMarkup(t: UnitType, tables: Tables, cur?: { hp: number; fa
     `<span class="txt" style="${px(270, 187)}">${esc(p.rank)}</span>` +
     `<span class="txt" style="${px(270, 207)}">${cur?.fatigue ?? S.ed.startFatigue?.(t) ?? t.fatigue}</span>` +
     `<span class="txt" style="${px(270, 227)}">${t.exp}</span>` +
-    t.equip.map((id, k) => id ? `<button class="eq" data-item="${id}" style="${px(35 + 51 * k, 275, 48, 56)}">${icon(id)}</button>` : '').join('') +
+    t.equip.map((id, k) => id ? `<button class="eq" data-item="${id}" data-k="${k}" style="${px(35 + 51 * k, 275, 48, 56)}">${icon(id)}</button>` : '').join('') +
     t.magic.slice(0, 8).map((id, k) => `<button class="mg" data-magic="${id}" style="${px(213 + 34 * (k % 4), 255 + 41 * Math.floor(k / 4), 32, 40)};background-position:-${id * 32}px 0"
       aria-label="${esc(tables.magic.get(id)?.name ?? '')}"></button>`).join('')
 }
@@ -125,6 +127,15 @@ function statusFrame(modern: boolean, x = 0, y = 0) {
 }
 
 /** 전투 중 큰 인물기본자료 (원작: 작은 창의 얼굴 아이콘). 정비 화면 상태창을 맵 창 가운데에. 클릭·오른쪽 클릭으로 닫는다 */
+const UP_STATS = [['maxHp', '생명'], ['atk', '역량'], ['def', '방어'], ['spi', '정신'], ['agi', '민첩'], ['mov', '이동']] as const
+/** 장비 칸 slot 을 to 로 바꿀 때 오르내리는 능력치 글자 ("역량 +13 방어 −3", 오름 blue · 내림 red). 개선판 승급 고르기 (B1 제안 36) — 레벨업 창·정비 화면 */
+export function equipDiff(t: UnitType, slot: number, to: number, items: Map<number, Item>, [upCls, downCls] = ['blue', 'red']) {
+  const eq = [...t.equip] as UnitType['equip']
+  eq[slot] = to
+  const a = equippedStats(t, items), b = equippedStats({ ...t, equip: eq }, items)
+  return UP_STATS.filter(([k]) => b[k] !== a[k]).map(([k, l]) => `<span class="${b[k] > a[k] ? upCls : downCls}">${l} ${b[k] > a[k] ? '+' : '−'}${Math.abs(b[k] - a[k])}</span>`).join(' ')
+}
+
 export function statusWindow(t: UnitType, tables: Tables, cur: Parameters<typeof statusMarkup>[2] & {}, onClose?: () => void) {
   document.querySelector('.bigstat')?.remove()
   const m = mapRect()
@@ -206,6 +217,22 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
       const show = () => describe(o.tables.items.get(Number(b.dataset.item)))
       b.onclick = show
       b.onmouseenter = show
+      // 받지 않은 승급 (B1 제안 36): 표시하고, 누르면 바뀌는 능력치를 보이고 묻는다
+      const k = Number(b.dataset.k), to = k < 2 && o.promote && t.promo?.[k] ? nextUpgrade(t, k as 0 | 1, o.tables) : undefined
+      if (to === undefined) return
+      b.classList.add('up')
+      b.onclick = () => {
+        if (dialog) return
+        const diff = equipDiff(t, k, to, o.tables.items).replace(/<[^>]+>/g, '') || '능력치 그대로'
+        say(`${k ? '방어구' : '무기'} 승급: ${o.tables.items.get(t.equip[k])?.name} → ${o.tables.items.get(to)?.name} (${diff})${t.promo![k] > 1 ? ` · ${t.promo![k]}단계 남음` : ''}`)
+        confirm('승급', 300, () => {
+          const got = o.promote!(i, k as 0 | 1), p = t.promo ?? [0, 0], left = got === undefined ? 0 : p[k] - 1
+          if (got !== undefined) { t.equip[k] = got; play('e1', SFX.upgrade) }
+          t.promo = k ? [p[0], left] : [left, p[1]]
+          showStatus(i)
+          describe(o.tables.items.get(t.equip[k]))
+        }, 200)
+      }
     })
     if (o.remake) status.querySelectorAll<HTMLButtonElement>('.mg').forEach(b => {
       const show = () => describeMagic(Number(b.dataset.magic))

@@ -9,6 +9,7 @@ export interface UnitType {
   canMagic: number; magic: number[] // Magic id
   // 인물 상태창 글자 (labels.json 색인, formats.md "정비 화면"). rank = 부하상태, moveKind = 이동방식
   race: number; sex: number; job: number; rank: number; moveKind: number; fatigue: number; exp: number
+  promo?: [number, number]          // 개선판 받지 않은 장비 승급 단계 (무기·방어구, B1 제안 36 — 레벨업 창 「나중에」, 정비 화면에서 받는다)
   lag?: number[]                    // 개선판 성장 난수가 기대치보다 처진 양 (생명·역량·방어·정신·민첩, B1 N4 — original/rules.ts levelUp)
 }
 

@@ -8,7 +8,7 @@ import { attackKind, inReach, strikeTargets } from './attack'
 import { applyHit, hitText, spellTargets } from './magic'
 import type { Placement } from './stage'
 import { member, S } from './state'
-import { equippedStats, type Pos, type Unit } from './unit'
+import { equippedStats, nextUpgrade, refit, type Pos, type Unit } from './unit'
 
 let uidSeq = 0
 
@@ -201,6 +201,22 @@ export function addExp(a: Unit, hits: { target: Unit; value: number }[], m?: Mag
   }
   keepGrowth(t)
   return r
+}
+
+/** 레벨업 창 「승급」 (개선판 B1 제안 36): 전투 중인 일행 대원이 쌓인 장비 승급을 모두 받는다. 능력치·사거리를 장비 차이만큼 고친다 */
+export function takePromos(u: Unit) {
+  const t = u.type, p = t.promo
+  if (!p?.some(Boolean)) return
+  const before = equippedStats(t, S.tables.items)
+  for (const slot of [0, 1] as const) for (let n = p[slot]; n > 0; n--) {
+    const next = nextUpgrade(t, slot, S.tables)
+    if (next === undefined) break
+    t.equip[slot] = next
+  }
+  t.promo = undefined
+  refit(u, before, S.tables.items)
+  u.range = S.ed.rules.weaponRange(t, S.tables.items)
+  keepGrowth(t)
 }
 
 /** 경계 부대는 공격·마법에 맞으면 깨어난다 (원작 20ec:93b5) */
