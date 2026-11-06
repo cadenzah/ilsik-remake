@@ -6,6 +6,7 @@
 ## 1. 분기점 저장 (자동)
 - 9장(진로 선택 직전 장)을 클리어하면 그때 상태(일행·소지품·장비·플래그)를 `progress.branch` 에 남긴다. 새로 시작해서 다시 9장을 깨면 덮어쓴다.
 - 엔딩에 닿으면 `progress.endings` 에 그 루트(A/B/C)를 더한다.
+- 「유랑천하」(새로 시작, save.ts resetProgress) 는 이 판의 것 (next·flags·party·items·equip·grown) 만 비우고, cleared·branch·endings·found·seen·carry·hidden·stars 는 남긴다 (2026-11-07 고침 — 그 전엔 cleared 만 남겨 엔딩·도감·분기점이 새 판마다 지워졌다).
 
 ## 2. "다른 길로" (타이틀 메뉴, 엔딩을 1번 이상 본 뒤)
 - 루트 3개 중 하나를 골라 그 루트의 10장대 첫 장부터 시작. 상태 = 분기점 저장 그대로 (레벨·능력치·일행·플래그).

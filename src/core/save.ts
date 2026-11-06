@@ -40,9 +40,11 @@ function store(ed: EditionId, p: Progress) {
   try { localStorage.setItem(key(ed), JSON.stringify(p)) } catch { /* 저장 불가 (사생활 보호 모드 등) — 진행은 계속 */ }
 }
 
-/** 새로 시작: 다음 장을 1장으로 되돌린다. 클리어 기록(장 선택)은 남긴다 */
+/** 새로 시작: 이 판의 것 (다음 장·플래그·일행·소지품·장비·성장) 만 비운다. 판을 넘어 쌓이는 기록 (장 지도·분기점·엔딩·찾은 사건·도감·이어받기·숨은 장·별) 은 남긴다
+ *  (2026-11-07 고침: 전에는 클리어한 장만 남기고 엔딩·도감까지 지웠다 — replay-design.md 는 판을 넘어 누적) */
 export function resetProgress(ed: EditionId) {
-  store(ed, { next: { n: 1, route: 0 }, cleared: loadProgress(ed)?.cleared ?? [], flags: [] })
+  const { next: _n, flags: _f, party: _p, items: _i, equip: _e, grown: _g, ...keep } = loadProgress(ed) ?? { next: { n: 1, route: 0 }, cleared: [], flags: [] }
+  store(ed, { ...keep, cleared: keep.cleared ?? [], next: { n: 1, route: 0 }, flags: [] })
 }
 
 /** 장 클리어 기록. at = 그 장 시작 때 상태, now = 클리어 뒤 상태. next 가 없으면 (엔딩) 다음 장은 그대로 둔다 */
