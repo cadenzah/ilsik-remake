@@ -4,6 +4,7 @@ import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { mindNote, planFor } from './ai'
 import { afterWin, ensureSeed, grow, partyChange, startFatigue } from './growth'
+import { affinity, affinityNote, affinityTags } from './affinity'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
 import { difficulty } from '../../core/settings'
@@ -25,7 +26,7 @@ const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) =>
 const ENEMY = { coef: 0.19, spell: 0.6 }
 // 어려움 = ×1.1 + 적 협공 (2026-11-06, 그전 ×1.2 와 첫판 승이 같게 — balance-proposal.md "30 협공")
 export const DIFF_SCALE = [0.8, 1, 1.1]
-const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }   // affinity 는 아래 AFFINITY 를 정한 뒤 넣는다
+const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
 /** 개선판 피해 조정 (tools/sim 이 이 값에서 바꿔 본다). 아군 = 물리 0.4, 마법·회복은 원작 그대로 */
 // 고대 병기 특효 (B1 제안 24, Q7): 용자의검·빛의갑옷·무자의책·현자의돌을 지닌 수마다 제관·사바카 (세 형태) 의 방어를 덜 본다 — balance-proposal.md "24 고대 병기 특효"
 export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
@@ -34,20 +35,10 @@ const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
 const stance = { dmg: 1.3, tire: 2, def: 1.2, rest: 15 }
 // 포위·협공 (B1 제안 30): 대상 옆에 붙은 아군 1명마다 물리 피해 +10%, 최대 +30%. 일행·NPC 는 늘, 적은 어려움에서만 (applyDifficulty) — balance-proposal.md "30 협공"
 const flank = { per: 0.1, max: 0.3 }
-// 종족 × 마법 계열 상성 (B1 제안 25): 생명상해 마법만, 두 편 모두. 종족 번호 = labels.race, 계열 = magic SCHOOL_NAME (빛 0 어둠 1 바람 2 물 3 불 4 땅 5) — balance-proposal.md "25 종족 상성"
-// 불사족·마족은 빛에 약하고 어둠에 강하다 (크란·아티스가 망혼림·마족 장에서 산다), 불사족은 불에도 조금 약하다 (애슬), 마족은 불에 강하다 (염마),
-// 용족은 물(얼음)에 약하고 불에 강하다 (리사 — 40장), 해족은 바람(벼락)에 약하고 물에 강하다, 빙마녀 (리사) 는 불에 약하고 얼음에 강하다, 기계 (수호자) 는 바람에 약하다
-export const AFFINITY: NonNullable<Tuning['affinity']> = {
-  7: { 0: 1.5, 4: 1.25, 1: 0.5 },
-  9: { 0: 1.5, 1: 0.5, 4: 0.5 },
-  8: { 3: 1.5, 4: 0.5 },
-  10: { 2: 1.5, 3: 0.5 },
-  11: { 4: 1.5, 3: 0.5 },
-  12: { 2: 1.5 },
-}
+// 상성 (B1 제안 25·25-2): 종족·비행·시전자 속성·중갑 — remake/affinity.ts, balance-proposal.md "25 종족 상성"·"25-2 맞붙음 늘리기". 두 편 모두
+enemyHit.affinity = affinity
 // 승급 고르기 (B1 제안 36): 레벨업 때 장비 승급을 바로 쓰지 않고 「승급 / 나중에」, 받지 않은 승급은 정비 화면에서 (core/campaign.ts takePromo)
-enemyHit.affinity = AFFINITY   // 상성은 두 편 모두 (적 마법도 같은 표)
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity: AFFINITY }
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity }
 /** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
 export function applyDifficulty(d: number, hardFlank = true) {
   enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]
@@ -78,6 +69,7 @@ export const edition: Edition = {
   startFatigue,  // 지난 장에 쓰러진 대원 피로 30 (제안 12)
   partyChange,   // 늦은 합류 맞춤·전직·교체 성장 이어받기 (제안 5·N2)
   mindNote,  // 성향 카드 줄 (제안 10)
+  affinityText: (t, raceName, magic) => ({ tags: affinityTags(t, raceName, magic), note: affinityNote(t, magic) }),   // 상성 글 (제안 25)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {

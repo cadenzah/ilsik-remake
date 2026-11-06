@@ -45,9 +45,10 @@ export function flankBonus(a: Unit, d: Unit, units?: Unit[], f?: Flank) {
   return Math.min(f.max, f.per * n)
 }
 
-/** 종족 × 마법 계열 상성 (개선판 B1 제안 25): [종족 (UnitType.race)][계열 (Magic.school)] = 생명상해 배율. 없는 칸 = 1. 시전자 편의 조정 (enemy 가 있으면 적은 그쪽) 을 본다 */
-export type Affinity = Record<number, Record<number, number>>
-export const affinityOf = (m: Magic, d: Unit, aff?: Affinity) => aff?.[d.type.race]?.[m.school] ?? 1
+/** 상성 (개선판 B1 제안 25·25-2, remake/affinity.ts): 대상 종류가 계열 (Magic.school) 이나 활 ('bow') 에서 받는 배율. 시전자·공격자 편의 조정을 본다 */
+export type Affinity = (d: UnitType, key: number | 'bow') => number
+/** 활 (궁수·추전수) 물리 공격인가 — 상성 'bow' 를 본다 */
+const bowAttack = (a: Unit) => a.type.job === 17 || a.type.job === 18
 
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
 function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL, units?: Unit[]) {
@@ -56,7 +57,8 @@ function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIG
   const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d) * baneCut(a, d, all.bane) * (st && d.guard ? st.def : 1)
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
-  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1) * (1 + flankBonus(a, d, units, p.flank)))   // 협공은 편마다 (적 조정에 없으면 적은 협공 없음)
+  const aff = p.affinity && bowAttack(a) ? p.affinity(d.type, 'bow') : 1   // 상성 (제안 25-2): 활 → 비행
+  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1) * (1 + flankBonus(a, d, units, p.flank)) * aff)   // 협공은 편마다 (적 조정에 없으면 적은 협공 없음)
   return Math.min(clamp(v, 1, 99), d.hp)
 }
 
@@ -85,7 +87,7 @@ function comaHits(a: Unit, d: Unit) {
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
 function spell(a: Unit, d: Unit, m: Magic, all: Tuning = ORIGINAL): SpellHit {
   const P = m.power, e = m.effect, t = forSide(a, all)
-  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * affinityOf(m, d, t.affinity)), 1, 99), d.hp) }
+  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * (t.affinity?.(d.type, m.school) ?? 1)), 1, 99), d.hp) }
   if (e === 0) {
     const v = clamp(tr(k5(a, P) * (t.heal ?? 1)), 1, 99)
     return { kind: 'heal', value: Math.min(v, d.maxHp - d.hp), fatigue: Math.min(d.fatigue, tr(1 + 0.33 * v)) }
@@ -249,7 +251,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   expGain,
   levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow, tuning.promoChoice) },
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
-  ...tuning.affinity ? { affinity: (m: Magic, d: Unit) => m.effect === 7 ? affinityOf(m, d, tuning.affinity) : 1, affinityTable: tuning.affinity } : {},
+  ...tuning.affinity || tuning.enemy?.affinity ? { affinity: (a: Unit, d: Unit, m?: Magic) => { const f = forSide(a, tuning).affinity; return !f ? 1 : m ? (m.effect === 7 ? f(d.type, m.school) : 1) : bowAttack(a) ? f(d.type, 'bow') : 1 } } : {},
   stance: tuning.stance,
   ...tuning.flank || tuning.enemy?.flank ? { flank: (a: Unit, d: Unit, units: Unit[]) => flankBonus(a, d, units, forSide(a, tuning).flank) } : {},
 } }

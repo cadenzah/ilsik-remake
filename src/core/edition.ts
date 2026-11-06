@@ -28,10 +28,8 @@ export interface Rules {
   aiRests(u: Unit): boolean
   /** 공격자가 대상에게 특효 (방어를 덜 봄, 개선판 B1 제안 24) 인가. 확인창 표시용. 없으면 특효 없음 */
   bane?(a: Unit, d: Unit): boolean
-  /** 종족 × 마법 계열 상성 (개선판 B1 제안 25): 이 마법이 대상에게 주는 피해 배율 (생명상해만, 1 = 보통). 확인창 표시용. 없으면 상성 없음 */
-  affinity?(m: Magic, d: Unit): number
-  /** 상성 표 [종족][계열] = 배율 (카드·도감 표시용) */
-  affinityTable?: Record<number, Record<number, number>>
+  /** 상성 (개선판 B1 제안 25·25-2): 공격자가 대상에게 주는 피해 배율 (m = 마법이면 생명상해만, 없으면 물리 — 활만). 1 = 보통. 확인창 표시용. 없으면 상성 없음 */
+  affinity?(a: Unit, d: Unit, m?: Magic): number
   /** 협공 보정 (개선판 B1 제안 30): 대상 옆에 붙은 공격자 편 수만큼 오르는 물리 피해 비율 (0.2 = +20%). 확인창 표시용. 없으면 협공 없음 */
   flank?(a: Unit, d: Unit, units: Unit[]): number
   /** 전력 공격·방어 태세 (개선판 B1 제안 27). 없으면 두 명령이 없다 */
@@ -75,6 +73,8 @@ export interface Edition {
   order(units: Unit[], round: number): Unit[][]
   /** 컴퓨터 조종 유닛의 행동. troopState 를 바꿀 수 있다 (경계 → 행동) */
   planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan
+  /** 상성 글 (개선판 B1 제안 25·25-2, 카드·도감): tags = 붙은 까닭 (「불사족」「비행」「불 마법」「중갑」), note = 「약점 빛·불 · 내성 어둠」. 상성이 없으면 둘 다 빈 글 */
+  affinityText?(t: UnitType, raceName: string, magic?: Map<number, Magic>): { tags: string; note: string }
   /** 컴퓨터 유닛 성향 한 줄 (개선판 카드, B1 제안 10). 없으면 '' */
   mindNote?(u: Unit): string
   /** 편의 기능: 적 위협 범위, 피해 예측, 적 클릭 한 번에 이동+공격.

@@ -88,12 +88,6 @@ const EFFECT_TEXT = ['생명 회복', '역량 강화', '방어 강화', '민첩 
   '역량 약화', '방어 약화', '민첩 약화', '정신 약화', '중독시킴', '혼수에 빠뜨림', '중독·혼수 치료', '피로를 쌓음']
 export const SCHOOL_NAME = ['빛', '어둠', '바람', '물', '불', '땅', '소환', '노래', '기원']
 
-/** 종족 상성 (개선판 B1 제안 25) 을 글로: 약점 = 배율 > 1, 내성 = < 1 인 계열 이름 (센 것부터). table = Rules.affinityTable */
-export function affinityNote(race: number, table?: Record<number, Record<number, number>>): string {
-  const row = Object.entries(table?.[race] ?? {}).map(([k, v]) => [Number(k), v] as const).sort((a, b) => b[1] - a[1])
-  const weak = row.filter(([, v]) => v > 1).map(([k]) => SCHOOL_NAME[k]), strong = row.filter(([, v]) => v < 1).map(([k]) => SCHOOL_NAME[k])
-  return [weak.length ? `약점 ${weak.join('·')}` : '', strong.length ? `내성 ${strong.join('·')}` : ''].filter(Boolean).join(' · ')
-}
 
 /** 개선판 마법 목록 한 줄 정보: 대상편·효과 말·사거리·범위 */
 export function spellInfo(rules: Rules, m: Magic) {

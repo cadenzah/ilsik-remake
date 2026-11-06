@@ -9,7 +9,6 @@ import type { Unit } from './unit'
 import { closeWin, esc, openWin } from './ui'
 import { winUrl } from './skin'
 import { TW } from './data'
-import { affinityNote } from './magic'
 
 const NARROW = 171, WIDE = 224   // 개선판 마우스 올림 창은 정보 줄 때문에 넓게 (지형·이동·사거리 줄이 잘리지 않게)
 
@@ -20,10 +19,10 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   basic = null
   if (!u) return
   const next = opts.extra ? nextTurn(u) : ''
-  // 종족 상성 (개선판 B1 제안 25): 상성이 있는 종족이면 이름 줄에 종족, 그 아래 「약점 빛·불 · 내성 어둠」 줄
-  const aff = opts.extra ? affinityNote(u.type.race, S.ed.rules.affinityTable) : ''
-  const kin = aff ? `<span class="dim">${aff}</span>` : ''
-  const race = aff ? ` <span class="dim">${esc(S.tables.labels.race[u.type.race] ?? '')}</span>` : ''
+  // 상성 (개선판 B1 제안 25·25-2): 상성이 있으면 이름 줄에 까닭 (「불사족」「비행·불 마법」…), 그 아래 「약점 빛·불 · 내성 어둠」 줄
+  const af = opts.extra ? S.ed.affinityText?.(u.type, S.tables.labels.race[u.type.race] ?? '') : undefined
+  const kin = af?.note ? `<span class="dim">${esc(af.note)}</span>` : ''
+  const race = af?.note && af.tags ? ` <span class="dim">${esc(af.tags)}</span>` : ''
   const h = opts.extra ? 112 + (next ? 18 : 0) + (kin ? 18 : 0) : 74, W = opts.extra ? WIDE : NARROW
   const el = document.createElement('div')
   el.className = `owin basic${opts.extra ? ' passive' : ''}`   // 개선판 마우스 올림 창은 입력을 가로채지 않는다

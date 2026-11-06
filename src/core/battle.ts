@@ -1065,6 +1065,9 @@ export function hoverTile(t: Pos | null) {
   showBasic(there, aboveUnit(sx, sy, 112), { extra: true })
 }
 
+/** 상성 (개선판 B1 제안 25) 확인창 꼬리표: 더 들면 「약점」, 덜 들면 「내성」 */
+const affTag = (k: number) => k > 1 ? ' <span class="green">약점</span>' : k < 1 ? ' <span class="red">내성</span>' : ''
+
 /** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸.
  *  power = 전력 공격 (개선판 제안 27): 창 이름 「전력 공격」, 예측은 전력 피해로, 쌓일 피로 줄 */
 function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>, power = false) {
@@ -1078,17 +1081,18 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
     const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
     const hit = strikeTargets(u, target, spot ?? u)
     const flank = (t: Unit) => { const b = S.ed.rules.flank?.(u, t, S.units) ?? 0; return b ? ` <span class="green">협공 +${Math.round(b * 100)}%</span>` : '' }   // 제안 30
+    const aff = (t: Unit) => affTag(S.ed.rules.affinity?.(u, t) ?? 1)   // 상성 (제안 25-2): 활 → 비행
     if (hit.length === 1 && hit[0] === target) {
       const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u, S.units)
       const kill = lo >= target.hp ? '<span class="red">처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
       const back = counterDamage(u, target, spot ?? u)   // 제안 3: 되받는 피해
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}${S.ed.rules.bane?.(u, target) ? ' <span class="green">특효</span>' : ''}${flank(target)}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}${S.ed.rules.bane?.(u, target) ? ' <span class="green">특효</span>' : ''}${aff(target)}${flank(target)}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {
         const [lo] = S.ed.rules.damageRange(S.map, u, t, spot ?? u, S.units)
         const name = t.side === u.side ? `<span class="red">${esc(t.type.name)}</span>` : esc(t.type.name)
-        return `${name} −${lo}${flank(t)}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
+        return `${name} −${lo}${aff(t)}${flank(t)}${lo >= t.hp ? ' <span class="red">처치</span>' : ''}`
       }).join('<br>')
       lines = hit.length
     }
@@ -1314,7 +1318,7 @@ function askMagic(u: Unit, m: Magic, c: Pos) {
   let body: string | undefined
   if (S.ed.features.forecast) {
     // 종족 상성 (제안 25): 생명상해가 더 들면 「약점」, 덜 들면 「내성」
-    const aff = (t: Unit) => { const k = S.ed.rules.affinity?.(m, t) ?? 1; return k > 1 ? ' <span class="green">약점</span>' : k < 1 ? ' <span class="red">내성</span>' : '' }
+    const aff = (t: Unit) => affTag(S.ed.rules.affinity?.(u, t, m) ?? 1)
     const lines = spellTargets(S.ed.rules, u, m, c).map(t => esc(hitLine(t, S.ed.rules.spell(u, t, m))) + aff(t))
     body = [esc(m.name), ...lines.slice(0, 6), ...lines.length > 6 ? [`외 ${lines.length - 6}명`] : []].join('<br>')
   }
