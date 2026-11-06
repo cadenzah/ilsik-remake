@@ -274,8 +274,9 @@ export function initScript(src: ScriptSource | undefined, types: UnitType[]) {
   }
   banterLines = src?.banter ? parseBanter('banter.ecs', src.banter, s => names(s), types) : new Map()
   epilogueCh = src?.epilogue ? parseChapter('epilogue.ecs', 0, src.epilogue, s => names(s)) : undefined
+  recallLines = new Map(src?.recall ? parseRecall('recall.ecs', src.recall) : [])
 }
-export interface ScriptSource { files: Record<string, string>; aliases?: Record<string, string>; banter?: string; epilogue?: string }
+export interface ScriptSource { files: Record<string, string>; aliases?: Record<string, string>; banter?: string; epilogue?: string; recall?: string }
 
 export const chapter = (n = S.def.n) => chapters.get(n)
 
@@ -361,6 +362,35 @@ export async function banter(kind: BanterKind) {
   lastBanter = text
   spoke.add(c.u.type.id)
   await playDialogue([{ who: c.u.type, text }])
+}
+
+// ---------- 레스다 회상 (recall.ecs, B1 제안 42) ----------
+
+export type RecallKind = 'lv10' | 'lv20' | 'hp' | 'ch37'
+const RECALL_KINDS: RecallKind[] = ['lv10', 'lv20', 'hp', 'ch37']
+let recallLines = new Map<RecallKind, string>()
+
+/** "키: 대사" 줄들 (키 = lv10·lv20·hp·ch37) */
+function parseRecall(file: string, src: string): [RecallKind, string][] {
+  const out: [RecallKind, string][] = []
+  src.split('\n').forEach((raw, i) => {
+    const line = raw.replace(/^#.*$/, '').trim()
+    if (!line) return
+    const m = /^(\w+):\s*(.+)$/.exec(line)
+    if (!m || !RECALL_KINDS.includes(m[1] as RecallKind)) throw new ScriptError(file, i + 1, `"${RECALL_KINDS.join('|')}: 대사" 꼴이 아님`)
+    out.push([m[1] as RecallKind, m[2]])
+  })
+  return out
+}
+
+/** 레스다 회상 한 줄: 레스다가 죽은 뒤 (캠페인 9~43장) 그때가 처음 왔으면 레스다 초상으로 (판 플래그 recall:키 로 한 번만). lv20 은 lv10 도 지운다 */
+export async function recall(kind: RecallKind | null) {
+  const text = kind && recallLines.get(kind), n = S.def.n
+  if (!text || !S.def.campaign || n < 9 || n > 43 || FLAGS.has(`recall:${kind}`)) return
+  FLAGS.add(`recall:${kind}`)
+  if (kind === 'lv20') FLAGS.add('recall:lv10')
+  const resda = S.types.find(t => t.name === '레스다')
+  if (resda) await playDialogue([{ who: { ...resda, name: '레스다 (회상)' }, text }])
 }
 
 // ---------- 에필로그 (epilogue.ecs, 제안 15) ----------

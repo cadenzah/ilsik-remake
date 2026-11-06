@@ -10,6 +10,7 @@ import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
+import recall from '../../../content/remake/recall.ecs?raw'      // 레스다 회상 (B1 제안 42)
 import tune from '../../../content/remake/tune.json'            // 장별 조정 (B1 제안 6)
 import par from '../../../content/remake/par.json'              // 장 평가 턴 기준 (제안 11·34, tools/sim.mjs --par 로 다시 만든다)
 
@@ -73,7 +74,7 @@ export const edition: Edition = {
     const enemy = units.filter(u => u.side === 'enemy')
     return [party, npc, enemy].filter(s => s.length)
   },
-  script: { files, aliases, banter, epilogue },
+  script: { files, aliases, banter, epilogue, recall },
   extraBattles,
   features: { threat: true, forecast: true, quickAttack: true, commandFirst: false, autoRest: true, originalCamp: false },
   // S2 제안 1: 세 길을 목적으로 (story-proposal.md)

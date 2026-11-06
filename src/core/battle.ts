@@ -31,7 +31,7 @@ import { DIFFICULTIES, difficulty, setSetting, setting } from './settings'
 import { travelMap } from './worldmap'
 import { stageDef, type StageDef } from './stage'
 import { alive, canCommand, isNpc, member, S, unitAt } from './state'
-import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
+import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, recall, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, setOutsideCloses, showMenu, showResult, type Btn } from './ui'
 import { applyMods, nextUpgrade, type Pos, type Unit } from './unit'
 import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takePromos, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
@@ -187,6 +187,7 @@ async function start(resume?: Suspended) {
   setTitle(chapterTitle())
   centerOn(S.units[0])
   await fadeIn()
+  if (S.def.n === 37) await recall('ch37')   // 레스다 회상 (B1 제안 42): 정체를 듣는 장 앞
   await story('pre', S.scenes.pre[S.def.n] ?? [], aliveMember)
   startEvents()
   await banter('start')
@@ -385,6 +386,7 @@ async function showLevelUp(u: Unit, r: LevelUp) {
   await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + (offers.length ? 16 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
+  if (u.type.id === PARTY[0]) await recall(u.type.lv >= 20 ? 'lv20' : u.type.lv >= 10 ? 'lv10' : null)   // 레스다 회상 (B1 제안 42)
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
@@ -500,6 +502,9 @@ export async function checkEnd(): Promise<boolean> {
     else if (scenes.length || lines.length) await playDialogue([...sceneLines(scenes), ...lines])
     if (!result) S.mode = prev
   }
+  // 레스다 회상 (B1 제안 42): 선두 생명이 처음 30% 아래로
+  const lead = S.units.find(u => u.troop === 0 && u.type.id === PARTY[0])
+  if (!result && lead && lead.hp > 0 && lead.hp < lead.maxHp * 0.3) { S.mode = { kind: 'busy' }; await recall('hp'); S.mode = prev }
   if (!result) return false
   // 원작 2ff8:1706: 전투 함수가 끝나면 (결과 3 이 아니면) 보상 품목 (BAD w121~) 마다 알림 창 (모드 5) → 소지품 끝에. 웹은 finishStage 가 넣는다
   for (const item of S.reward) await gotItem('보 상', item)
