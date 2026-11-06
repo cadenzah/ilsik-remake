@@ -22,7 +22,7 @@ import { AFF } from '../../src/editions/remake/affinity'
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
-interface Opts { until?: number; ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; par?: string; dmg: string; careful: 'lead' | 'all' | 'none' }
+interface Opts { saveSnap?: string; until?: number; ed: Edition; routes: number[]; seed: number; pick: 'level' | 'front'; book: boolean; tools: boolean; turns: number; retry: number; push: boolean; json: boolean; par?: string; dmg: string; careful: 'lead' | 'all' | 'none' }
 let careful: Opts['careful'] = 'all'
 
 /** 장 하나의 기록 */
@@ -382,6 +382,7 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
     S.turnEv = data.battles.turn[n] ?? []
     S.startEv = data.battles.start?.[n] ?? []
     const before: Camp = snapshot()
+    if (o.saveSnap) simFs().writeFileSync(`${o.saveSnap}/${route}-${n}-${curSeed}.json`, JSON.stringify({ n, r, route, seed: curSeed, camp: before, deploy: S.deploy }))   // 장 하나 모드 (--snap) 의 시작 상태
     const deployedTypes = S.deploy.map(i => partyType(PARTY[i]))
     let out: ReturnType<typeof battle> | null = null, tries = 0
     for (; tries <= o.retry; tries++) {
@@ -428,6 +429,9 @@ async function runRoute(o: Opts, route: number, data: { battles: Battles }) {
   return rows
 }
 
+let curSeed = 0   // 지금 도는 씨앗 (--save-snap 파일 이름)
+/** 파일 읽고 쓰기 (장 하나 모드). 타입 검사에 node 타입이 없어 tools/sim.mjs 가 node:fs 를 globalThis.__simFs 로 넘긴다 */
+const simFs = () => (globalThis as unknown as { __simFs: { mkdirSync(p: string, o: { recursive: boolean }): void; readFileSync(p: string, e: 'utf8'): string; readdirSync(p: string): string[]; writeFileSync(p: string, d: string): void } }).__simFs
 const RES: Record<string, string> = { win: '승', ending: '끝', lose: '패', stall: '정체' }
 function printRow(w: Row) {
   console.log([`${String(w.n).padStart(2)}장`, RES[w.result] + (w.tries > 1 ? `(${w.tries})` : '') + (w.pushed ? '→계속' : ''), `${w.turns}턴`,
@@ -531,6 +535,16 @@ export async function main(argv: string[]) {
     } } }
     S.ed = o.ed
   }
+  // 장 하나 모드: --save-snap DIR 로 (보통 --seeds 와 함께) 장마다 시작 상태 (일행·장비·성장·플래그·출전) 를 저장해 두고,
+  //   --snap DIR --chapter N|N,M|all [--route 0|1|2] 로 그 상태에서 그 장만 돌린다. 전투에 난수가 레벨업뿐이라 같은 상태면 결과가 같다 →
+  //   조정 변형끼리 같은 일행으로 비교 (앞 장에서 번지는 잡음 없음). 상태 파일 = DIR/<루트>-<장>-<씨앗>.json
+  if (argv.includes('--save-snap')) { o.saveSnap = arg('save-snap', ''); simFs().mkdirSync(o.saveSnap, { recursive: true }) }
+  if (argv.includes('--snap')) {
+    const dir = arg('snap', ''), ch = arg('chapter', 'all')
+    const all = [...new Set(simFs().readdirSync(dir).filter(f => f.endsWith('.json')).map(f => Number(f.split('-')[1])))].sort((a, b) => a - b)
+    for (const n of ch === 'all' ? all : ch.split(',').map(Number)) await snapChapter(o, dir, n, battles)
+    return
+  }
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
   const out: Record<string, Row[]> = {}
@@ -557,6 +571,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
+      curSeed = seed
       for (const w of await runRoute(q, r, { battles })) {
         by.set(w.n, [...by.get(w.n) ?? [], w])
         if (w.result === 'win' || w.result === 'ending') wins.set(`${w.n}-${w.route}`, [...wins.get(`${w.n}-${w.route}`) ?? [], w.turns])
@@ -614,5 +629,51 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     const { writeFile } = await import(/* @vite-ignore */ fsMod) as { writeFile: (f: string, s: string) => Promise<void> }
     await writeFile(parFile, `{\n${keys.map(k => `  "${k}": ${med(wins.get(k)!)}`).join(',\n')}\n}\n`)
     console.log(`\n턴 기준 ${keys.length}개 → ${parFile}`)
+  }
+}
+
+/** 장 하나 모드 (--snap): 저장한 시작 상태마다 그 장을 한 번씩 (다시 하기 o.retry 번까지) 돌려 루트별로 모은다 */
+async function snapChapter(o: Opts, dir: string, n: number, battles: Battles) {
+  const files = simFs().readdirSync(dir).filter(f => f.endsWith('.json') && f.split('-')[1] === String(n))
+  const pct = (k: number, m: number) => `${Math.round(k / Math.max(1, m) * 100)}%`
+  for (const route of o.routes) {
+    const mine = files.filter(f => f.startsWith(`${route}-`)).sort((a, b) => parseInt(a.split('-')[2]) - parseInt(b.split('-')[2]))
+    if (!mine.length) continue
+    let first = 0, any = 0, fallen = 0
+    const turns: number[] = [], lost = new Map<string, number>()
+    for (const f of mine) {
+      const snap = JSON.parse(simFs().readFileSync(`${dir}/${f}`, 'utf8')) as { n: number; r: number; seed: number; camp: Camp; deploy: number[] }
+      seedRandom(snap.seed * 1000 + n)
+      restore(snap.camp)
+      S.def = stageDef(n, snap.r, true)
+      const rec = battles.records[`${n}-${snap.r}`] ?? battles.records[[0, 1, 2].map(k => `${n}-${k}`).find(k => k in battles.records)!]
+      S.deploy = snap.deploy
+      S.map = await (await fetch(`/assets/stages/${String(n).padStart(2, '0')}.json`)).json() as StageMap
+      Object.assign(S, placements(rec, S.map))
+      S.reward = rec.reward
+      S.treasure = rec.treasure ?? []
+      S.cond = battles.cond[n] ?? []
+      S.turnEv = battles.turn[n] ?? []
+      S.startEv = battles.start?.[n] ?? []
+      let res: ReturnType<typeof battle> | null = null, tries = 0
+      for (; tries <= o.retry; tries++) {
+        restore(snap.camp)
+        res = battle(o.turns)
+        if (res.result === 'win' || res.result === 'ending') break
+      }
+      const won = res!.result === 'win' || res!.result === 'ending'
+      if (won && tries === 0) first++
+      if (won) any++
+      turns.push(Math.min(S.turn, o.turns))
+      fallen += S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent).length
+      if (!won) {
+        const lose = S.cond.filter(c => c.do.includes('lose') && 'dead' in c.if && c.if.dead.every(m => (member(m)?.hp ?? 1) <= 0))
+        const by = res!.result === 'stall' ? '정체' : lose.length ? lose.flatMap(c => 'dead' in c.if ? c.if.dead.map(m => member(m)!.type.name) : []).join('·') : member([0, 0])!.type.name
+        lost.set(by, (lost.get(by) ?? 0) + 1)
+      }
+      if (process.env.SIM_SNAP_EACH) console.log(`  ${f} ${RES[res!.result] ?? res!.result} 턴 ${S.turn} 시도 ${tries + 1}`)
+    }
+    const v = [...turns].sort((a, b) => a - b)
+    console.log(`${n}장 ${'ABC'[route]} | 상태 ${mine.length}개 | 첫판 승 ${pct(first, mine.length)} | 다시 하기 포함 ${pct(any, mine.length)} | 턴 (중앙) ${v[v.length >> 1]} | 쓰러진 아군 ${(fallen / mine.length).toFixed(1)} | 진 까닭 ${[...lost].map(([k, c]) => `${k} ${c}`).join(', ') || '-'}`)
   }
 }
