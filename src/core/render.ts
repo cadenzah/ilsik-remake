@@ -284,7 +284,8 @@ export function frame(now: number) {
         ctx.fillRect(x + 8, y + TH - 7, ((TW - 16) * Math.min(100, u.fatigue)) / 100, 3)
       }
       statusDots(u, x, y)
-      if (restsNext(u)) restBadge(x, y)
+      if (restsNext(u)) badge(x, y, '휴식')
+      else if (u.guard && u.hp > 0) badge(x, y, '방어', '#ffd27a', 'rgba(70,50,10,0.85)', '#fff1cf')   // 방어 태세 (제안 27)
     }
     ctx.globalAlpha = 1
   }
@@ -348,17 +349,17 @@ export function frame(now: number) {
 /** 컴퓨터 조종 유닛이 다음 제 차례에 쉰다 (휴식선, 행동하는 부대) — 개선판 B1 N1 */
 export const restsNext = (u: Unit) => u.hp > 0 && (u.side === 'enemy' || isNpc(u)) && S.troopState[u.troop] !== 1 && S.troopState[u.troop] !== 2 && S.ed.rules.aiRests(u)
 
-/** 머리 위 오른쪽 「휴식」 표 */
-function restBadge(x: number, y: number) {
+/** 머리 위 오른쪽 표: 「휴식」 (컴퓨터 유닛 휴식선) · 「방어」 (방어 태세) */
+function badge(x: number, y: number, text: string, line = '#9ad8ff', fill = 'rgba(20,40,70,0.85)', ink = '#cfeeff') {
   ctx.font = 'bold 11px sans-serif'
   ctx.textAlign = 'center'
   const w = 26, bx = x + TW - w - 2, by = y - 2
-  ctx.fillStyle = 'rgba(20,40,70,0.85)'
+  ctx.fillStyle = fill
   ctx.fillRect(bx, by, w, 13)
-  ctx.strokeStyle = '#9ad8ff'; ctx.lineWidth = 1
+  ctx.strokeStyle = line; ctx.lineWidth = 1
   ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, 12)
-  ctx.fillStyle = '#cfeeff'
-  ctx.fillText('휴식', bx + w / 2, by + 10)
+  ctx.fillStyle = ink
+  ctx.fillText(text, bx + w / 2, by + 10)
 }
 
 /** 개선판: 상태 이상 점 (중독 보라 · 혼수 파랑 · 강화 하늘 · 약화 주황), 피로 막대 위 오른쪽 */

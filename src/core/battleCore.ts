@@ -218,6 +218,18 @@ export function rest(u: Unit) {
 export function tire(u: Unit, attacked: boolean, magic?: Magic) {
   u.fatigue = leveled.delete(u) ? 0 : S.ed.rules.fatigueAfter(u, attacked, magic)
   u.steps = 0
+  u.power = false
+}
+
+/** 방어 태세 (개선판 B1 제안 27, Rules.stance): 움직이지 않고 휴식 대신 차례를 마친다. 피로 −rest (생명 회복 없음),
+ *  다음 제 차례 (statusTick) 까지 물리 방어 ×def */
+export function brace(u: Unit) {
+  const st = S.ed.rules.stance
+  if (!st) return
+  u.fatigue = Math.max(0, u.fatigue - st.rest)
+  u.steps = 0
+  u.guard = true
+  S.floats.push({ x: u.x, y: u.y, text: '방어', t0: performance.now(), color: '#9ad8ff' })
 }
 
 /** 차례를 마친 뒤 두 번째 행동을 받나 (원작 2ff8:1109, 라운드에 한 번). 받으면 이동 기록을 지우고 true */

@@ -28,6 +28,8 @@ export interface Rules {
   aiRests(u: Unit): boolean
   /** 공격자가 대상에게 특효 (방어를 덜 봄, 개선판 B1 제안 24) 인가. 확인창 표시용. 없으면 특효 없음 */
   bane?(a: Unit, d: Unit): boolean
+  /** 전력 공격·방어 태세 (개선판 B1 제안 27). 없으면 두 명령이 없다 */
+  stance?: Stance
   /** 이 유닛이 한 차례에 두 번 행동하나 (차례를 마칠 때 검사) */
   actsTwice(u: Unit): boolean
   /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */
@@ -38,6 +40,10 @@ export interface Rules {
   /** 레벨 하나 오른 뒤 처리 (u.type.lv 는 이미 올렸다). 유닛·u.type (일행 사본) 을 바꾸고 바뀐 것을 돌려준다. route = 지금 루트 */
   levelUp(u: Unit, tables: Tables, route: number): LevelUp
 }
+
+/** 피로를 쓰는 명령 (개선판 B1 제안 27). 전력 공격 = 물리 피해 ×dmg, 그 공격으로 쌓이는 피로 ×tire.
+ *  방어 태세 = 움직이지 않은 차례에 휴식 대신. 다음 제 차례까지 물리 방어 (피해식의 D) ×def, 피로 −rest (생명은 회복 없음, 휴식보다 덜) */
+export interface Stance { dmg: number; tire: number; def: number; rest: number }
 
 /** 레벨업 결과. gains = 생명(최대)·역량·방어·정신·민첩 증가, weapon·armor = 승급한 장비 Item id, magic = 배운 마법 id */
 export interface LevelUp { gains: [number, number, number, number, number]; weapon?: number; armor?: number; magic?: number }

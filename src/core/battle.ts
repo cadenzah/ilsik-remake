@@ -34,7 +34,7 @@ import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, setOutsideCloses, showMenu, showResult, type Btn } from './ui'
 import { applyMods, type Pos, type Unit } from './unit'
-import { addExp, again, applyCounter, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
+import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
 import { SCHOOL_COLOR, SCHOOL_NAME, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 
@@ -443,9 +443,10 @@ function gotItem(title: string, item: number, who?: string) {
     bodyH: 104, at: 'center', kind: 'levelup', dir: 'row', width: 180, buttons: [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
 }
 
-/** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식 */
-function finishUnit(u: Unit, attacked = false, magic?: Magic) {
-  if (S.ed.features.autoRest && !attacked && !magic && !u.moved) rest(u)
+/** 유닛 차례 끝. 개선판은 이동·공격 없이 마치면 휴식, guard = 방어 태세 (제안 27, 휴식 대신) */
+function finishUnit(u: Unit, attacked = false, magic?: Magic, guard = false) {
+  if (guard) brace(u)
+  else if (S.ed.features.autoRest && !attacked && !magic && !u.moved) rest(u)
   else tire(u, attacked, magic)
   const twice = again(u)
   if (!twice) u.acted = true
@@ -1026,7 +1027,7 @@ export async function clickTile(t: Pos) {
   if (md.magic) { if (validCenter(md.unit, md.magic, t)) askMagic(md.unit, md.magic, t); else back(); return }
   // 범위 공격은 맞을 적을 눌러도 된다 (그 적을 맞히는 중심 — 기사는 자기·아군, 포수는 다른 적)
   const c = there && (canAim(md.unit, there) ? there : aimsFrom(md.unit).find(c => strikeTargets(md.unit, c).includes(there) && there.side !== md.unit.side))
-  if (c) askAttack(md.unit, c)
+  if (c) askAttack(md.unit, c, undefined, undefined, md.power)
   else back()   // 대상이 아닌 칸 = 한 단계 뒤로 (행동 메뉴)
 }
 
@@ -1050,13 +1051,15 @@ export function hoverTile(t: Pos | null) {
   showBasic(there, aboveUnit(sx, sy, 112), { extra: true })
 }
 
-/** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸 */
-function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>) {
+/** 「전 투」 확인 (원작 DS:0x1f72). 개선판은 피해 예측을 창에 넣는다 (범위 공격은 맞는 유닛마다). target = 중심 유닛, spot = 개선판 이동+공격 때 설 칸.
+ *  power = 전력 공격 (개선판 제안 27): 창 이름 「전력 공격」, 예측은 전력 피해로, 쌓일 피로 줄 */
+function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof reachable>, power = false) {
   const cp = target === u ? spot ?? u : target
   S.aim = { x: cp.x, y: cp.y }
   hideBasic()
   let body: string | undefined
   let lines = 0
+  u.power = power   // 예측 동안만 (피해·반격·피로 계산이 본다)
   if (S.ed.features.forecast) {
     const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
     const hit = strikeTargets(u, target, spot ?? u)
@@ -1074,7 +1077,13 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
       }).join('<br>')
       lines = hit.length
     }
+    if (power) {
+      const tired = `피로 ${u.fatigue} → ${S.ed.rules.fatigueAfter(u, true)}`
+      body = body ? `${body}<br>${tired}` : tired
+      if (lines) lines++
+    }
   }
+  u.power = false
   const { sx, sy } = toScreen(cp.x + 1, cp.y)
   const go = () => {
     S.aim = null
@@ -1085,11 +1094,11 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
         await walk(u, pathTo(moves, spot.x, spot.y))
         S.mode = { kind: 'targeting', unit: u, from }
       }
-      await doAttack(u, target)
+      await doAttack(u, target, power)
     })()
   }
   if (remake() ? setting('quickAttack') : !S.notice) { go(); return }   // 원작: 알림을 열었을 때만 확인 (기본 닫기), 개선판: 설정으로 생략
-  confirmWin('전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, lines ? 200 : undefined)
+  confirmWin(power ? '전력 공격' : '전 투', { x: sx + 4, y: sy }, go, () => { S.aim = null }, body, lines ? 200 : undefined)
 }
 
 /** 원작판: 차례인 유닛을 누르면 여는 명령창 「명령」 (원작 20ec:eb81): [마법]·이동·전투·상황·시스템 (마법은 마법 있는 유닛만) */
@@ -1144,18 +1153,26 @@ export function actionMenu(u: Unit, from: Pos) {
   const undo = () => { undoMove(u, from); if (remake()) select(u); else commandMenu(u) }
   const targets = aimsFrom(u)
   const magic: Btn[] = spellsOf(u).length ? [['마법', () => magicMenu(u, from, () => actionMenu(u, from))]] : []
+  // 피로를 쓰는 명령 (개선판 B1 제안 27): 전력 공격 = 칠 대상이 있을 때, 방어 = 움직이지 않았을 때 (휴식 대신)
+  const st = S.ed.rules.stance
+  const power: Btn[] = st && targets.length ? [['전력 공격', () => { S.mode = { kind: 'targeting', unit: u, from, power: true } }]] : []
+  const guard: Btn[] = st && !u.moved ? [['방어', () => finishUnit(u, false, undefined, true)]] : []
   const items: Btn[] = remake()
-    ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ...magic, ['대기', () => finishUnit(u)],
+    ? [...targets.length ? [['공격', () => { S.mode = { kind: 'targeting', unit: u, from } }] as Btn] : [], ...power, ...magic, ...guard, ['대기', () => finishUnit(u)],
       ['상태', () => bigStatus(u, () => actionMenu(u, from))], ['취소', undo]]   // 상태 = 터치 기기용 (마우스는 올리면 작은 창)
     : [...magic, ['전투', () => fightMode(u, from)], ['결정', () => finishUnit(u)], ['취소', undo]]
   const p = beside(u)
   showMenu(items, p.x, p.y, remake() ? '행동' : '명령', () => { closeWin('menu'); undo() }, { x: false })   // 취소 버튼이 있다
 }
 
-export async function doAttack(u: Unit, target: Unit) {
+export async function doAttack(u: Unit, target: Unit, power = false) {
   S.mode = { kind: 'busy' }
   hideMenu()
   hideBasic()
+  if (power) {   // 전력 공격 (제안 27): 차례를 마칠 때 (tire) 풀린다
+    u.power = true
+    S.floats.push({ x: u.x, y: u.y - 0.4, text: '전력', t0: performance.now(), color: '#ffb04a' })
+  }
   await attack(u, target)
   finishUnit(u, true)
 }

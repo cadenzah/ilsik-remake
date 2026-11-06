@@ -5,7 +5,7 @@
 import { loadBattles, loadDialogue, loadScenes, loadTables, type Battles, type Magic, type StageMap } from '../../src/core/data'
 import type { AiPlan, Edition } from '../../src/core/edition'
 import { EQUIP, GOLD, ITEMS, PARTY, finishStage, giveGold, nextStage, partyType, promoteDeployed, restore, snapshot, type Camp } from '../../src/core/campaign'
-import { addExp, again, applyCounter, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
+import { addExp, again, applyCounter, brace, counterDamage, freshBattle, judge, placements, rest, spellResult, startEvents, strike, takeTreasure, tire, treasureAt, turnStart, type Outcome } from '../../src/core/battleCore'
 import { DIRS, dist, inside, key, moveCost, pathTo, reachable } from '../../src/core/grid'
 import { aimsFrom, inReach, strikeTargets } from '../../src/core/attack'
 import { aiCaster, spellsOf } from '../../src/core/magic'
@@ -207,9 +207,29 @@ const countered = { ally: 0, foe: 0 }, counterMade = { ally: 0, foe: 0 }   // �
 const QUIET = 6   // 이만큼 아무도 안 쓰러지는 턴이 이어지면 조심을 풀고 들어간다
 let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 
+// ---------- 피로 명령 (개선판 B1 제안 27): 사람이 쓸 법한 때 ----------
+/** --stance no = 쓰지 않음, power = 전력 공격을 쓰는 피로 한도 (그 공격 뒤 피로), guard = 방어 태세를 쓰나 */
+const stanceUse = { power: 40, guard: true }
+const stanceMade = { power: 0, guard: 0 }
+/** 전력 공격: 보통으로는 못 쓰러뜨리는데 전력이면 쓰러뜨리거나, 못 쓰러뜨려도 공격 뒤 피로가 한도 안이면. 보통으로 쓰러뜨리면 안 씀 (u 는 이미 칠 칸에) */
+function wantPower(u: Unit, target: Unit) {
+  if (!S.ed.rules.stance || stanceUse.power < 0) return false
+  if (S.ed.rules.damageRange(S.map, u, target)[0] >= target.hp) return false
+  u.power = true
+  const kill = S.ed.rules.damageRange(S.map, u, target)[0] >= target.hp, f = S.ed.rules.fatigueAfter(u, true)
+  u.power = false
+  return kill || f <= stanceUse.power
+}
+/** 방어 태세 (제자리만, 휴식 대신): 다음 적 차례에 맞을 수 있고 생명 60% 이상·피로 30 이하일 때 (아니면 휴식) */
+function wantGuard(u: Unit) {
+  if (!S.ed.rules.stance || !stanceUse.guard || u.moved) return false
+  return u.hp >= u.maxHp * 0.6 && u.fatigue <= 30 && danger(u, u) > 0
+}
+
 /** 행동 하나 (battle.ts aiAct·finishUnit). party = 일행 → 개선판 점수식 AI 로 고르고, 행동을 마친 칸의 보물을 줍는다. 전투가 끝나면 결과 */
 function act(u: Unit, party: boolean, t: Tally): Outcome | null {
   const plan: AiPlan = party ? partyPlan(u) : S.ed.planFor(S.map, S.units, u, S.troopState)
+  if (plan.rest && party && plan.dest.x === u.x && plan.dest.y === u.y && wantGuard(u)) { brace(u); stanceMade.guard++; return judge().result }
   if (plan.rest) {
     if (party) t.allyRests++
     else if (u.fatigue > 70 || u.hp <= u.maxHp * 0.25) t.foeRests++   // 원작 AI 휴식선 (aiGate). 경계·대기 부대의 제자리는 세지 않는다
@@ -233,6 +253,7 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
     magic = plan.magic
   } else if (plan.target && plan.target.hp > 0) {
     const before = new Map(S.units.map(o => [o, o.hp]))
+    if (party && wantPower(u, plan.target)) { u.power = true; stanceMade.power++ }
     const back = counterDamage(u, plan.target)   // battle.ts attack 와 같은 차례
     const r = strike(u, plan.target)
     tallyHits(u.side === 'enemy' ? t.hits.foe : t.hits.ally, u, r.hits, before)
@@ -247,7 +268,8 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
       counterMade[k]++
     }
   }
-  if (party && S.ed.features.autoRest && !attacked && !magic && !u.moved) { rest(u); t.allyRests++ }
+  if (party && !attacked && !magic && wantGuard(u)) { brace(u); stanceMade.guard++ }
+  else if (party && S.ed.features.autoRest && !attacked && !magic && !u.moved) { rest(u); t.allyRests++ }
   else tire(u, attacked, magic)
   if (party && u.hp > 0) for (const [i] of treasureAt(u)) takeTreasure(i)
   S.floats.length = 0
@@ -436,6 +458,14 @@ export async function main(argv: string[]) {
   if (arg('retreat', 'yes') === 'no') mindOpts.retreat = false
   if (argv.includes('--backer')) mindOpts.backer = Number(arg('backer', '1'))
   if (arg('lag', 'yes') === 'no' && remakeTuning.grow) remakeTuning.grow.lag = Infinity   // 성장 난수 처짐 보정 (N4) 끔
+  // 피로 명령 (제안 27): --stance no (쓰지 않음) | power:N (전력 공격 피로 한도, −1 = 안 씀) · guard:no · dmg:1.3 · tire:2 · def:1.2 · rest:15 (쉼표로 여럿)
+  for (const kv of arg('stance', '').split(',').filter(Boolean)) {
+    const [k, v] = kv.split(':')
+    if (k === 'no') { stanceUse.power = -1; stanceUse.guard = false }
+    else if (k === 'power') stanceUse.power = Number(v)
+    else if (k === 'guard') stanceUse.guard = v !== 'no'
+    else if (remakeTuning.stance && k in remakeTuning.stance) remakeTuning.stance[k as keyof typeof remakeTuning.stance] = Number(v)
+  }
   if (argv.includes('--bane') && remakeTuning.bane) remakeTuning.bane.cut = arg('bane', 'no') === 'no' ? 0 : Number(arg('bane', '0.15'))   // 고대 병기 특효 (제안 24) 세기
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
@@ -456,6 +486,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
   const wins = new Map<string, number[]>()   // --par: 장-루트 → 이긴 판의 턴
   for (const r of o.routes) {
     countered.ally = countered.foe = counterMade.ally = counterMade.foe = 0
+    stanceMade.power = stanceMade.guard = 0
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
@@ -479,6 +510,10 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     if (o.ed.counter) {
       const turns = [...by.values()].flat().reduce((x, w) => x + w.turns * w.tries, 0)   // 어림: 마지막 시도 턴 × 시도 수
       console.log(`반격 — 아군이 준 물리 피해 중 ${pct(countered.ally, tot.ally.pts)}% / 적이 준 물리 피해 중 ${pct(countered.foe, tot.foe.pts)}% · 턴당 아군 ${(counterMade.ally / Math.max(1, turns)).toFixed(2)}번 적 ${(counterMade.foe / Math.max(1, turns)).toFixed(2)}번`)
+    }
+    if (S.ed.rules.stance) {
+      const turns = [...by.values()].flat().reduce((x, w) => x + w.turns * w.tries, 0)
+      console.log(`피로 명령 — 턴당 전력 공격 ${(stanceMade.power / Math.max(1, turns)).toFixed(2)}번 · 방어 태세 ${(stanceMade.guard / Math.max(1, turns)).toFixed(2)}번`)
     }
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'

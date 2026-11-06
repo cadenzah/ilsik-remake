@@ -26,6 +26,8 @@ export interface Unit {
   ticked: boolean                // 이번 라운드 차례 처리 (중독·혼수·강화 되돌림) 를 했다
   again?: boolean                // 이번 라운드 두 번째 행동을 받았다 (Rules.actsTwice)
   absent?: boolean               // 전투 시작 처리로 자리를 비웠다 (HP 0, 쓰러진 동료로 치지 않음 — 17장 페니·22장 아티스)
+  power?: boolean                // 전력 공격 중 (개선판 B1 제안 27, Rules.stance): 이번 공격 피해 ↑, 공격 피로 ↑. 차례를 마치면 (tire) 풀린다
+  guard?: boolean                // 방어 태세 (제안 27): 다음 제 차례가 올 때까지 물리 방어 ↑. 차례 시작 처리 (statusTick) 에서 풀린다
   // 렌더용 보간 위치
   px: number; py: number
   alpha: number

@@ -27,7 +27,9 @@ const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
 // 고대 병기 특효 (B1 제안 24, Q7): 용자의검·빛의갑옷·무자의책·현자의돌을 지닌 수마다 제관·사바카 (세 형태) 의 방어를 덜 본다 — balance-proposal.md "24 고대 병기 특효"
 export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
 const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane }   // grow = 성장 난수 (N4, growth.ts)
+// 피로를 쓰는 명령 (B1 제안 27): 전력 공격 = 피해 ×1.3·공격 피로 ×2, 방어 태세 = 물리 방어 ×1.2·제자리면 피로 −15 — balance-proposal.md "27 피로 명령"
+const stance = { dmg: 1.3, tire: 2, def: 1.2, rest: 15 }
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance }   // grow = 성장 난수 (N4, growth.ts)
 
 export const edition: Edition = {
   ...original,

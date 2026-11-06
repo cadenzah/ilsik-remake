@@ -1,7 +1,7 @@
 // 원작판 전투 규칙 [확정] — 행동 실행 20ec:6e92, 수치 함수 0aa2:0e17(유닛, x, k) (rules.md "원작 전투 공식").
 // 전투 계산에 난수가 없다: 명중 판정·치명타·피해 흔들림·반격 모두 없음. 정수화는 0 쪽 절사, 중간값 일부는 float32
 import type { Item, Magic, StageMap, Tables, UnitType } from '../../core/data'
-import type { LevelUp, Rules, SpellHit } from '../../core/edition'
+import type { LevelUp, Rules, SpellHit, Stance } from '../../core/edition'
 import { applyMods, equippedStats, type BuffStat, type Pos, type Unit } from '../../core/unit'
 
 const f32 = Math.fround
@@ -22,7 +22,7 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance }
 /** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
 export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
@@ -40,10 +40,11 @@ export function baneCut(a: Unit, d: Unit, b?: Bane) {
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
 function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL) {
   const p = forSide(a, all)
-  const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d) * baneCut(a, d, all.bane)
+  const st = all.stance   // 전력 공격·방어 태세 (개선판 B1 제안 27)
+  const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d) * baneCut(a, d, all.bane) * (st && d.guard ? st.def : 1)
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
-  const v = tr(raw * 0.01)
+  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1))
   return Math.min(clamp(v, 1, 99), d.hp)
 }
 
@@ -197,7 +198,8 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
    *  이어서 이동 (a317): += 움직인 칸. 단계마다 상한 100. 맞아도 늘지 않는다 */
   fatigueAfter(u, attacked, magic) {
     let f = u.fatigue
-    if (attacked) f = Math.min(100, tr(f + (6 * u.type.rank + 82) * (1 + 0.1 * (u.steps + 1 + 5)) * 0.033))
+    // 전력 공격 (개선판 제안 27) 은 공격 몫을 stance.tire 배
+    if (attacked) f = Math.min(100, tr(f + (6 * u.type.rank + 82) * (1 + 0.1 * (u.steps + 1 + 5)) * 0.033 * (tuning.stance && u.power ? tuning.stance.tire : 1)))
     // 마법 (8e0f): += trunc((6·부하 + 82)·MAD 피로·0.01)
     if (magic) f = Math.min(100, tr(f + (6 * u.type.rank + 82) * magic.fatigue * 0.01))
     return Math.min(100, f + u.steps)
@@ -215,6 +217,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   // 매 차례 (20ec:a419): 중독 → 1 줄고 HP −= max(1, trunc(HP·0.33)) / 혼수 → 1 줄고 휴식하고 넘김 /
   // 강화·약화 남은량 r → d = min(r, 1 + floor(10r/(현재 정신 + 50))) 만큼 원상 쪽으로
   statusTick(u) {
+    u.guard = false   // 방어 태세 (제안 27) 는 다음 제 차례까지
     let poison = 0
     if (u.poison > 0) { u.poison--; poison = Math.min(u.hp, Math.max(1, tr(u.hp * 0.33))); u.hp -= poison }
     const coma = u.coma > 0
@@ -230,6 +233,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   expGain,
   levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow) },
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
+  stance: tuning.stance,
 } }
 
 /** 효과 7~13·15 = 상대편 (124e:c1b6 대상편) */

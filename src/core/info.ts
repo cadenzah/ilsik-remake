@@ -58,6 +58,7 @@ function statusTags(u: Unit) {
   const tags = [
     ...u.poison > 0 ? [`<span class="red">중독${u.poison}</span>`] : [],
     ...u.coma > 0 ? [`<span class="blue">혼수${u.coma}</span>`] : [],
+    ...u.guard ? ['<span class="blue">방어</span>'] : [],   // 방어 태세 (제안 27)
     ...(Object.keys(name) as (keyof typeof name)[]).filter(k => u.mods[k]).map(k => `${name[k]}${u.mods[k] > 0 ? '+' : ''}${u.mods[k]}`),
   ]
   return tags.length ? ` · ${tags.join(' ')}` : ''

@@ -10,7 +10,7 @@ export type Mode =
   | { kind: 'idle' }
   | { kind: 'selected'; unit: Unit; moves: Moves }
   | { kind: 'moved'; unit: Unit; from: Pos }
-  | { kind: 'targeting'; unit: Unit; from: Pos; magic?: Magic }   // magic = 마법 중심 칸 고르기
+  | { kind: 'targeting'; unit: Unit; from: Pos; magic?: Magic; power?: boolean }   // magic = 마법 중심 칸 고르기, power = 전력 공격 (개선판 제안 27)
 
 export const S = {
   ed: null as unknown as Edition,
