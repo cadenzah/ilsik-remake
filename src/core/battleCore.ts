@@ -12,8 +12,11 @@ import { equippedStats, nextUpgrade, refit, type Pos, type Unit } from './unit'
 
 let uidSeq = 0
 
-/** 지금 장의 판 조정 (장-루트가 장보다 먼저). 숨은 장은 없음 */
-export const stageTune = () => S.ed.extraBattles?.[S.def.n] ? undefined : S.ed.tune?.[`${S.def.n}-${S.def.route}`] ?? S.ed.tune?.[S.def.n]
+/** 지금 장의 판 조정 (장-루트가 장보다 먼저, 어려움이면 hard 를 덮어씀). 숨은 장은 없음 */
+export const stageTune = () => {
+  const t = S.ed.extraBattles?.[S.def.n] ? undefined : S.ed.tune?.[`${S.def.n}-${S.def.route}`] ?? S.ed.tune?.[S.def.n]
+  return t?.hard && S.diff === 2 ? { ...t, ...t.hard } : t   // 어려움 덮어쓰기
+}
 
 export function spawn(p: Placement, side: Unit['side']): Unit {
   const t = p.troop === 0 ? partyType(p.type) : S.types[p.type]   // 일행은 정비 화면에서 바꾼 장비로

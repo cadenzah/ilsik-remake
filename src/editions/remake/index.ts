@@ -7,6 +7,7 @@ import { afterWin, ensureSeed, grow, partyChange, startFatigue } from './growth'
 import { affinity, affinityNote, affinityTags } from './affinity'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
+import { S } from '../../core/state'
 import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
@@ -41,6 +42,7 @@ enemyHit.affinity = affinity
 export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity }
 /** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
 export function applyDifficulty(d: number, hardFlank = true) {
+  S.diff = d   // 장별 조정의 hard (core/battleCore stageTune)
   enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]
   enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
   enemyHit.flank = d === 2 && hardFlank ? flank : undefined

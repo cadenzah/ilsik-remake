@@ -40,6 +40,7 @@ export const S = {
   figs: new Map<number, Fig>(),   // 공격·시전 동작 (ECPnn.FIG)
   units: [] as Unit[],
   turn: 1,
+  diff: 1,                     // 이번 전투에 쓴 난이도 0 쉬움 · 1 보통 · 2 어려움 (개선판 applyDifficulty, 장별 조정 hard 가 본다)
   active: [] as Unit[],        // 지금 행동 단계에서 플레이어가 움직일 수 있는 일행 대원
   mode: { kind: 'busy' } as Mode,
   hover: null as Pos | null,
