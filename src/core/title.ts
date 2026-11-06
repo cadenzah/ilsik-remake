@@ -156,10 +156,17 @@ export function showTitle(): Promise<Launch> {
     // 개선판 새로 시작: 난이도부터 (설정에서 언제든 바꿀 수 있다)
     const pickDifficulty = () => {
       win.classList.add('wide')
+      const seenEnd = !!loadProgress(ed)?.endings?.length   // 엔딩을 본 적이 있으면 시스템 안내 (tips.ts) 를 볼지 묻는다 (기본 끔)
       rows([...([0, 1, 2] as Difficulty[]).map(d => ({ label: DIFFICULTIES[d],
-        on: () => { setDifficulty(d); newGame() } })),
+        on: () => { setDifficulty(d); if (seenEnd) askTips(); else newGame() } })),
         { label: '돌아가기', cls: 'back', on: menu }])
       body.querySelectorAll<HTMLButtonElement>('button')[difficulty()]?.focus()
+    }
+    const askTips = () => {
+      const pick = (on: boolean) => () => { setSetting('tipLines', on); setSetting('tipCards', on); newGame() }
+      rows([{ label: '안내 없이 시작', title: '새 규칙을 처음 겪을 때의 동료 한마디·안내 카드를 끈다 (설정에서 다시 켤 수 있다)', on: pick(false) },
+        { label: '안내 보며 시작', title: '새 규칙을 처음 겪을 때 동료 한마디와 안내 카드', on: pick(true) },
+        { label: '돌아가기', cls: 'back', on: pickDifficulty }])
     }
     /** 기록 칸 글자 뒤에 붙일 그 판의 가장 낮은 난이도 (개선판) */
     const lowest = (flags: string[]) => { const d = ed === 'remake' ? lowestDifficulty(flags) : undefined; return d === undefined ? '' : ` · ${DIFFICULTIES[d]}` }

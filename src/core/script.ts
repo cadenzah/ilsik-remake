@@ -7,6 +7,7 @@ import type { PostStep, UnitType } from './data'
 import { S } from './state'
 import { playDialogue } from './dialogue'
 import { confirmWin, showResult } from './ui'
+import { initTips } from './tips'
 
 // ---------- 형식 ----------
 
@@ -275,8 +276,9 @@ export function initScript(src: ScriptSource | undefined, types: UnitType[]) {
   banterLines = src?.banter ? parseBanter('banter.ecs', src.banter, s => names(s), types) : new Map()
   epilogueCh = src?.epilogue ? parseChapter('epilogue.ecs', 0, src.epilogue, s => names(s)) : undefined
   recallLines = new Map(src?.recall ? parseRecall('recall.ecs', src.recall) : [])
+  initTips(src?.tips, types)   // 시스템 대화 안내 (tips-proposal.md)
 }
-export interface ScriptSource { files: Record<string, string>; aliases?: Record<string, string>; banter?: string; epilogue?: string; recall?: string }
+export interface ScriptSource { files: Record<string, string>; aliases?: Record<string, string>; banter?: string; epilogue?: string; recall?: string; tips?: string }
 
 export const chapter = (n = S.def.n) => chapters.get(n)
 

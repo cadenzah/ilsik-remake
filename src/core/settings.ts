@@ -9,8 +9,10 @@ const KEYS = {
   shortAnim: 'eclipse.shortAnim',     // 전투 연출 짧게
   quickAttack: 'eclipse.quickAttack', // 공격 확인창 없이 바로
   modernUi: 'eclipse.modernUi',       // 설정 이름 '개선된 UI' (코드에선 현대식 화면): 창틀 없이 맵 가득·다듬은 창. 끄면 원작 창틀
+  tipLines: 'eclipse.tipLines',       // 새 시스템을 처음 겪을 때 인물 한 줄 (tips-proposal.md, core/tips.ts)
+  tipCards: 'eclipse.tipCards',       // 그 뒤의 안내 카드
 } as const
-const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, sound: true, music: true, fastEnemy: false, shortAnim: false, quickAttack: false, modernUi: false }
+const DEFAULTS: Record<keyof typeof KEYS, boolean> = { bitmapFont: true, logoSound: false, sound: true, music: true, fastEnemy: false, shortAnim: false, quickAttack: false, modernUi: false, tipLines: true, tipCards: true }
 
 export type Setting = keyof typeof KEYS
 
@@ -65,6 +67,8 @@ export const SETTINGS: { k: Setting; label: string; desc: string }[] = [   // de
   { k: 'fastEnemy', label: '적 차례 빠르게', desc: '' },
   { k: 'shortAnim', label: '전투 연출 짧게', desc: '' },
   { k: 'quickAttack', label: '공격 확인 생략', desc: '대상을 누르면 바로 공격' },
+  { k: 'tipLines', label: '이야기 속 안내', desc: '새 규칙을 처음 겪을 때 동료의 한마디' },
+  { k: 'tipCards', label: '안내 카드', desc: '새 규칙을 처음 겪을 때 규칙 설명 카드' },
 ]
 
 // ---------- 음량 (배경음악·효과음, 웹 추가). 0~100, 10 단위, 기본 100 = 예전 크기. 원작판도 따른다 ----------

@@ -1,11 +1,12 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
-import { helpKnown, rulesWin } from './help'
+import { rulesWin } from './help'
+import { battleKnown, flushTips, noteTip, resetTips, seenTip, tipLog, tipNow } from './tips'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, takePromo, type Camp } from './campaign'
 import type { Edition, LevelUp } from './edition'
-import { dist, key, pathTo, reachable, terrainName } from './grid'
+import { dist, key, pathTo, reachable, slips, terrainName } from './grid'
 import { aimsFrom, attackKind, canAim, strikeArea, strikeCells, strikePlans, strikeTargets } from './attack'
 import { campScreen, equipDiff, icon, type CampResult } from './camp'
 import { promoteScene } from './promote'
@@ -23,7 +24,7 @@ import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './b
 import { initMinimap, minimapOn, removeMinimap, setMinimap } from './minimap'
 import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } from './info'
 import { playDialogue, resetTalkLog } from './dialogue'
-import { loadProgress, loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
+import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
 import { stageMarks, starText } from './grade'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
@@ -177,6 +178,7 @@ async function start(resume?: Suspended) {
   preloadSounds(all)
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
   resetTalk()
+  resetTips()
   S.active = []
   S.mode = { kind: 'busy' }
   S.aim = S.watch = null
@@ -358,6 +360,7 @@ async function attack(a: Unit, c: Unit) {
   else if (attackKind(a) >= 4 && c !== a) await arrowHit(a, c, attackKind(a) === 4)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const back = counterDamage(a, c)   // 타격 전 상태로 판단 (맞으면 혼수가 풀린다)
+  if (remake()) attackTips(a, targets)
   const { hits } = strike(a, c)
   if (melee) await meleeHit(a, targets)   // 맞는 자세·밀림 (원작 39c9·4b7a) 이 타격 프레임을 보이는 동안
   else await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
@@ -366,7 +369,15 @@ async function attack(a: Unit, c: Unit) {
   S.fx = null
   await fadeDead(targets)
   await gainExp(a, hits)
-  if (back) await counterAct(a, c, back)
+  if (back) { await counterAct(a, c, back); if (remake()) noteTip('counter') }
+}
+
+/** 시스템 대화 안내 (tips.ts): 일행의 협공, 활이 날 수 있는 유닛을 맞힘 (어느 편이든 — 적이 쏘면 foe 갈래) */
+function attackTips(a: Unit, targets: Unit[]) {
+  if (a.troop === 0 && targets.some(t => t.side !== a.side && (S.ed.rules.flank?.(a, t, S.units) ?? 0) > 0)) noteTip('flank')
+  const shot = targets.filter(t => t.side !== a.side && t.type.moveKind === 4 && (S.ed.rules.affinity?.(a, t) ?? 1) > 1)
+  if (a.troop === 0 && shot.length) noteTip('arrow', 'ally')
+  else if (a.side === 'enemy' && shot.some(t => t.troop === 0)) noteTip('arrow', 'foe')
 }
 
 /** 반격 연출 (개선판 제안 3): 맞은 쪽이 공격 동작으로 되받는다 */
@@ -422,6 +433,7 @@ async function showLevelUp(u: Unit, r: LevelUp) {
     width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
   if (u.type.id === PARTY[0]) await recall(u.type.lv >= 20 ? 'lv20' : u.type.lv >= 10 ? 'lv10' : null)   // 레스다 회상 (B1 제안 42)
+  if (offers.length) await tipNow('promo')   // 승급 고르기 안내 (tips.ts)
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
@@ -465,6 +477,11 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
   const { targets, hits, cured } = spellResult(a, m, c)
+  if (remake() && a.troop === 0 && m.effect === 7) for (const t of targets) {   // 상성 안내: 생명상해 마법이 적에게 약점·내성으로 (tips.ts)
+    if (t.side === a.side) continue
+    const tip = S.ed.affinityTip?.(t.type, m.school, S.ed.rules.affinity?.(a, t, m) ?? 1)
+    if (tip) { noteTip(tip[0], tip[1]); break }
+  }
   await sleep(step)
   S.fx = null
   a.pose = undefined
@@ -502,7 +519,8 @@ function finishUnit(u: Unit, attacked = false, magic?: Magic, guard = false) {
   S.aim = null
   const found = u.hp > 0 && treasureAt(u).length > 0
   if (found) S.mode = { kind: 'busy' }
-  void (found ? pickUp(u).then(() => { S.mode = { kind: 'idle' } }) : Promise.resolve()).then(checkEnd).then(over => {
+  void (found ? pickUp(u).then(() => { S.mode = { kind: 'idle' } }) : Promise.resolve()).then(checkEnd).then(async over => {
+    if (!over && remake()) await flushTips()   // 이 행동에서 생긴 안내 (반격·협공·상성, tips.ts)
     if (over) stepDone?.(true)
     else if (S.active.every(a => a.acted || a.hp <= 0)) stepDone?.(false)
     else if (twice && remake() && S.mode.kind === 'idle') select(u)   // 개선판: 두 번째 행동할 대원을 골라 둔다
@@ -547,8 +565,10 @@ export async function checkEnd(): Promise<boolean> {
   if (!remake()) stopMusic()
   const bench: { text: string }[] = []
   S.ed.afterWin?.(bench, atStart)   // 개선판: 대기 동료 경험치·쓰러진 대가
+  const benched = bench.length > 0 && PARTY.some(t => !S.units.some(u => u.troop === 0 && u.type.id === t))   // 대기 동료 안내 (tips.ts): 이 장 뒤 합류하는 동료는 빼고 (growth.ts benchShare 와 같은 때)
   const done = finishStage(S.joined, S.reward, aliveMember, ownsSteps(chapter()))
   await story('post', done.scenes, aliveMember, undefined, [...done.notes, ...bench])
+  if (remake() && result !== 'ending') await postTips(benched)
   if (result === 'ending' && !S.ed.extraBattles?.[S.def.n]) {
     // 원작 엔딩 영상 (0aa2:3982): 마지막 전투 일행 (쓰러진 대원 포함) 에 채스 (초상 6) +1, 소피아 (초상 28) +2, 루트별 장면. 엔딩 곡은 영상이 튼다
     const party = S.units.filter(u => u.side === 'ally' && u.troop === 0).map(u => u.type.por)
@@ -707,6 +727,7 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
         if (live.every(u => u.acted || u.hp <= 0)) skipped = true
         else {
           if (step.length > 1) await goGo(900)
+          if (remake()) { turnTips(live); await flushTips() }   // 장 시작·적 차례에 생긴 안내 (tips.ts)
           if (await playerStep(live)) return
         }
         if (remake()) { record(S.turn, 'ally', diff(before, 'ally')); since = { at: mark(), turn: S.turn } }
@@ -723,6 +744,25 @@ function enemySummary() {
   if (!since) return
   record(since.turn, 'enemy', diff(since.at, 'enemy'))
   since = null
+}
+
+/** 아군 차례 시작에 쌓을 안내 (tips.ts). 앞에 쌓은 것부터 보이므로 급한 것을 먼저: 호위 → 경계 → 고대 병기 → 중갑 → 전력·방어 → 피로 */
+function turnTips(live: Unit[]) {
+  const foes = alive('enemy')
+  if (S.cond.some(r => r.do.includes('lose') && 'dead' in r.if && r.if.dead.some(d => { const u = member(d); return !!u && isNpc(u) }))) noteTip('escort')
+  if (foes.some(f => S.troopState[f.troop] === 1)) noteTip('wake')
+  if (live.some(u => foes.some(f => S.ed.rules.bane?.(u, f)))) noteTip('ancient')
+  if (foes.some(f => S.ed.affinityText?.(f.type, '', S.tables.magic).tags.split('·').includes('중갑'))) noteTip('heavy')
+  if (S.def.n >= 2 && S.ed.rules.stance) noteTip('stance')
+  if (live.some(u => u.fatigue > 70)) noteTip('tired')
+}
+
+/** 이긴 장 뒤 (원작 장면 뒤): 쓰러진 대가·대기 동료 경험치 안내. 전투 중 남은 안내는 버리고 이 둘만 (셈 없이) */
+async function postTips(benched: boolean) {
+  resetTips()
+  const down = S.units.filter(u => u.troop === 0 && u.hp <= 0 && !u.absent && FLAGS.has(`down:${u.type.name}`))   // growth.ts fallenCost 가 세운 플래그
+  if (down.length) await tipNow('down', undefined, down.map(u => u.type.name).join(', '), true)
+  if (benched) await tipNow('bench', undefined, undefined, true)
 }
 
 // 플레이어 단계: 단계의 일행 대원이 모두 행동하거나 턴 종료(원작판은 휴식)를 누를 때까지
@@ -796,6 +836,7 @@ async function aiAct(u: Unit, alone: boolean): Promise<boolean> {
     const back = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
     if (back.length > 1) { if (alone) updatePhase(phase.side, u.type.name); centerOnIfOff(u); await walk(u, back) }
     rest(u)
+    if (u.side === 'enemy' && remake()) noteTip('foeRest')   // 다음 아군 차례에 안내 (tips.ts)
     return false
   }
   const path = pathTo(reachable(S.map, S.units, u), plan.dest.x, plan.dest.y)
@@ -980,7 +1021,7 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
   }
   const items: Btn[] = remake() ? [
     ['목표', () => showGoalsWin(back, '이전')],
-    ['도움말', () => rulesWin(helpKnown([...loadProgress(S.ed.id)?.seen?.units ?? [], ...S.units.map(u => u.type.id)], S.tables.types, S.tables.labels.race), back)],
+    ['도움말', () => rulesWin(battleKnown(), back, { extra: tipLog() })],   // 맨 앞 「안내 기록」 = 이 판에서 본 안내 카드
     ['기록', () => logWin(back)],
     ['화면', () => screenWin(back)],
     ['소리', () => soundWin(back)],
@@ -1010,7 +1051,10 @@ function systemMenu(at?: { x: number; y: number }, from?: Unit) {
 const beside = (u: Pos) => { const { sx, sy } = toScreen(u.x + 1, u.y); return { x: sx + 4, y: sy } }
 
 export function select(u: Unit) {
-  S.mode = { kind: 'selected', unit: u, moves: reachable(S.map, S.units, u) }
+  const moves = reachable(S.map, S.units, u)
+  S.mode = { kind: 'selected', unit: u, moves }
+  // 통제 영역 안내 (tips.ts): 적 옆 칸 때문에 이동 범위가 줄어든 대원을 처음 골랐을 때. 지금 못 보이면 다음에 또
+  if (remake() && S.ed.zoc && u.troop === 0 && !slips(u) && !seenTip('zoc') && reachable(S.map, S.units, u, false).size > moves.size) void tipNow('zoc')
 }
 
 /** 행동 전이면 이동 취소 (원위치) */

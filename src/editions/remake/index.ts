@@ -4,7 +4,7 @@ import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { mindNote, planFor } from './ai'
 import { afterWin, ensureSeed, grow, partyChange, startFatigue } from './growth'
-import { affinity, affinityNote, affinityTags } from './affinity'
+import { affinity, affinityNote, affinityTags, affinityTip } from './affinity'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
 import { S } from '../../core/state'
@@ -13,6 +13,7 @@ import aliases from '../../../content/remake/names.json'
 import banter from '../../../content/remake/banter.ecs?raw'      // 동료 한마디 (제안 8)
 import epilogue from '../../../content/remake/epilogue.ecs?raw'  // 에필로그 (제안 15)
 import recall from '../../../content/remake/recall.ecs?raw'      // 레스다 회상 (B1 제안 42)
+import tips from '../../../content/remake/tips.ecs?raw'          // 시스템 대화 안내 (tips-proposal.md)
 import tune from '../../../content/remake/tune.json'            // 장별 조정 (B1 제안 6)
 import par from '../../../content/remake/par.json'              // 장 평가 턴 기준 (제안 11·34, tools/sim.mjs --par 로 다시 만든다)
 
@@ -72,6 +73,7 @@ export const edition: Edition = {
   partyChange,   // 늦은 합류 맞춤·전직·교체 성장 이어받기 (제안 5·N2)
   mindNote,  // 성향 카드 줄 (제안 10)
   affinityText: (t, raceName, magic) => ({ tags: affinityTags(t, raceName, magic), note: affinityNote(t, magic) }),   // 상성 글 (제안 25)
+  affinityTip,   // 상성 안내 고르기 (tips-proposal.md)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {
@@ -80,7 +82,7 @@ export const edition: Edition = {
     const enemy = units.filter(u => u.side === 'enemy')
     return [party, npc, enemy].filter(s => s.length)
   },
-  script: { files, aliases, banter, epilogue, recall },
+  script: { files, aliases, banter, epilogue, recall, tips },
   extraBattles,
   features: { threat: true, forecast: true, quickAttack: true, commandFirst: false, autoRest: true, originalCamp: false },
   // S2 제안 1: 세 길을 목적으로 (story-proposal.md)

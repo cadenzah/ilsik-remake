@@ -29,11 +29,11 @@ export const slips = (u: Unit) => u.type.moveKind === 4 || u.type.job === 3
 
 /** 이동 범위. 적 유닛은 통과 불가, 같은 편은 통과 가능하나 정지 불가.
  *  통제 영역 (S.ed.zoc): 상대 (혼수 아님) 옆 칸에 들어가면 거기서 멈춘다 — 처음 선 칸은 빼고, slips 유닛은 무시 */
-export function reachable(map: StageMap, units: Unit[], u: Unit): Moves {
+export function reachable(map: StageMap, units: Unit[], u: Unit, zoc = !!S.ed?.zoc): Moves {   // zoc = false: 통제 영역 없이 (안내 tips.ts 가 견줘 본다)
   const occ = new Map<number, Unit>()
   for (const o of units) if (o.hp > 0 && o !== u) occ.set(key(o.x, o.y), o)
   const held = new Set<number>()   // 멈추는 칸
-  if (S.ed?.zoc && !slips(u))
+  if (zoc && !slips(u))
     for (const o of occ.values()) if (o.side !== u.side && !o.coma) for (const [dx, dy] of DIRS) held.add(key(o.x + dx, o.y + dy))
   const cost = new Map<number, number>([[key(u.x, u.y), 0]])
   const prev = new Map<number, number>([[key(u.x, u.y), -1]])

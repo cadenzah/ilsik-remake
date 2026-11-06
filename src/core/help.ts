@@ -1,6 +1,6 @@
 // 개선판 규칙 도움말 (B1 제안 N5 → 2026-11-07 개편, .claude/docs/help-proposal.md). 전투 메뉴 「도움말」과 도감 「도움말」 탭이 같은 글을 쓴다.
 // 주제마다 요약 한 줄 → 핵심 (그림·표 포함) → 「자세히」 (접힘). 문구는 짧게, 화면에 안 보이는 내부 계수·배율은 쓰지 않는다. 용어는 화면과 같게 (반격·협공·통제 영역·생명상해 마법).
-// 요약 한 줄은 안내 카드 (tips-proposal.md) 가 그대로 가져다 쓸 글이다.
+// 안내 카드 (tips-proposal.md, core/tips.ts) 는 아래 TIP_CARDS 가 주제 키·요약·where·문장 상수 L 로 이 글에서 가져간다. 문장을 고치면 카드도 바뀐다.
 // 패배 = 출전 0번 (battleCore judge member([0,0])) + 장별 dead→lose. 본편은 늘 아리크스 (scenes.json post 의 0번 자리 = 아리크스 0·1 뿐), 숨은 장 44·45 는 레스다 (content/remake/battles). 목표 창 실패조건 = info.ts conditions
 // 수치의 근거 = editions/original/rules.ts (피로 계수·휴식·행동 뒤 피로·aiRests·actsTwice·flankBonus), core/attack.ts (사격·범위: 맨해튼 거리 1 = 상하좌우), core/battleCore.ts counterDamage (반격), core/grid.ts reachable (통제 영역), editions/remake/growth.ts (성장·쓰러진 대가)
 // 전력 공격·방어 태세 = remake/index.ts stance (제안 27), 협공 = remake/index.ts flank (제안 30), 상성 = remake/affinity.ts (제안 25·25-2). 규칙을 바꾸면 여기도 고친다. 피로 % = 공격 계수 (2.6 − F) · 방어 계수 (2.4 − F) 의 피로 0 대비 감소 (30: 18·20, 50: 34·37, 70: 54·59)
@@ -36,6 +36,24 @@ const AFF_ROWS: [who: string, weak: string, resist: string, gate?: Gate][] = [
   ['기계', '바람', '', race('기계')],
 ]
 
+// 도움말 본문과 안내 카드 (TIP_CARDS) 가 함께 쓰는 문장. 한 곳에서 고치면 두 곳이 같이 바뀐다
+const L = {
+  wake: '[[경계]] 중인 적은 가까이 다가가거나 공격하면 깨어납니다. 위험 범위를 켜면 청록색으로 표시됩니다.',
+  zocClear: '길을 막은 적을 먼저 치워야 지나갈 수 있습니다.',
+  zocSlip: '날 수 있는 유닛과 도둑은 멈추지 않습니다.',
+  power: '[[전력 공격]]: 피해가 크게 늘지만, 피로도 그만큼 훨씬 많이 쌓입니다.',
+  guard: '[[방어]]: 움직이지 않은 차례에만 고를 수 있습니다. 다음 차례까지 물리 방어가 오릅니다.',
+  guardRest: '방어한 차례는 쉰 것으로 치지 않아서 생명이 차지 않습니다. 피로도 쉴 때보다 덜 풀립니다.',
+  tired70: '피로가 70을 넘으면 반격할 수 없습니다.',
+  foeRest: '적도 피로가 70을 넘거나 생명이 ¼ 이하로 떨어지면 그 차례는 쉬어 갑니다.',
+  oppose: '서로 반대인 계열은 물과 불, 바람과 땅, 빛과 어둠입니다. 마법을 쓰는 유닛은 주로 쓰는 계열에 강하고 그 반대 계열에 약합니다.',
+  down: '이긴 장이라도 쓰러진 대원은 그 장에서 얻은 경험치를 잃고, 다음 장을 지친 상태로 시작합니다. 그 장에서 오른 레벨도 되돌아갑니다.',
+  promo: '레벨이 올라 무기·방어구를 [[승급]]할 수 있게 되면 바로 받아도 되고 나중에 정비 화면에서 받아도 됩니다. 승급하면 떨어지는 능력치도 있으니 비교해 보고 고르세요.',
+  bench: '출전하지 않은 동료도 이긴 장에서 경험치를 조금 받습니다.',
+  late: '늦게 합류한 동료는 일행과 비슷한 레벨로 들어옵니다.',
+  ancient: '용자의검 · 빛의갑옷 · 무자의책 · 현자의돌은 고대 병기입니다. 지닌 개수만큼 제관과 사바카의 방어를 뚫습니다. 마법에는 효과가 없습니다.',
+}
+
 export const HELP: HelpTopic[] = [
   { key: 'start', title: '처음이라면', core: [
     '[[아리크스]]가 쓰러지면 패배합니다. 아리크스는 출전에서 뺄 수 없습니다.',
@@ -63,24 +81,24 @@ export const HELP: HelpTopic[] = [
     '적은 어려움 난이도에서만 협공합니다.',
   ], where: '공격 확인창에 「협공 +N%」로 나옵니다.' },
   { key: 'stance', title: '전력·방어', summary: '행동 메뉴에서 보통 공격 대신 고를 수 있습니다.', core: [
-    '[[전력 공격]]: 피해가 크게 늘지만, 피로도 그만큼 훨씬 많이 쌓입니다.',
-    '[[방어]]: 움직이지 않은 차례에만 고를 수 있습니다. 다음 차례까지 물리 방어가 오릅니다.',
+    L.power,
+    L.guard,
   ], more: [
-    '방어한 차례는 쉰 것으로 치지 않아서 생명이 차지 않습니다. 피로도 쉴 때보다 덜 풀립니다.',
+    L.guardRest,
   ], where: '쌓일 피로는 공격 확인창에 나옵니다.' },
   { key: 'zoc', title: '움직이기', both: true, summary: '적 바로 옆 칸에 들어서면 그 자리에서 이동이 끝납니다. 이것을 [[통제 영역]]이라고 합니다.', core: [
     { fig: { rows: ['.rrsx', 'MrsFx', '.rrsx'], cap: '노란 테두리 칸에 들어서면 멈춥니다. 적 뒤쪽으로는 돌아갈 수 없습니다.' } },
-    '길을 막은 적을 먼저 치워야 지나갈 수 있습니다.',
+    L.zocClear,
   ], more: [
-    '날 수 있는 유닛과 도둑은 멈추지 않습니다.',
+    L.zocSlip,
     '혼수 상태인 유닛 옆은 그냥 지나갈 수 있습니다.',
   ] },
   { key: 'tired', title: '지치고 쉬기', both: true, summary: '피로가 쌓일수록 공격과 방어가 함께 떨어집니다. 움직이지도 공격하지도 않고 차례를 넘기면 쉬면서 생명과 피로가 회복됩니다.', core: [
     { html: () => `<table><tr><th>피로가 쌓이는 행동</th><th>쌓이는 양</th></tr>
       <tr><td>공격 · 반격</td><td>4~8</td></tr><tr><td>이동</td><td>한 칸마다 1</td></tr>
       <tr><td>마법</td><td>마법 목록에 적힌 만큼</td></tr><tr><td>공격받기</td><td>쌓이지 않음</td></tr></table>` },
-    '피로가 70을 넘으면 반격할 수 없습니다.',
-    '적도 피로가 70을 넘거나 생명이 ¼ 이하로 떨어지면 그 차례는 쉬어 갑니다.',
+    L.tired70,
+    L.foeRest,
   ], more: [
     '[[부하상태]]가 낮을수록 공격하거나 마법을 쓸 때 피로가 더 많이 쌓입니다.',
     '레벨이 오르면 피로가 0으로 돌아갑니다. 생명회복 마법을 받아도 줄어듭니다.',
@@ -92,20 +110,20 @@ export const HELP: HelpTopic[] = [
     { fig: { rows: ['.f..', 'fA.M', '.f..'], cap: '기사: 우리 편 한 명 (자기 자신도 됩니다) 을 골라 그 상하좌우의 적을 칩니다.', tag: { A: '편' } } },
   ], more: [
     '[[생명상해 마법]]은 상대의 정신이 높을수록 덜 들어갑니다. 방어는 높은데 정신이 낮은 적에게 쓰면 좋습니다.',
-    { t: '용자의검 · 빛의갑옷 · 무자의책 · 현자의돌은 고대 병기입니다. 지닌 개수만큼 제관과 사바카의 방어를 뚫습니다. 마법에는 효과가 없습니다.', if: met('제관', '사바카') },
+    { t: L.ancient, if: met('제관', '사바카') },
     { t: '혜유가 질풍화를 신고 민첩이 61 이상이면 한 차례에 두 번 움직입니다.', if: met('혜유') },
   ] },
   { key: 'affinity', title: '약점·내성', both: true, summary: '생명상해 마법과 활은 상대에 따라 더 잘 듣기도, 덜 듣기도 합니다. 이것을 [[상성]]이라고 합니다.', core: [
     { html: k => `<table><tr><th>상대</th><th>약점</th><th>내성</th></tr>${AFF_ROWS.filter(r => !r[3] || r[3](k))
       .map(([w, a, b]) => `<tr><td>${w}</td><td>${a}</td><td>${b || '—'}</td></tr>`).join('')}</table>` },
-    '서로 반대인 계열은 물과 불, 바람과 땅, 빛과 어둠입니다. 마법을 쓰는 유닛은 주로 쓰는 계열에 강하고 그 반대 계열에 약합니다.',
+    L.oppose,
     '두 가지 이상에 해당하면 효과가 겹칩니다.',
   ], more: [
     '칼이나 창 같은 다른 물리 공격, 그리고 그 밖의 마법에는 상성이 없습니다. 포수의 포격도 마찬가지입니다.',
     '새로운 종족을 만나면 이 표에 추가됩니다.',
   ], where: '공격 확인창에 「약점」「내성」으로 표시되고, 유닛에 마우스를 올리면 이유가 나옵니다.' },
   { key: 'foes', title: '적의 속셈', summary: '적은 쓰러뜨릴 수 있는 상대와 회복 마법을 쓰는 대원을 먼저 노립니다.', core: [
-    '[[경계]] 중인 적은 가까이 다가가거나 공격하면 깨어납니다. 위험 범위를 켜면 청록색으로 표시됩니다.',
+    L.wake,
     '적 부대는 보조를 맞춰 다가오다가, 한 명이 싸움을 시작하면 다 같이 몰려듭니다.',
   ], more: [
     '[[대기]] 중인 적은 정해진 때가 될 때까지 공격받아도 움직이지 않습니다.',
@@ -117,15 +135,49 @@ export const HELP: HelpTopic[] = [
     '[[혼수]]: 아무 행동도 할 수 없습니다. 반격도 못 하고, 옆을 지나가는 적을 막지도 못하며, 협공에도 끼지 못합니다.',
   ] },
   { key: 'grow', title: '강해지기', summary: '경험치가 100이 되면 레벨이 오릅니다. 레벨이 높은 적일수록, 마지막 일격을 넣을수록 경험치를 많이 받습니다.', core: [
-    '이긴 장이라도 쓰러진 대원은 그 장에서 얻은 경험치를 잃고, 다음 장을 지친 상태로 시작합니다. 그 장에서 오른 레벨도 되돌아갑니다.',
-    '레벨이 올라 무기·방어구를 [[승급]]할 수 있게 되면 바로 받아도 되고 나중에 정비 화면에서 받아도 됩니다. 승급하면 떨어지는 능력치도 있으니 비교해 보고 고르세요.',
+    L.down,
+    L.promo,
   ], more: [
-    '출전하지 않은 동료도 이긴 장에서 경험치를 조금 받습니다.',
-    '늦게 합류한 동료는 일행과 비슷한 레벨로 들어옵니다.',
+    L.bench,
+    L.late,
     '전직하거나 출전 대원을 바꿔도 레벨은 그대로 이어집니다.',
     '레벨이 오를 때 어떤 능력치가 얼마나 오를지는 판마다 정해져 있어서, 다시 해도 결과가 같습니다. 오랫동안 덜 오른 능력치는 다음 레벨에서 하나 더 오릅니다.',
   ] },
 ]
+
+// ---------- 안내 카드 (tips-proposal.md, core/tips.ts) ----------
+// 카드 = 그 주제 (topic = HELP 의 key) 의 글에서 가져온다. '@sum' = 주제의 요약, '@where' = 주제의 「어디에서 보나」, 나머지는 위 L 의 문장 (도움말 본문과 같은 글).
+// 「도움말에서 더 보기」 는 그 주제를 연다. 키 'resist:fly' 처럼 갈래가 있으면 갈래 것이 먼저
+export interface TipCard { topic: string; title: string; lines: string[] }
+const NO_COUNTER = '피로가 70을 넘었거나 생명이 ¼ 이하이면 반격하지 못합니다. 기사·포수·궁수·추전수의 공격과 마법에는 반격이 없습니다.'   // 반격 주제의 표와 같은 내용
+const tc = (topic: string, title: string, ...lines: string[]): TipCard => ({ topic, title, lines })
+export const TIP_CARDS: Record<string, TipCard> = {
+  wake: tc('foes', '경계', L.wake),
+  counter: tc('counter', '반격', '@sum', NO_COUNTER, '@where'),
+  zoc: tc('zoc', '통제 영역', '@sum', L.zocClear, L.zocSlip),
+  flank: tc('flank', '협공', '@sum', '@where'),
+  stance: tc('stance', '전력 공격·방어', L.power, L.guard, L.guardRest),
+  tired: tc('tired', '피로', '@sum', L.tired70),
+  foeRest: tc('tired', '적의 휴식', L.foeRest, '쉬어 가는 적은 그 차례에 공격하지 않습니다.'),
+  escort: tc('win', '함께 지킬 인물', '@sum', '@where'),
+  undead: tc('affinity', '상성 · 불사족', '@sum', '불사족은 빛에 크게 약하고, 불에도 약합니다.', '@where'),
+  'resist:fly': tc('affinity', '상성 · 내성', '@sum', '날 수 있는 유닛은 땅의 마법에 강합니다.', '@where'),
+  'resist:cast': tc('affinity', '상성 · 내성', '@sum', '마법을 쓰는 유닛은 자기가 주로 쓰는 계열에 강합니다.', '@where'),
+  resist: tc('affinity', '상성 · 내성', '@sum', '종족에 따라 강한 계열이 있습니다. 도움말의 표에서 볼 수 있습니다.', '@where'),
+  caster: tc('affinity', '상성 · 마법 쓰는 적', '@sum', L.oppose, '@where'),
+  heavy: tc('affinity', '상성 · 중갑', '@sum', '중갑 기사는 땅의 마법에 약합니다.', '@where'),
+  arrow: tc('affinity', '상성 · 활과 비행', '날 수 있는 유닛은 활과 바람에 약합니다. 적 궁수 곁에서는 날개 달린 동료를 조심하세요.', '@where'),
+  promo: tc('grow', '승급', L.promo),
+  down: tc('grow', '쓰러진 대원', L.down),
+  bench: tc('grow', '대기 동료', L.bench, L.late),
+  ancient: tc('jobs', '고대 병기', L.ancient, '공격 확인창에 「특효」로 표시됩니다.'),
+}
+/** 카드 글 (HTML, 문장마다 <br> — openWin 이 줄 수로 높이를 잰다). '@sum'·'@where' 를 주제 글로 */
+export function tipCardHtml(c: TipCard) {
+  const t = HELP.find(h => h.key === c.topic)
+  return c.lines.map(l => l === '@sum' ? t?.summary : l === '@where' ? t?.where : l).filter(Boolean).map(l => term(l!)).join('<br>')
+}
+export const tipCard = (key: string, variant?: string) => (variant && TIP_CARDS[`${key}:${variant}`]) || TIP_CARDS[key]
 
 const CELL = 18
 const CELL_TEXT: Record<string, string> = { M: '나', A: '편', F: '적', a: '편', f: '적' }
@@ -156,16 +208,17 @@ export function topicHtml(t: HelpTopic, k: HelpKnown) {
     ${t.where ? `<p class="where">${t.where}</p>` : ''}`
 }
 
-let lastTopic = 0   // 다시 열면 마지막에 본 주제
-/** 주제 목록 + 본문. el 안을 채우고 고르기를 잇는다 */
-export function mountHelp(el: HTMLElement, k: HelpKnown, at = lastTopic) {
+let lastTopic = HELP[0].key   // 다시 열면 마지막에 본 주제
+/** 주제 목록 + 본문. el 안을 채우고 고르기를 잇는다. at = 주제 키, extra = 목록 맨 앞에 붙일 주제 (전투 메뉴의 「안내 기록」) */
+export function mountHelp(el: HTMLElement, k: HelpKnown, at = lastTopic, extra: HelpTopic[] = []) {
+  const list = [...extra, ...HELP]
   el.classList.add('help')
-  el.innerHTML = `<div class="hl">${HELP.map((t, i) => `<button data-i="${i}">${t.title}</button>`).join('')}</div><div class="hb"></div>`
+  el.innerHTML = `<div class="hl">${list.map((t, i) => `<button data-i="${i}">${t.title}</button>`).join('')}</div><div class="hb"></div>`
   const body = el.querySelector<HTMLElement>('.hb')!, btns = [...el.querySelectorAll<HTMLButtonElement>('.hl button')]
   const show = (i: number) => {
-    lastTopic = i
+    lastTopic = list[i].key
     btns.forEach((b, j) => b.classList.toggle('on', i === j))
-    body.innerHTML = topicHtml(HELP[i], k)
+    body.innerHTML = topicHtml(list[i], k)
     body.scrollTop = 0
     // 「자세히」를 펴면 펼친 내용이 보이게 내려 준다 (아래가 잘려 있으면 열린 줄 모른다). 위 끝은 넘지 않는다
     body.querySelector('details')?.addEventListener('toggle', e => {
@@ -186,21 +239,23 @@ export function mountHelp(el: HTMLElement, k: HelpKnown, at = lastTopic) {
       show(j); btns[j].focus()
     }
   })
-  show(Math.min(at, HELP.length - 1))
-  return btns[lastTopic]
+  const i = list.findIndex(t => t.key === at)
+  show(i < 0 ? extra.length : i)
+  return btns[list.findIndex(t => t.key === lastTopic)]
 }
 
 const WIDTH = 560, HEIGHT = 340
 
-/** 전투 메뉴 「도움말」: 왼쪽 주제 목록 + 오른쪽 본문. back = 메뉴에서 열었을 때 「이전」 (오른쪽 클릭·Esc·바깥 누르기도) */
-export function rulesWin(known: HelpKnown, back?: () => void) {
+/** 전투 메뉴 「도움말」: 왼쪽 주제 목록 + 오른쪽 본문. back = 메뉴에서 열었을 때 「이전」 (오른쪽 클릭·Esc·바깥 누르기도).
+ *  o.topic = 열 주제 키 (안내 카드의 「도움말에서 더 보기」), o.label = 버튼 글자, o.extra = 목록 맨 앞 주제 */
+export function rulesWin(known: HelpKnown, back?: () => void, o: { topic?: string; label?: string; extra?: HelpTopic[] } = {}) {
   const m = mapRect()
   const leave = () => { closeWin('rules'); back?.() }
   const el = openWin({
     title: '도움말', kind: 'rules', at: 'center', width: Math.min(WIDTH, m.w - 16), dir: 'row', btnW: 64, bodyH: Math.min(HEIGHT, m.h - 90),
     body: '<div class="hwrap"></div>',
-    buttons: [[back ? '이전' : '닫기', leave]],
+    buttons: [[o.label ?? (back ? '이전' : '닫기'), leave]],
     onBack: leave, closeOnPick: false,
   })
-  mountHelp(el.querySelector<HTMLElement>('.hwrap')!, known).focus()
+  mountHelp(el.querySelector<HTMLElement>('.hwrap')!, known, o.topic, o.extra).focus()
 }

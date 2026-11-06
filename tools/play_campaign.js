@@ -5,7 +5,7 @@
 //   __play.stop(); __play.restore()         — 멈춤 / 시작 전 localStorage (설정·진행·기록) 로 되돌리고 새로 고침
 // 일행: 개선판 AI (planFor) 로 칠 대상이 있으면 치고 (quickAttack 으로 이동+공격), 없으면 적까지 길 거리 (유닛 무시) 가 가장 가까운 칸으로 간다.
 //   호위 NPC 가 있으면 그 둘레 3칸 안의 적부터. 선두는 적에서 7칸쯤 뒤를 따라가고 생명 45% 아래면 치지 않는다. 생명 낮은 대원은 쉬게 둔다 (턴 끝 자동 휴식)
-// 대사 = Esc, 레벨업 창 = 「승급」 (없으면 「확인」), 결과 창 = 「다음 장」 → 「다시 하기」, 그 밖 확인·진로선택·목표 창 = 첫 버튼, 정비 화면 = 출전.
+// 대사 = Esc, 레벨업 창 = 「승급」 (없으면 「확인」), 안내 카드 = 「닫기」 (status 의 tips), 결과 창 = 「다음 장」 → 「다시 하기」, 그 밖 확인·진로선택·목표 창 = 첫 버튼, 정비 화면 = 출전.
 // 빠르게: setTimeout 대기를 speed 배 (기본 0.3), 설정 quickAttack·fastEnemy·shortAnim 을 켠다 (시작 전 값은 restore 로).
 // 한계: 진형·호위·선두 보호가 약하다 → guard = { 장: '선두' | 유닛 이름 }·guardLeadFrom = 장 이면 그 장 (부터) 전투 동안 그 유닛 생명을 300 으로 (시험 보조, status 에 남김).
 //   2026-11-06 1~12장 약 20분, 5장 루이스·8장부터 선두에 guard 가 필요했다. 1장부터 하려면 타이틀 → 새로 시작 → 난이도를 고른 뒤 start
@@ -31,17 +31,32 @@ P.start = async function (opt = {}) {
 
   const [B, DL, G, { S }] = await Promise.all([import('/src/core/battle.ts'), import('/src/core/dialogue.ts'), import('/src/core/grid.ts'), import('/src/core/state.ts')])
   const planFor = (u) => S.ed.planFor(S.map, S.units, u, S.troopState)
-  const D = P.d = { on: true, stopAt, log: [], recall: [], lv: [], ch: [], err: [], guarded: [] }
+  const D = P.d = { on: true, stopAt, log: [], recall: [], lv: [], ch: [], err: [], guarded: [], tips: [] }
   const wait = ms => new Promise(r => oST(r, ms))
   const vis = el => !!el && el.isConnected && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none'
   const btnIn = (root, labels) => [...root.querySelectorAll('button')].find(b => vis(b) && labels.includes(b.textContent.trim()))
   const key = k => (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: k, code: k, bubbles: true }))
   const md = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
   const ready = () => S.mode.kind === 'idle' || S.mode.kind === 'selected'
-  const blocking = () => DL.dialogueOpen() || [...document.querySelectorAll('.owin.levelup, .owin.result')].some(vis)
+  const blocking = () => DL.dialogueOpen() || [...document.querySelectorAll('.owin.levelup, .owin.result, .owin.tip')].some(vis)
   const seen = new Set()
   let lastResult = null
 
+  // 대원을 고르면 통제 영역 안내 (tips.ts) 가 바로 뜰 수 있다: 대사는 Esc, 카드는 남기고 닫은 뒤 고른 상태로 돌아올 때까지
+  function closeTip() {
+    const tip = document.querySelector('.owin.tip')
+    if (!vis(tip)) return false
+    D.tips.push({ n: S.def?.n, turn: S.turn, title: tip.innerText.split('\n')[0], line: DL.talkLog.at(-1)?.text?.slice(0, 40) })
+    btnIn(tip, ['닫기'])?.click()
+    return true
+  }
+  async function pick(u) {
+    B.select(u); await wait(60)
+    for (let i = 0; i < 100 && (DL.dialogueOpen() || vis(document.querySelector('.owin.tip')) || S.mode.kind === 'busy'); i++) {
+      if (DL.dialogueOpen()) key('Escape'); else closeTip()
+      await wait(80)
+    }
+  }
   async function settle(maxMs = 20000) {
     const t = Date.now()
     while (Date.now() - t < maxMs) { await wait(80); if (blocking()) return false; if (ready()) return true }
@@ -79,7 +94,7 @@ P.start = async function (opt = {}) {
   }
   async function moveWait(u, dest) {
     if (S.mode.kind === 'selected') { B.cancel(); await wait(40) }
-    B.select(u); await wait(60)
+    await pick(u)
     await B.clickTile(dest); await wait(300)
     const m = [...document.querySelectorAll('.owin')].find(w => vis(w) && btnIn(w, ['대기']))
     if (m) { btnIn(m, ['대기']).click(); return settle() }
@@ -96,7 +111,7 @@ P.start = async function (opt = {}) {
       const plan = planFor(u), lead = u.member === 0
       if (plan.target && !plan.magic && !(lead && u.hp < u.maxHp * 0.45)) {
         if (S.mode.kind === 'selected') { B.cancel(); await wait(40) }
-        B.select(u); await wait(60)
+        await pick(u)
         await B.clickTile({ x: plan.target.x, y: plan.target.y })
         if (!(await settle())) return
         if (!u.acted) { const d = advanceSpot(u, lead); if (d && (d.x !== u.x || d.y !== u.y) && !(await moveWait(u, d))) return }
@@ -133,6 +148,7 @@ P.start = async function (opt = {}) {
         if (DL.dialogueOpen()) { key('Escape'); continue }
         const lv = document.querySelector('.owin.levelup')
         if (vis(lv)) { D.lv.push({ n, text: lv.innerText.replace(/\n+/g, ' | ') }); (btnIn(lv, ['승급']) || btnIn(lv, ['확인']))?.click(); continue }
+        if (closeTip()) { await wait(100); continue }   // 시스템 안내 카드 (tips.ts): 제목과 바로 앞 대사를 남기고 닫기
         const res = document.querySelector('.owin.result')
         if (vis(res)) {
           if (res !== lastResult) { lastResult = res; D.log.push(`${n}장 ${res.innerText.replace(/\n+/g, ' / ').slice(0, 100)}`) }
@@ -159,7 +175,7 @@ P.status = function () {
   const wins = D.log.filter(l => l.includes('승 리')).map(l => `${l.split('장')[0]}장 ${(l.match(/(\d+)턴/) ?? [])[1]}턴`)
   const losses = {}
   for (const l of D.log.filter(l => l.includes('패 배'))) { const k = `${l.split('장')[0]}장 ${l.split(' / ')[1]}`; losses[k] = (losses[k] ?? 0) + 1 }
-  return { on: D.on, ch: D.ch.map(c => `${c.n}@${c.at}`), wins, losses, recall: D.recall, promos: D.lv.filter(l => l.text.includes('승급')).map(l => `${l.n}장 ${l.text.slice(0, 80)}`), levelUps: D.lv.length, guarded: [...new Set(D.guarded)], err: D.err }
+  return { on: D.on, ch: D.ch.map(c => `${c.n}@${c.at}`), wins, losses, recall: D.recall, promos: D.lv.filter(l => l.text.includes('승급')).map(l => `${l.n}장 ${l.text.slice(0, 80)}`), levelUps: D.lv.length, guarded: [...new Set(D.guarded)], tips: D.tips.map(t => `${t.n}장 ${t.turn}턴 ${t.title}`), err: D.err }
 }
 
 P.restore = function () {

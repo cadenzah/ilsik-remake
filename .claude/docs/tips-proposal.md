@@ -1,4 +1,4 @@
-# 개선판 새 시스템을 대화로 드러내기 (제안, 2026-11-07 — 아직 반영 안 함)
+# 개선판 새 시스템을 대화로 드러내기 (제안 2026-11-07, 같은 날 반영 — 5절)
 
 사용자 요청: 개선판에 넣은 새 시스템이 진행 중 대화로 자연스럽게 드러나게. 지금은 전투 메뉴 「도움말」·도감 (core/help.ts HELP) 에서만 알 수 있다.
 근거: 장별 첫 등장 = battles.json 루트 순서 (A 1~11·16·19·17·18·20·22·26~29·36~43, B 1~9·12·14~16·19·23~26·30~32·36~43, C 1~9·13~16·19~21·26·33~43), 대본 틀 = script-format.md, 화자 말투 = script-format.md 8절.
@@ -8,7 +8,7 @@
 2. **인물 한 줄 + 안내 카드 한 장** (2026-11-07 사용자 의견으로 고침 — 처음 안은 "세계의 말로" 만이었는데, 그것만으로는 규칙이 분명히 전해지지 않는다).
    - 인물 대사는 세계의 말로, 짧게. 「버튼·메뉴·확인창·%」 를 쓰지 않는다. 분위기와 "왜 신경 써야 하는지" 를 맡는다
    - 바로 뒤에 **안내 카드**: 제목 (시스템 이름) + 두세 문장. 플레이에 필요한 만큼만 쓴다. 무엇이 일어나는지, 언제 일어나지 않는지, 어디에서 미리 보는지 (확인창 「반격 −N」 같은 화면 이름은 여기서 쓴다). 화면에 이미 보이는 기준선 (피로 70·생명 ¼) 은 쓰고, 화면에 안 보이는 내부 계수 (×1.5·0.4 등) 는 쓰지 않는다 — help.ts 와 같은 수준
-   - 카드 문장은 도움말 (help.ts HELP) 과 **한 곳에서** 가져온다 (카드 글 = 그 주제의 `summary`, 「도움말에서 더 보기」 = mountHelp 에 그 주제 번호). 고칠 때 두 곳이 어긋나지 않게
+   - 카드 문장은 도움말 (help.ts HELP) 과 **한 곳에서** 가져온다. 도움말 개편 (help-proposal.md, 주제 12개·키) 뒤에는 요약 한 줄만으로 모자란 카드가 많아, help.ts `TIP_CARDS` 가 카드마다 주제 키 (`topic`) 와 줄 목록을 갖는다: `'@sum'` = 그 주제 summary, `'@where'` = 그 주제 where, 나머지는 도움말 본문과 같이 쓰는 문장 상수 `L` (예 `L.wake` = 「적의 속셈」 첫 줄). 「도움말에서 더 보기」 = rulesWin 에 그 주제 키. 고칠 때 두 곳이 어긋나지 않게
    - 카드 아래 「도움말에서 더 보기」 (그 쪽이 열림)·「닫기」. 대화와 한 흐름 (대사 → 카드 → 닫으면 조작으로), 따로 두 번 멈추지 않는다
    - 화자가 없으면 (출전 안 함·그 장에 없음) **카드만** 낸다. 규칙을 아는 일이 누가 출전했는지에 달리지 않게. 인물 줄은 덤
    - 설정은 둘로: 「이야기 속 안내」 (인물 줄)·「안내 카드」. 두 번째 판은 카드만 끄는 사람이 많을 것
@@ -44,7 +44,7 @@
 
 - 9장 이후 레스다 차례면 「레스다 (회상)」 으로 (recall 과 같은 초상·이름). 1~8장은 살아 있는 레스다가 출전했을 때만, 아니면 다음 후보
 
-### 안내 카드 글 (초안 — help.ts 와 맞춰 다듬는다)
+### 안내 카드 글 (초안 — 반영본은 help.ts TIP_CARDS. 아래 「출처」 표가 실제 출처)
 | 키 | 제목 | 카드 |
 |---|---|---|
 | wake | 경계 | 경계 중인 적은 가까이 가거나 공격하면 깨어나 움직이기 시작한다. 메뉴의 위험 범위를 켜면 깨우는 범위가 청록색으로 보인다. |
@@ -93,3 +93,25 @@
 2. 상성 묶음 (undead·resist·caster·arrow·heavy) — 25-2 와 짝
 3. 나머지 (stance·tired·foeRest·escort·down·bench·ancient)
 4. 손으로 1~10장 해 보며 빈도 조절 (한 장에 둘이 많은지)
+
+## 5. 반영 (2026-11-07)
+- 1~3 단계 (17개 키) 를 한 번에. 4 (손으로 1~10장 빈도 조절) 는 남음
+- 그릇: `content/remake/tips.ecs` (인물 줄, 「@ 키 [갈래]」 + 「화자: 대사」, 화자 「레스다 (회상)」 = 9~43장 회상 목소리 — 그때 일이 아닌 늘 맞는 말에만), `core/tips.ts` (noteTip 쌓기 → flushTips 보이기, tipNow 그 자리에서, 판 플래그 `tip:키[:갈래]`, 한 차례 하나·한 전투 셋·전투 뒤 것은 셈 밖, 안내 기록 tipLog), 설정 `tipLines`·`tipCards` (기본 켬), 엔딩을 본 기록이 있으면 새로 시작 때 「안내 없이/보며 시작」 을 묻는다 (title.ts askTips)
+- 카드 출처 (help.ts TIP_CARDS, 주제 키 = HELP key):
+
+| 키 | 주제 | 카드 줄 |
+|---|---|---|
+| wake | foes 적의 속셈 | L.wake (본문 첫 줄) |
+| counter | counter 반격 | @sum · NO_COUNTER (본문 표와 같은 내용을 문장으로) · @where |
+| zoc | zoc 움직이기 | @sum · L.zocClear · L.zocSlip |
+| flank | flank 협공 | @sum · @where |
+| stance | stance 전력·방어 | L.power · L.guard · L.guardRest |
+| tired · foeRest | tired 지치고 쉬기 | @sum · L.tired70 / L.foeRest · 「쉬어 가는 적은 공격하지 않는다」 |
+| escort | win 이기고 지기 | @sum · @where (실패조건) |
+| undead · resist(:fly·:cast) · caster · heavy · arrow | affinity 약점·내성 | @sum · 키마다 한 줄 (caster = L.oppose) · @where |
+| promo · down · bench | grow 강해지기 | L.promo / L.down / L.bench · L.late |
+| ancient | jobs 직업별 공격 | L.ancient · 「확인창 특효」 |
+
+- 부르는 자리 (battle.ts): 아군 차례 시작 turnTips (escort·wake·ancient·heavy·stance (2장부터)·tired) → flushTips, 일행 행동 끝 finishUnit → flushTips, attack 의 attackTips (flank·arrow) 와 반격 뒤 counter, castSpell 의 spellResult 뒤 상성 (remake/affinity.ts affinityTip: 약점 = 불사족 → 상극 → 중갑, 내성 = 비행 → 같은 계열 → 종족), aiAct 쉬기 = foeRest, select = zoc (grid.reachable 를 zoc 끄고 견줌, 못 보이면 버림), showLevelUp 승급 제안 뒤 promo, 전투 뒤 장면 뒤 postTips (down = 판 플래그 down:이름, bench = 출전 안 한 동료)
+- 도움말: rulesWin(known, back, { topic, label, extra }), mountHelp 의 고른 주제를 키로 기억, 전투 메뉴 도움말 맨 앞 「안내 기록」 (본 것이 있을 때)
+- tools/play_campaign.js 는 안내 카드를 「닫기」 하고 status().tips 에 남긴다

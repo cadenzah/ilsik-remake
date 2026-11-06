@@ -77,3 +77,19 @@ export function affinityNote(t: UnitType, magic?: Map<number, Magic>): string {
 export function affinityTags(t: UnitType, raceName: string, magic?: Map<number, Magic>): string {
   return affinityRow(t, magic).tags.map(x => x === 'race' ? raceName : x).filter(Boolean).join('·')
 }
+
+/** 시스템 대화 안내 (tips-proposal.md): 일행 마법이 상성에 걸렸을 때 어떤 안내인가. 약점 = 불사족 (빛·불) → caster (상극) → heavy (땅),
+ *  내성 = 비행 (땅) → 같은 계열 → 종족. 해당 없으면 null. 갈래: undead fire = 불로 찌름 (애슬 줄), resist fly·cast */
+export function affinityTip(t: UnitType, school: number, k: number, magic = S.tables?.magic): [key: 'undead' | 'caster' | 'heavy' | 'resist', variant?: string] | null {
+  if (k === 1) return null
+  const e = AFF.cast ? elementOf(t, magic) : -1
+  if (k > 1) {
+    if (AFF.race && t.race === 7 && (school === 0 || school === 4)) return ['undead', school === 4 ? 'fire' : undefined]
+    if (e >= 0 && OPPOSE[e] === school) return ['caster']
+    if (AFF.armor && isHeavy(t) && school === 5) return ['heavy']
+    return null
+  }
+  if (AFF.fly && isFlyer(t) && school === 5) return ['resist', 'fly']
+  if (e === school) return ['resist', 'cast']
+  return ['resist']
+}
