@@ -17,7 +17,7 @@ import type { Unit } from '../../src/core/unit'
 import { edition as original } from '../../src/editions/original'
 import { DIFF_SCALE, applyDifficulty, edition as remake, tuning as remakeTuning } from '../../src/editions/remake'
 import { mindOpts, planFor as smartPlan, type Mind } from '../../src/editions/remake/ai'
-import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/rules'
+import { ORIGINAL, affinityOf, makeRules, type Affinity, type Tuning } from '../../src/editions/original/rules'
 
 declare const process: { env: Record<string, string | undefined> }   // node (tools/sim.mjs) — @types/node 없이
 
@@ -211,6 +211,7 @@ let lastFight = 0   // 마지막으로 누가 쓰러진 턴
 /** --stance no = 쓰지 않음, power = 전력 공격을 쓰는 피로 한도 (그 공격 뒤 피로), guard = 방어 태세를 쓰나 */
 const stanceUse = { power: 40, guard: true }
 const stanceMade = { power: 0, guard: 0 }
+const affMade = { ally: [0, 0, 0], foe: [0, 0, 0] }   // 상성 (제안 25): 생명상해 마법이 맞힌 대상 수 · 그중 약점 · 내성
 const flankMade = { ally: [0, 0], foe: [0, 0] }   // 협공 (제안 30): 물리 공격 수 · 그중 협공 보정이 붙은 수
 /** 전력 공격: 보통으로는 못 쓰러뜨리는데 전력이면 쓰러뜨리거나, 못 쓰러뜨려도 공격 뒤 피로가 한도 안이면. 보통으로 쓰러뜨리면 안 씀 (u 는 이미 칠 칸에) */
 function wantPower(u: Unit, target: Unit) {
@@ -249,6 +250,10 @@ function act(u: Unit, party: boolean, t: Tally): Outcome | null {
     const r = spellResult(u, plan.magic, plan.at)
     const side = u.side === 'enemy' ? 'foe' : 'ally'
     if (S.ed.rules.spellSide(plan.magic) === 'foe') tallyHits(t.mag[side], u, r.hits.filter(h => h.value > 0), before)
+    if (plan.magic.effect === 7) for (const h of r.hits) {
+      const k = affinityOf(plan.magic, h.target, (u.side === 'enemy' ? S.ed.id === 'remake' ? remakeTuning.enemy : undefined : S.ed.id === 'remake' ? remakeTuning : undefined)?.affinity), am = affMade[side]
+      am[0]++; if (k > 1) am[1]++; if (k < 1) am[2]++
+    }
     else t.heal[side] += r.hits.reduce((a, h) => a + h.value, 0)
     if (addExp(u, r.hits, plan.magic, r.cured)) t.levelUps++
     magic = plan.magic
@@ -445,8 +450,19 @@ export async function main(argv: string[]) {
     else if (k === 'per' || k === 'max') f[k] = Number(v)
     else if (k === 'foe' && remakeTuning.enemy) remakeTuning.enemy.flank = f
   }
-  // 종족 상성 (제안 25): --affinity no 면 끈다 (규칙은 tuning.affinity 를 부를 때마다 읽는다)
-  if (arg('affinity', 'yes') === 'no') remakeTuning.affinity = undefined
+  // 종족 상성 (제안 25): --affinity no | ally (아군 마법만) | foe (적 마법만) | scale:0.5 (배율의 1 과의 차를 몇 배로) | json:{"7":{"0":1.5}} (표 바꿈) | add:{"1":{"4":1.25}} (표에 보탬), 쉼표 대신 ; 로 여럿.
+  //   규칙은 시전자 편 조정의 affinity 를 부를 때마다 읽는다
+  for (const kv of arg('affinity', '').split(';').filter(Boolean)) {
+    const i = kv.indexOf(':'), k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1)
+    const en = remakeTuning.enemy!, cur = remakeTuning.affinity ?? en.affinity ?? {}
+    const both = (tb?: Affinity) => { remakeTuning.affinity = tb; en.affinity = tb }
+    if (k === 'no') both(undefined)
+    else if (k === 'ally') en.affinity = undefined
+    else if (k === 'foe') remakeTuning.affinity = undefined
+    else if (k === 'scale') both(Object.fromEntries(Object.entries(cur).map(([r, row]) => [r, Object.fromEntries(Object.entries(row).map(([c, x]) => [c, Math.max(0, 1 + (x - 1) * Number(v))]))])))
+    else if (k === 'json') both(JSON.parse(v))
+    else if (k === 'add') { const a = JSON.parse(v) as Affinity; both(Object.fromEntries([...new Set([...Object.keys(cur), ...Object.keys(a)])].map(r => [r, { ...cur[Number(r)], ...a[Number(r)] }]))) }
+  }
   const keys = ['dmg', 'spell', 'heal', 'dmg-enemy', 'spell-enemy', 'heal-enemy'].filter(k => argv.includes(`--${k}`))
   const dmg = keys.map(k => `${k} ${arg(k, '')}`).join(' ')
   const tuned = (): Tuning => {
@@ -507,6 +523,7 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     countered.ally = countered.foe = counterMade.ally = counterMade.foe = 0
     stanceMade.power = stanceMade.guard = 0
     flankMade.ally = [0, 0]; flankMade.foe = [0, 0]
+    affMade.ally = [0, 0, 0]; affMade.foe = [0, 0, 0]
     const by = new Map<number, Row[]>()
     for (const seed of list) {
       seedRandom(seed)
@@ -538,6 +555,10 @@ async function summary(o: Opts, seeds: string, battles: Battles) {
     if (S.ed.rules.flank) {
       const pc = ([n, k]: number[]) => `${Math.round(100 * k / Math.max(1, n))}%`
       console.log(`협공 — 물리 공격 중 보정이 붙은 비율 아군 ${pc(flankMade.ally)} · 적 ${pc(flankMade.foe)}`)
+    }
+    {
+      const pc = ([n, w, r]: number[]) => `${n}명 중 약점 ${Math.round(100 * w / Math.max(1, n))}% · 내성 ${Math.round(100 * r / Math.max(1, n))}%`
+      console.log(`상성 — 생명상해 마법 맞은 대상 아군이 칠 때 ${pc(affMade.ally)} / 적이 칠 때 ${pc(affMade.foe)}`)
     }
     for (const [n, ws] of by) {
       const won = (w: Row) => w.result === 'win' || w.result === 'ending'

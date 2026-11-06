@@ -25,7 +25,7 @@ const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) =>
 const ENEMY = { coef: 0.19, spell: 0.6 }
 // 어려움 = ×1.1 + 적 협공 (2026-11-06, 그전 ×1.2 와 첫판 승이 같게 — balance-proposal.md "30 협공")
 export const DIFF_SCALE = [0.8, 1, 1.1]
-const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
+const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }   // affinity 는 아래 AFFINITY 를 정한 뒤 넣는다
 /** 개선판 피해 조정 (tools/sim 이 이 값에서 바꿔 본다). 아군 = 물리 0.4, 마법·회복은 원작 그대로 */
 // 고대 병기 특효 (B1 제안 24, Q7): 용자의검·빛의갑옷·무자의책·현자의돌을 지닌 수마다 제관·사바카 (세 형태) 의 방어를 덜 본다 — balance-proposal.md "24 고대 병기 특효"
 export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
@@ -46,6 +46,7 @@ export const AFFINITY: NonNullable<Tuning['affinity']> = {
   12: { 2: 1.5 },
 }
 // 승급 고르기 (B1 제안 36): 레벨업 때 장비 승급을 바로 쓰지 않고 「승급 / 나중에」, 받지 않은 승급은 정비 화면에서 (core/campaign.ts takePromo)
+enemyHit.affinity = AFFINITY   // 상성은 두 편 모두 (적 마법도 같은 표)
 export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity: AFFINITY }
 /** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
 export function applyDifficulty(d: number, hardFlank = true) {

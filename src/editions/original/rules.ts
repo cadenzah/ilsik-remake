@@ -45,7 +45,7 @@ export function flankBonus(a: Unit, d: Unit, units?: Unit[], f?: Flank) {
   return Math.min(f.max, f.per * n)
 }
 
-/** 종족 × 마법 계열 상성 (개선판 B1 제안 25): [종족 (UnitType.race)][계열 (Magic.school)] = 생명상해 배율. 없는 칸 = 1. 두 편 모두 */
+/** 종족 × 마법 계열 상성 (개선판 B1 제안 25): [종족 (UnitType.race)][계열 (Magic.school)] = 생명상해 배율. 없는 칸 = 1. 시전자 편의 조정 (enemy 가 있으면 적은 그쪽) 을 본다 */
 export type Affinity = Record<number, Record<number, number>>
 export const affinityOf = (m: Magic, d: Unit, aff?: Affinity) => aff?.[d.type.race]?.[m.school] ?? 1
 
@@ -85,7 +85,7 @@ function comaHits(a: Unit, d: Unit) {
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
 function spell(a: Unit, d: Unit, m: Magic, all: Tuning = ORIGINAL): SpellHit {
   const P = m.power, e = m.effect, t = forSide(a, all)
-  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * affinityOf(m, d, all.affinity)), 1, 99), d.hp) }
+  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * affinityOf(m, d, t.affinity)), 1, 99), d.hp) }
   if (e === 0) {
     const v = clamp(tr(k5(a, P) * (t.heal ?? 1)), 1, 99)
     return { kind: 'heal', value: Math.min(v, d.maxHp - d.hp), fatigue: Math.min(d.fatigue, tr(1 + 0.33 * v)) }
