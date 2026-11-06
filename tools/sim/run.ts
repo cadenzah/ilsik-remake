@@ -15,7 +15,7 @@ import { stageDef } from '../../src/core/stage'
 import { S, member } from '../../src/core/state'
 import type { Unit } from '../../src/core/unit'
 import { edition as original } from '../../src/editions/original'
-import { edition as remake, tuning as remakeTuning } from '../../src/editions/remake'
+import { DIFF_SCALE, applyDifficulty, edition as remake, tuning as remakeTuning } from '../../src/editions/remake'
 import { mindOpts, planFor as smartPlan, type Mind } from '../../src/editions/remake/ai'
 import { ORIGINAL, makeRules, type Tuning } from '../../src/editions/original/rules'
 
@@ -432,6 +432,9 @@ export async function main(argv: string[]) {
   //   --dmg-enemy·--spell-enemy·--heal-enemy = 적이 칠 때만
   const parse = (v: string) => { const [form, coef] = v.split(':'); return { form: form as Tuning['form'], coef: Number(coef ?? 0) } }
   const base = arg('ed', 'remake') === 'original' ? original : remake
+  // 난이도 (제안 7): --diff 0|1|2 (기본 보통), --diff-scale 0.8,1,1.2 (적 피해 배율 세 단계), --hard-flank no (어려움의 적 협공 끔)
+  if (argv.includes('--diff-scale')) arg('diff-scale', '').split(',').forEach((v, i) => { DIFF_SCALE[i] = Number(v) })
+  applyDifficulty(Number(arg('diff', '1')), arg('hard-flank', 'yes') !== 'no')
   // 협공 (제안 30): --flank no | per:0.1 · max:0.3 · foe (적도 협공, 같은 값) (쉼표로 여럿). 규칙을 다시 만들기 전에 바꾼다
   for (const kv of arg('flank', '').split(',').filter(Boolean)) {
     const [k, v] = kv.split(':'), f = remakeTuning.flank

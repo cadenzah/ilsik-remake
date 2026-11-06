@@ -1,6 +1,6 @@
 // 밸런스 시뮬레이터 실행기 (B1 제안 8). 웹 core 규칙·판 AI 를 node 에서 그대로 돌린다 — 본체는 tools/sim/run.ts
 //   node tools/sim.mjs [--ed remake|original] [--route 0|1|2|all] [--seed N] [--pick level|front] [--book yes|no] [--turns N] [--retry N]
-//   [--careful lead|all|none] [--push yes|no] [--dmg orig|floor:0.15|ratio:0.4] [--dmg-enemy 같은 꼴] [--seeds 1-8] [--growth no] [--tune '{"42":{"foeScale":0.85}}'] [--until 장] [--counter no|0.5] [--counter-decay 0.5] [--foe-hp 1.3] [--zoc no] [--lag no] [--bane no|0.15] [--stance no|power:40,guard:no,dmg:1.3,tire:2,def:1.2,rest:15] [--flank no|per:0.1,max:0.3,foe] [--par content/remake/par.json] [--mind charge|hold|pack] [--retreat no] [--backer 1] [--json]   — 옵션 뜻은 tools/sim/run.ts main, 결과 읽는 법은 .claude/docs/balance-proposal.md "시뮬레이터"
+//   [--careful lead|all|none] [--push yes|no] [--dmg orig|floor:0.15|ratio:0.4] [--dmg-enemy 같은 꼴] [--seeds 1-8] [--growth no] [--tune '{"42":{"foeScale":0.85}}'] [--until 장] [--counter no|0.5] [--counter-decay 0.5] [--foe-hp 1.3] [--zoc no] [--lag no] [--bane no|0.15] [--stance no|power:40,guard:no,dmg:1.3,tire:2,def:1.2,rest:15] [--flank no|per:0.1,max:0.3,foe] [--diff 0|1|2] [--diff-scale 0.8,1,1.2] [--hard-flank no] [--par content/remake/par.json] [--mind charge|hold|pack] [--retreat no] [--backer 1] [--json]   — 옵션 뜻은 tools/sim/run.ts main, 결과 읽는 법은 .claude/docs/balance-proposal.md "시뮬레이터"
 // vite 로 TypeScript·?raw·import.meta.glob 를 풀고, 자원은 public/assets 에서 읽는다 (fetch 흉내). 화면 모듈은 불러올 때만 쓰는 DOM 을 빈 객체로
 import { createServer } from 'vite'
 import { readFile } from 'node:fs/promises'

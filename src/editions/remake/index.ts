@@ -19,9 +19,11 @@ const files = import.meta.glob<string>('../../../content/remake/chapters/*.ecs',
 const extra = import.meta.glob<ExtraBattle>('../../../content/remake/battles/*.json', { import: 'default', eager: true })
 const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) => [Number(/(\d+)\.json$/.exec(path)![1]), b]))
 
-// 적이 칠 때 = 물리 비율식 계수 0.19 · 생명상해 ×0.6 (B1 제안 1·2, balance-proposal.md "2번 마법 수치") 에 난이도 배율 (쉬움·보통·어려움 = ×0.8·1·1.2, settings.ts).
-// 시뮬레이터 첫판 승 (1~9·10~25·26~43장): 쉬움 89·85·57%, 보통 79·69·38% (원작판 75·63·31%), 어려움 60·55·14%
-const ENEMY = { coef: 0.19, spell: 0.6 }, DIFF_SCALE = [0.8, 1, 1.2]
+// 적이 칠 때 = 물리 비율식 계수 0.19 · 생명상해 ×0.6 (B1 제안 1·2, balance-proposal.md "2번 마법 수치") 에 난이도 배율 (아래 DIFF_SCALE, settings.ts).
+// 시뮬레이터 첫판 승 (1~9·10~25·26~41·42~43장, 2026-11-06 씨앗 1~16): 보통 96·92·81·36%, 어려움 85·79·60·18%
+const ENEMY = { coef: 0.19, spell: 0.6 }
+// 어려움 = ×1.1 + 적 협공 (2026-11-06, 그전 ×1.2 와 첫판 승이 같게 — balance-proposal.md "30 협공")
+export const DIFF_SCALE = [0.8, 1, 1.1]
 const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
 /** 개선판 피해 조정 (tools/sim 이 이 값에서 바꿔 본다). 아군 = 물리 0.4, 마법·회복은 원작 그대로 */
 // 고대 병기 특효 (B1 제안 24, Q7): 용자의검·빛의갑옷·무자의책·현자의돌을 지닌 수마다 제관·사바카 (세 형태) 의 방어를 덜 본다 — balance-proposal.md "24 고대 병기 특효"
@@ -29,9 +31,15 @@ export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
 const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
 // 피로를 쓰는 명령 (B1 제안 27): 전력 공격 = 피해 ×1.3·공격 피로 ×2, 방어 태세 = 물리 방어 ×1.2·제자리면 피로 −15 — balance-proposal.md "27 피로 명령"
 const stance = { dmg: 1.3, tire: 2, def: 1.2, rest: 15 }
-// 포위·협공 (B1 제안 30): 대상 옆에 붙은 아군 1명마다 물리 피해 +10%, 최대 +30%. 일행·NPC 만 (enemyHit 에 없음) — balance-proposal.md "30 협공"
+// 포위·협공 (B1 제안 30): 대상 옆에 붙은 아군 1명마다 물리 피해 +10%, 최대 +30%. 일행·NPC 는 늘, 적은 어려움에서만 (applyDifficulty) — balance-proposal.md "30 협공"
 const flank = { per: 0.1, max: 0.3 }
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank }   // grow = 성장 난수 (N4, growth.ts)
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank }
+/** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
+export function applyDifficulty(d: number, hardFlank = true) {
+  enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]
+  enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
+  enemyHit.flank = d === 2 && hardFlank ? flank : undefined
+}   // grow = 성장 난수 (N4, growth.ts)
 
 export const edition: Edition = {
   ...original,
@@ -42,8 +50,7 @@ export const edition: Edition = {
   rules: makeRules(tuning),
   beginBattle() {
     const d = difficulty()
-    enemyHit.coef = ENEMY.coef * DIFF_SCALE[d]
-    enemyHit.spell = ENEMY.spell * DIFF_SCALE[d]
+    applyDifficulty(d)
     FLAGS.add(`diff${d}`)
     ensureSeed()   // 성장 난수 판 씨앗 (N4)
   },

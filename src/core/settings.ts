@@ -48,7 +48,7 @@ export function setDifficulty(d: Difficulty) {
   try { localStorage.setItem(DIFF_KEY, String(d)) } catch { /* 저장 불가 */ }
 }
 export const nextDifficulty = () => setDifficulty(((difficulty() + 1) % 3) as Difficulty)
-export const DIFF_DESC = '적이 주는 피해. 다음 전투부터 적용'
+export const DIFF_DESC = '적이 주는 피해 (어려움은 적도 협공). 다음 전투부터 적용'
 /** 판 플래그에서 쓴 가장 낮은 난이도 (없으면 undefined = 난이도 설정 전의 기록) */
 export function lowestDifficulty(flags: string[]): Difficulty | undefined {
   const used = ([0, 1, 2] as const).filter(d => flags.includes(`diff${d}`))
