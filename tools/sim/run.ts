@@ -445,6 +445,8 @@ export async function main(argv: string[]) {
     else if (k === 'per' || k === 'max') f[k] = Number(v)
     else if (k === 'foe' && remakeTuning.enemy) remakeTuning.enemy.flank = f
   }
+  // 종족 상성 (제안 25): --affinity no 면 끈다 (규칙은 tuning.affinity 를 부를 때마다 읽는다)
+  if (arg('affinity', 'yes') === 'no') remakeTuning.affinity = undefined
   const keys = ['dmg', 'spell', 'heal', 'dmg-enemy', 'spell-enemy', 'heal-enemy'].filter(k => argv.includes(`--${k}`))
   const dmg = keys.map(k => `${k} ${arg(k, '')}`).join(' ')
   const tuned = (): Tuning => {

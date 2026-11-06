@@ -1,6 +1,7 @@
 // 개선판 장 지도·도감 화면 (.claude/docs/replay-design.md 3·6절). 타이틀의 .page (640×480) 에 그린다
 import { RULE_PAGES } from './help'
-import { A, loadBattles, loadTables, portraitUrl } from './data'
+import { A, loadBattles, loadTables, portraitUrl, type UnitType } from './data'
+import { affinityNote } from './magic'
 import { FOUND, HIDDEN, trueEndingOpen } from './replay'
 import { loadPlaces, placeLabel, type Place } from './worldmap'
 import type { Progress } from './save'
@@ -189,7 +190,7 @@ export async function chapterMap(page: HTMLElement, p: Progress | null,
 
 /** 도감: 판을 넘어 만난 인물·적, 손에 넣은 도구 */
 export async function codex(page: HTMLElement, p: Progress | null, close: () => void) {
-  const t = await loadTables()
+  const [t, { edition }] = await Promise.all([loadTables(), import('../editions/remake')])   // 도감은 개선판만 (상성 표)
   const seen = new Set(p?.seen?.units ?? []), items = new Set(p?.seen?.items ?? [])
   // 같은 이름 = 한 인물 (성장·전직·적으로 나온 모습은 유닛 번호·초상이 따로 — 아리크스 0·1, 채스 6·92, 소피아 27·28·94 등).
   // 묶음은 그 이름의 가장 작은 번호로 (채스·소피아는 적으로도 나오지만 동료)
@@ -197,6 +198,8 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
   for (const u of t.types) forms.set(u.name, [...forms.get(u.name) ?? [], u.id])
   const groupOf = (name: string) => { const id = forms.get(name)![0]; return id < 29 ? 0 : id < 100 ? 1 : 2 }
   const groups = ['동료', '적', '그 밖의 인물']
+  // 종족과 상성 (개선판 B1 제안 25, 도감은 개선판만). 알 수 없는 종족 (??????) 은 빼고
+  const kin = (u: UnitType) => { const r = t.labels.race[u.race] ?? '', a = affinityNote(u.race, edition.rules.affinityTable); return r && !r.startsWith('?') ? `<small>${r}${a ? ` · ${a}` : ''}</small>` : '' }
   const personCell = (name: string) => {
     const all = forms.get(name)!.filter(id => seen.has(id)).map(id => t.types[id]).sort((a, b) => a.lv - b.lv || a.id - b.id)
     const top = all.reduce((a, b) => b.lv > a.lv ? b : a)   // 초상·HP 는 가장 자란 모습
@@ -207,7 +210,7 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
     const us = lines.length > 1 ? all : [top]
     const tip = us.length > 1 ? ` title="${lines.join('\n')}"` : ''
     return `<div class="cell"${tip}><img src="${portraitUrl(top.por)}" alt=""><div><b>${name}</b>
-      <small>Lv ${lv} · ${jobs}${us.length > 1 ? '' : ` · HP ${top.hp}`}</small></div></div>`
+      <small>Lv ${lv} · ${jobs}${us.length > 1 ? '' : ` · HP ${top.hp}`}</small>${kin(top)}</div></div>`
   }
   const names = [...forms.keys()]
   const met = names.filter(n => forms.get(n)!.some(id => seen.has(id)))

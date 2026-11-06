@@ -28,6 +28,10 @@ export interface Rules {
   aiRests(u: Unit): boolean
   /** 공격자가 대상에게 특효 (방어를 덜 봄, 개선판 B1 제안 24) 인가. 확인창 표시용. 없으면 특효 없음 */
   bane?(a: Unit, d: Unit): boolean
+  /** 종족 × 마법 계열 상성 (개선판 B1 제안 25): 이 마법이 대상에게 주는 피해 배율 (생명상해만, 1 = 보통). 확인창 표시용. 없으면 상성 없음 */
+  affinity?(m: Magic, d: Unit): number
+  /** 상성 표 [종족][계열] = 배율 (카드·도감 표시용) */
+  affinityTable?: Record<number, Record<number, number>>
   /** 협공 보정 (개선판 B1 제안 30): 대상 옆에 붙은 공격자 편 수만큼 오르는 물리 피해 비율 (0.2 = +20%). 확인창 표시용. 없으면 협공 없음 */
   flank?(a: Unit, d: Unit, units: Unit[]): number
   /** 전력 공격·방어 태세 (개선판 B1 제안 27). 없으면 두 명령이 없다 */

@@ -22,7 +22,7 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank; promoChoice?: boolean }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank; promoChoice?: boolean; affinity?: Affinity }
 /** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
 export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
@@ -44,6 +44,10 @@ export function flankBonus(a: Unit, d: Unit, units?: Unit[], f?: Flank) {
   const n = units.filter(o => o !== a && o.hp > 0 && !o.coma && o.side === a.side && Math.abs(o.x - d.x) + Math.abs(o.y - d.y) === 1).length
   return Math.min(f.max, f.per * n)
 }
+
+/** 종족 × 마법 계열 상성 (개선판 B1 제안 25): [종족 (UnitType.race)][계열 (Magic.school)] = 생명상해 배율. 없는 칸 = 1. 두 편 모두 */
+export type Affinity = Record<number, Record<number, number>>
+export const affinityOf = (m: Magic, d: Unit, aff?: Affinity) => aff?.[d.type.race]?.[m.school] ?? 1
 
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
 function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL, units?: Unit[]) {
@@ -81,7 +85,7 @@ function comaHits(a: Unit, d: Unit) {
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
 function spell(a: Unit, d: Unit, m: Magic, all: Tuning = ORIGINAL): SpellHit {
   const P = m.power, e = m.effect, t = forSide(a, all)
-  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1)), 1, 99), d.hp) }
+  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * affinityOf(m, d, all.affinity)), 1, 99), d.hp) }
   if (e === 0) {
     const v = clamp(tr(k5(a, P) * (t.heal ?? 1)), 1, 99)
     return { kind: 'heal', value: Math.min(v, d.maxHp - d.hp), fatigue: Math.min(d.fatigue, tr(1 + 0.33 * v)) }
@@ -245,6 +249,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   expGain,
   levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow, tuning.promoChoice) },
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
+  ...tuning.affinity ? { affinity: (m: Magic, d: Unit) => m.effect === 7 ? affinityOf(m, d, tuning.affinity) : 1, affinityTable: tuning.affinity } : {},
   stance: tuning.stance,
   ...tuning.flank || tuning.enemy?.flank ? { flank: (a: Unit, d: Unit, units: Unit[]) => flankBonus(a, d, units, forSide(a, tuning).flank) } : {},
 } }

@@ -1313,7 +1313,9 @@ function askMagic(u: Unit, m: Magic, c: Pos) {
   hideBasic()
   let body: string | undefined
   if (S.ed.features.forecast) {
-    const lines = spellTargets(S.ed.rules, u, m, c).map(t => esc(hitLine(t, S.ed.rules.spell(u, t, m))))
+    // 종족 상성 (제안 25): 생명상해가 더 들면 「약점」, 덜 들면 「내성」
+    const aff = (t: Unit) => { const k = S.ed.rules.affinity?.(m, t) ?? 1; return k > 1 ? ' <span class="green">약점</span>' : k < 1 ? ' <span class="red">내성</span>' : '' }
+    const lines = spellTargets(S.ed.rules, u, m, c).map(t => esc(hitLine(t, S.ed.rules.spell(u, t, m))) + aff(t))
     body = [esc(m.name), ...lines.slice(0, 6), ...lines.length > 6 ? [`외 ${lines.length - 6}명`] : []].join('<br>')
   }
   const go = () => { S.aim = null; void doMagic(u, m, c) }

@@ -302,6 +302,7 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .codex .cell img { width: 32px; height: 37px; object-fit: cover; }
 #titlescreen .codex .cell b { display: block; font-weight: 400; color: #e8e6df; }
 #titlescreen .codex .cell small { color: #8c8c80; font-size: 10px; }
+#titlescreen .codex .cell small + small { display: block; }
 #titlescreen .codex .items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
 #titlescreen .codex p { margin: 0; color: #6c6c64; }
 #titlescreen .codex .rule-head { margin-top: 14px; }
