@@ -26,6 +26,8 @@ export interface Rules {
   spell(caster: Unit, target: Unit, m: Magic): SpellHit
   /** 컴퓨터 조종 유닛이 제 차례에 쉬는 선인가 (행동하는 부대일 때, original/ai.ts aiGate). 개선판은 맵·카드에 미리 보인다 (B1 N1) */
   aiRests(u: Unit): boolean
+  /** 공격자가 대상에게 특효 (방어를 덜 봄, 개선판 B1 제안 24) 인가. 확인창 표시용. 없으면 특효 없음 */
+  bane?(a: Unit, d: Unit): boolean
   /** 이 유닛이 한 차례에 두 번 행동하나 (차례를 마칠 때 검사) */
   actsTwice(u: Unit): boolean
   /** 차례 시작 처리 (중독 피해·혼수·강화 되돌림). 유닛을 바꾸고 일어난 일을 돌려준다 */

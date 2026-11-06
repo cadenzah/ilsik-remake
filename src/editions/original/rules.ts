@@ -22,17 +22,25 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane }
+/** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
+export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
  *  lag = 기대치보다 이만큼 넘게 처진 능력치는 그 레벨업에 +1 (처진 양은 t.lag 에 쌓는다). 없으면 원작대로 Math.random */
 export interface Grow { roll(t: UnitType, stat: number, n: number): number; lag: number }
 export const ORIGINAL: Tuning = { form: 'orig', coef: 0 }
 const forSide = (a: Unit, all: Tuning) => a.side === 'enemy' && all.enemy ? all.enemy : all
 
+/** 특효로 남는 방어 비율 (1 = 그대로) */
+export function baneCut(a: Unit, d: Unit, b?: Bane) {
+  if (!b || !b.foes.includes(d.type.id)) return 1
+  return Math.max(0, 1 - b.cut * a.type.equip.filter(e => b.items.includes(e)).length)
+}
+
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
 function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL) {
   const p = forSide(a, all)
-  const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d)
+  const A = k1(a) * 0.01 * terrAtk(map, a, at), D = k2(d) * 0.01 * terrDef(map, d) * baneCut(a, d, all.bane)
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
   const v = tr(raw * 0.01)
@@ -221,6 +229,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   },
   expGain,
   levelUp(u, tables, route) { return levelUp(u, tables, route, this.weaponRange, tuning.grow) },
+  bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
 } }
 
 /** 효과 7~13·15 = 상대편 (124e:c1b6 대상편) */

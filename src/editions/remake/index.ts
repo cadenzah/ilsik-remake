@@ -24,7 +24,10 @@ const extraBattles = Object.fromEntries(Object.entries(extra).map(([path, b]) =>
 const ENEMY = { coef: 0.19, spell: 0.6 }, DIFF_SCALE = [0.8, 1, 1.2]
 const enemyHit: NonNullable<Tuning['enemy']> = { form: 'ratio', ...ENEMY }
 /** 개선판 피해 조정 (tools/sim 이 이 값에서 바꿔 본다). 아군 = 물리 0.4, 마법·회복은 원작 그대로 */
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow }   // grow = 성장 난수 (N4, growth.ts)
+// 고대 병기 특효 (B1 제안 24, Q7): 용자의검·빛의갑옷·무자의책·현자의돌을 지닌 수마다 제관·사바카 (세 형태) 의 방어를 덜 본다 — balance-proposal.md "24 고대 병기 특효"
+export const ANCIENT = [58, 114, 148, 169], SABAKA_SIDE = [56, 97, 98, 99]
+const bane = { items: ANCIENT, foes: SABAKA_SIDE, cut: 0.15 }
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane }   // grow = 성장 난수 (N4, growth.ts)
 
 export const edition: Edition = {
   ...original,

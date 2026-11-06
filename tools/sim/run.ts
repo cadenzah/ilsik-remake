@@ -75,7 +75,8 @@ function equipTools() {
   const W = [0, 1, 1, 1, 1, 0, 3, 1, 0]   // 능력치 번호 (unit.ts equippedStats)
   const score = (id: number) => {
     const it = S.tables.items.get(id)
-    return it ? [it.stat, it.stat2].reduce((a, [n, v]) => a + (n > 8 ? -W[n - 8] * v : W[n] * v), 0) : 0
+    const bane = S.ed.id === 'remake' && remakeTuning.bane?.cut && remakeTuning.bane.items.includes(id) ? 100 : 0   // 특효 (제안 24) 가 있으면 고대 병기를 먼저
+    return it ? bane + [it.stat, it.stat2].reduce((a, [n, v]) => a + (n > 8 ? -W[n - 8] * v : W[n] * v), 0) : 0
   }
   for (const i of S.deploy) {
     const t = partyType(PARTY[i])
@@ -435,6 +436,7 @@ export async function main(argv: string[]) {
   if (arg('retreat', 'yes') === 'no') mindOpts.retreat = false
   if (argv.includes('--backer')) mindOpts.backer = Number(arg('backer', '1'))
   if (arg('lag', 'yes') === 'no' && remakeTuning.grow) remakeTuning.grow.lag = Infinity   // 성장 난수 처짐 보정 (N4) 끔
+  if (argv.includes('--bane') && remakeTuning.bane) remakeTuning.bane.cut = arg('bane', 'no') === 'no' ? 0 : Number(arg('bane', '0.15'))   // 고대 병기 특효 (제안 24) 세기
   const seeds = arg('seeds', '')
   if (seeds) return summary(o, seeds, battles)
   const out: Record<string, Row[]> = {}

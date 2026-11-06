@@ -1064,7 +1064,7 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
       const [lo, hi] = S.ed.rules.damageRange(S.map, u, target, spot ?? u)
       const kill = lo >= target.hp ? '<span class="red">처치</span>' : hi >= target.hp ? '<span class="red">처치 가능</span>' : ''
       const back = counterDamage(u, target, spot ?? u)   // 제안 3: 되받는 피해
-      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
+      body = [`${esc(target.type.name)}`, `피해 ${span(lo, hi)}${S.ed.rules.bane?.(u, target) ? ' <span class="green">특효</span>' : ''}`, `생명 ${target.hp} → ${span(Math.max(0, target.hp - hi), Math.max(0, target.hp - lo))}`, back ? `<span class="red">${back >= u.hp ? '반격에 쓰러짐' : `반격 −${back}`}</span>` : '', kill].filter(Boolean).join('<br>')
     } else {
       // 범위 공격: 한 줄에 한 유닛. 같은 편 (포수) 은 붉게
       body = hit.map(t => {
