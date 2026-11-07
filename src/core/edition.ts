@@ -75,8 +75,8 @@ export interface Edition {
   planFor(map: StageMap, units: Unit[], u: Unit, troopState: number[]): AiPlan
   /** 상성 글 (개선판 B1 제안 25·25-2, 카드·도감): tags = 붙은 까닭 (「불사족」「비행」「불 마법」「중갑」), note = 「약점 빛·불 · 내성 어둠」. 상성이 없으면 둘 다 빈 글 */
   affinityText?(t: UnitType, raceName: string, magic?: Map<number, Magic>): { tags: string; note: string }
-  /** 시스템 대화 안내 (tips-proposal.md): 일행 마법 (계열 school) 이 배율 k 로 들었을 때 안내 키·갈래 (remake/affinity.ts affinityTip). 없으면 null */
-  affinityTip?(t: UnitType, school: number, k: number): [key: 'undead' | 'caster' | 'heavy' | 'resist', variant?: string] | null
+  /** 시스템 대화 안내 (tips-proposal.md 9절): 이 종류에 붙은 상성 갈래 (undead·fly·caster·heavy·archer·종족…, remake/affinity.ts affinityKinds) */
+  affinityKinds?(t: UnitType): string[]
   /** 컴퓨터 유닛 성향 한 줄 (개선판 카드, B1 제안 10). 없으면 '' */
   mindNote?(u: Unit): string
   /** 편의 기능: 적 위협 범위, 피해 예측, 적 클릭 한 번에 이동+공격.

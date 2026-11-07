@@ -1,7 +1,8 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
-import { battleKnown, beginLessons, counterOpened, flushTips, noteTip, openCounter, openFlank, resetTips, seenTip, tipLog, tipNow } from './tips'
+import { affinityIntro, battleKnown, beginLessons, counterOpened, flushTips, noteTip, openCounter, openFlank, resetTips, seenTip, tipLog, tipNow } from './tips'
+import { locked } from './lessons'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, takePromo, type Camp } from './campaign'
@@ -374,12 +375,9 @@ async function attack(a: Unit, c: Unit) {
   if (back) { await counterAct(a, c, back); if (opened) await counterOpened(); else if (remake()) noteTip('counter') }
 }
 
-/** 시스템 대화 안내 (tips.ts): 일행의 협공, 활이 날 수 있는 유닛을 맞힘 (어느 편이든 — 적이 쏘면 foe 갈래) */
+/** 시스템 대화 안내 (tips.ts): 일행의 협공 (상성은 장 시작에 소개한다 — affinityIntro) */
 function attackTips(a: Unit, targets: Unit[]) {
   if (a.troop === 0 && targets.some(t => t.side !== a.side && (S.ed.rules.flank?.(a, t, S.units) ?? 0) > 0)) noteTip('flank')
-  const shot = targets.filter(t => t.side !== a.side && t.type.moveKind === 4 && (S.ed.rules.affinity?.(a, t) ?? 1) > 1)
-  if (a.troop === 0 && shot.length) noteTip('arrow', 'ally')
-  else if (a.side === 'enemy' && shot.some(t => t.troop === 0)) noteTip('arrow', 'foe')
 }
 
 /** 반격 연출 (개선판 제안 3): 맞은 쪽이 공격 동작으로 되받는다 */
@@ -430,12 +428,12 @@ async function showLevelUp(u: Unit, r: LevelUp) {
     ...r.magic === undefined ? [] : [`<figure><i class="mg" style="background-position:-${r.magic * 32}px 0"></i><figcaption>마법 습득<br><span class="blue">${esc(S.tables.magic.get(r.magic)?.name ?? '')}</span></figcaption></figure>`]]
   if (!lines.length && !got.length) return
   const body = lines.join('<br>') + (got.length ? `<div class="lvup">${got.join('')}</div>` : '')
+  if (offers.length) await tipNow('promo', undefined, undefined, true)   // 승급 고르기 안내 (tips.ts): 처음 제안 때 레벨업 창 앞에 (고르기 전에), 셈 밖
   if (got.length) play('e1', SFX.upgrade)   // 원작 알림 창 0aa2:12f2 모드 1~3 (승급·습득) = 110
   await new Promise<void>(ok => openWin({ title: '레벨 업', body, bodyH: lines.length * 16 + (got.length ? 96 : 0) + (offers.length ? 16 : 0) + 8, at: 'center', kind: 'levelup', dir: 'row',
     width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
   if (u.type.id === PARTY[0]) await recall(u.type.lv >= 20 ? 'lv20' : u.type.lv >= 10 ? 'lv10' : null)   // 레스다 회상 (B1 제안 42)
-  if (offers.length) await tipNow('promo', undefined, undefined, true)   // 승급 고르기 안내 (tips.ts). 셈 밖 — 첫 제안 (2장 소피아) 때 그 장 셋이 차 있어 빠지곤 했고, 제안은 드물다
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
@@ -479,11 +477,6 @@ async function castSpell(a: Unit, m: Magic, c: Pos) {
   S.fx = { cells, base: m.id * 6, step, color: SCHOOL_COLOR[m.school] ?? SCHOOL_COLOR[8], t0, until: t0 + span }
   await sleep(span - step)   // 마지막 박자와 겹쳐 결과를 띄운다
   const { targets, hits, cured } = spellResult(a, m, c)
-  if (remake() && a.troop === 0 && m.effect === 7) for (const t of targets) {   // 상성 안내: 생명상해 마법이 적에게 약점·내성으로 (tips.ts)
-    if (t.side === a.side) continue
-    const tip = S.ed.affinityTip?.(t.type, m.school, S.ed.rules.affinity?.(a, t, m) ?? 1)
-    if (tip) { noteTip(tip[0], tip[1]); break }
-  }
   await sleep(step)
   S.fx = null
   a.pose = undefined
@@ -729,7 +722,7 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
         if (live.every(u => u.acted || u.hp <= 0)) skipped = true
         else {
           if (step.length > 1) await goGo(900)
-          if (remake()) { turnTips(live); await flushTips() }   // 장 시작·적 차례에 생긴 안내 (tips.ts)
+          if (remake()) { turnTips(live); await flushTips(false, true) }   // 차례 시작 묶음 + 적 차례에 생긴 안내 (tips.ts)
           if (await playerStep(live)) return
         }
         if (remake()) { record(S.turn, 'ally', diff(before, 'ally')); since = { at: mark(), turn: S.turn } }
@@ -748,14 +741,14 @@ function enemySummary() {
   since = null
 }
 
-/** 아군 차례 시작에 쌓을 안내 (tips.ts). 앞에 쌓은 것부터 보이므로 급한 것을 먼저: 호위 → 경계 → 고대 병기 → 중갑 → 전력·방어 → 피로 */
+/** 아군 차례 시작에 깔 안내 (tips.ts). 한 묶음으로 tips.ts BUNDLE 순서 (호위 → 경계 → 상성 → 고대 병기 → 전력·방어 → 피로) 로 보인다 */
 function turnTips(live: Unit[]) {
   const foes = alive('enemy')
   openFlank()   // 1장: 반격을 배운 다음 차례에 협공을 열고 소개
   if (S.cond.some(r => r.do.includes('lose') && 'dead' in r.if && r.if.dead.some(d => { const u = member(d); return !!u && isNpc(u) }))) noteTip('escort')
   if (foes.some(f => S.troopState[f.troop] === 1)) noteTip('wake')
+  affinityIntro(live, foes)   // 처음 보이는 상성 갈래 (불사족·비행·마법 쓰는 적·중갑·적 궁수·종족)
   if (live.some(u => foes.some(f => S.ed.rules.bane?.(u, f)))) noteTip('ancient')
-  if (foes.some(f => S.ed.affinityText?.(f.type, '', S.tables.magic).tags.split('·').includes('중갑'))) noteTip('heavy')
   if (S.def.n >= 2 && S.ed.rules.stance) noteTip('stance')
   if (live.some(u => u.fatigue > 70)) noteTip('tired')
 }
@@ -1256,7 +1249,7 @@ export function actionMenu(u: Unit, from: Pos) {
   const targets = aimsFrom(u)
   const magic: Btn[] = spellsOf(u).length ? [['마법', () => magicMenu(u, from, () => actionMenu(u, from))]] : []
   // 피로를 쓰는 명령 (개선판 B1 제안 27): 전력 공격 = 칠 대상이 있을 때, 방어 = 움직이지 않았을 때 (휴식 대신)
-  const st = S.ed.rules.stance
+  const st = S.ed.rules.stance && !locked.has('stance')   // 1장은 2장 안내 전까지 빼 둔다 (core/lessons.ts)
   const power: Btn[] = st && targets.length ? [['전력 공격', () => { S.mode = { kind: 'targeting', unit: u, from, power: true } }]] : []
   const guard: Btn[] = st && !u.moved ? [['방어', () => finishUnit(u, false, undefined, true)]] : []
   const items: Btn[] = remake()

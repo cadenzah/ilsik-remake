@@ -78,18 +78,15 @@ export function affinityTags(t: UnitType, raceName: string, magic?: Map<number, 
   return affinityRow(t, magic).tags.map(x => x === 'race' ? raceName : x).filter(Boolean).join('·')
 }
 
-/** 시스템 대화 안내 (tips-proposal.md): 일행 마법이 상성에 걸렸을 때 어떤 안내인가. 약점 = 불사족 (빛·불) → caster (상극) → heavy (땅),
- *  내성 = 비행 (땅) → 같은 계열 → 종족. 해당 없으면 null. 갈래: undead fire = 불로 찌름 (애슬 줄), resist fly·cast */
-export function affinityTip(t: UnitType, school: number, k: number, magic = S.tables?.magic): [key: 'undead' | 'caster' | 'heavy' | 'resist', variant?: string] | null {
-  if (k === 1) return null
-  const e = AFF.cast ? elementOf(t, magic) : -1
-  if (k > 1) {
-    if (AFF.race && t.race === 7 && (school === 0 || school === 4)) return ['undead', school === 4 ? 'fire' : undefined]
-    if (e >= 0 && OPPOSE[e] === school) return ['caster']
-    if (AFF.armor && isHeavy(t) && school === 5) return ['heavy']
-    return null
-  }
-  if (AFF.fly && isFlyer(t) && school === 5) return ['resist', 'fly']
-  if (e === school) return ['resist', 'cast']
-  return ['resist']
+/** 시스템 대화 안내 (tips-proposal.md 9절): 이 종류에 붙은 상성 갈래 — 장 시작에 처음 보이는 갈래를 소개한다.
+ *  종족 (undead 불사족 · demon 마족 · dragon 용족 · sea 해족 · ice 빙마녀 · machine 기계) · fly 비행 · caster 마법 쓰는 유닛 · heavy 중갑 · archer 활 (궁수·추전수 — 날 수 있는 일행에게 위험) */
+const RACE_KIND: Record<number, string> = { 7: 'undead', 9: 'demon', 8: 'dragon', 10: 'sea', 11: 'ice', 12: 'machine' }
+export function affinityKinds(t: UnitType, magic = S.tables?.magic): string[] {
+  const k: string[] = []
+  if (AFF.race && RACE_KIND[t.race]) k.push(RACE_KIND[t.race])
+  if (AFF.fly && isFlyer(t)) k.push('fly')
+  if (AFF.cast && elementOf(t, magic) >= 0) k.push('caster')
+  if (AFF.armor && isHeavy(t)) k.push('heavy')
+  if (isBow(t)) k.push('archer')
+  return k
 }

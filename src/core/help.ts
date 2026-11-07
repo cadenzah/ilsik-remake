@@ -196,6 +196,19 @@ export const HELP: HelpTopic[] = [
 export interface TipCard { topic: string; title: string; lines: string[] }
 const NO_COUNTER = '피로가 70을 넘었거나 생명이 ¼ 이하이면 반격하지 못합니다. 기사·포수·궁수·추전수의 공격과 마법에는 반격이 없습니다.'   // 반격 주제의 표와 같은 내용
 const tc = (topic: string, title: string, ...lines: string[]): TipCard => ({ topic, title, lines })
+/** 상성 갈래 한 줄 (remake/affinity.ts affinityKinds 의 갈래, 도움말 표 AFF_ROWS 와 같은 내용) */
+export const AFF_LINE: Record<string, string> = {
+  undead: '불사족은 빛에 크게 약하고 불에도 약합니다. 어둠에는 강합니다.',
+  fly: '날 수 있는 유닛은 활과 바람에 약하고 땅에 강합니다.',
+  caster: L.oppose,
+  heavy: '중갑 기사는 땅의 마법에 약합니다.',
+  archer: '날 수 있는 우리 편은 활에 약합니다. 적 궁수 곁에서는 조심하세요.',
+  demon: '마족은 빛에 약하고 어둠과 불에 강합니다.',
+  dragon: '용족은 물에 약하고 불에 강합니다.',
+  sea: '해족은 바람에 약하고 물에 강합니다.',
+  ice: '빙마녀는 불에 약하고 물에 강합니다.',
+  machine: '기계는 바람에 약합니다.',
+}
 export const TIP_CARDS: Record<string, TipCard> = {
   wake: tc('foes', '경계', L.wake),
   counter: tc('counter', '반격', '@sum', NO_COUNTER, '@where'),
@@ -205,13 +218,17 @@ export const TIP_CARDS: Record<string, TipCard> = {
   tired: tc('tired', '피로', '@sum', L.tired70),
   foeRest: tc('tired', '적의 휴식', L.foeRest, '쉬어 가는 적은 그 차례에 공격하지 않습니다.'),
   escort: tc('win', '함께 지킬 인물', '@sum', '@where'),
-  undead: tc('affinity', '상성 · 불사족', '@sum', '불사족은 빛에 크게 약하고, 불에도 약합니다.', '@where'),
-  'resist:fly': tc('affinity', '상성 · 내성', '@sum', '날 수 있는 유닛은 땅의 마법에 강합니다.', '@where'),
-  'resist:cast': tc('affinity', '상성 · 내성', '@sum', '마법을 쓰는 유닛은 자기가 주로 쓰는 계열에 강합니다.', '@where'),
-  resist: tc('affinity', '상성 · 내성', '@sum', '종족에 따라 강한 계열이 있습니다. 도움말의 표에서 볼 수 있습니다.', '@where'),
-  caster: tc('affinity', '상성 · 마법 쓰는 적', '@sum', L.oppose, '@where'),
-  heavy: tc('affinity', '상성 · 중갑', '@sum', '중갑 기사는 땅의 마법에 약합니다.', '@where'),
-  arrow: tc('affinity', '상성 · 활과 비행', '날 수 있는 유닛은 활과 바람에 약합니다. 적 궁수 곁에서는 날개 달린 동료를 조심하세요.', '@where'),
+  // 상성은 장 시작에 그 장에서 처음 보이는 갈래를 묶어 소개 (tips.ts affinityIntro, 카드 = 아래 갈래 문장들 + 그 장의 적별 약점·내성). 안내 기록에는 갈래마다
+  'affinity:undead': tc('affinity', '상성 · 불사족', '@sum', AFF_LINE.undead, '@where'),
+  'affinity:fly': tc('affinity', '상성 · 날 수 있는 적', '@sum', AFF_LINE.fly, '@where'),
+  'affinity:caster': tc('affinity', '상성 · 마법 쓰는 적', '@sum', AFF_LINE.caster, '@where'),
+  'affinity:heavy': tc('affinity', '상성 · 중갑', '@sum', AFF_LINE.heavy, '@where'),
+  'affinity:archer': tc('affinity', '상성 · 활과 비행', '@sum', AFF_LINE.archer, '@where'),
+  'affinity:demon': tc('affinity', '상성 · 마족', '@sum', AFF_LINE.demon, '@where'),
+  'affinity:dragon': tc('affinity', '상성 · 용족', '@sum', AFF_LINE.dragon, '@where'),
+  'affinity:sea': tc('affinity', '상성 · 해족', '@sum', AFF_LINE.sea, '@where'),
+  'affinity:ice': tc('affinity', '상성 · 빙마녀', '@sum', AFF_LINE.ice, '@where'),
+  'affinity:machine': tc('affinity', '상성 · 기계', '@sum', AFF_LINE.machine, '@where'),
   promo: tc('grow', '승급', L.promo),
   down: tc('grow', '쓰러진 대원', L.down),
   bench: tc('grow', '대기 동료', L.bench, L.late),
@@ -221,7 +238,7 @@ export const TIP_CARDS: Record<string, TipCard> = {
 // wake = 원작도 경계 대기가 있었고 깨우는 범위가 보이게 됨, tired = 원작 피로에 「70 넘으면 반격 못 함」, promo = 원작은 레벨업 때 바로 승급
 export type TipTag = '신규' | '개선'
 const TIP_TAG: Record<string, TipTag> = {
-  counter: '신규', zoc: '신규', flank: '신규', stance: '신규', undead: '신규', resist: '신규', caster: '신규', heavy: '신규', arrow: '신규',
+  counter: '신규', zoc: '신규', flank: '신규', stance: '신규', affinity: '신규',
   down: '신규', bench: '신규', ancient: '신규', wake: '개선', tired: '개선', promo: '개선',
 }
 /** 카드 키 (갈래 포함, 'resist:fly') 의 표시 HTML. 없으면 빈 글자 */

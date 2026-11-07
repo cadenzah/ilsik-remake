@@ -4,7 +4,7 @@ import type { Edition } from '../../core/edition'
 import { edition as original } from '../original'
 import { mindNote, planFor } from './ai'
 import { afterWin, ensureSeed, grow, partyChange, startFatigue } from './growth'
-import { affinity, affinityNote, affinityTags, affinityTip } from './affinity'
+import { affinity, affinityNote, affinityKinds, affinityTags } from './affinity'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
 import { S } from '../../core/state'
@@ -73,7 +73,7 @@ export const edition: Edition = {
   partyChange,   // 늦은 합류 맞춤·전직·교체 성장 이어받기 (제안 5·N2)
   mindNote,  // 성향 카드 줄 (제안 10)
   affinityText: (t, raceName, magic) => ({ tags: affinityTags(t, raceName, magic), note: affinityNote(t, magic) }),   // 상성 글 (제안 25)
-  affinityTip,   // 상성 안내 고르기 (tips-proposal.md)
+  affinityKinds,   // 상성 갈래 (장 시작 안내, tips-proposal.md 9절)
   planFor,   // 개선판 AI = 점수식 (remake/ai.ts). 원작판은 원작 AI (original/ai.ts)
   // 페이즈제: 일행 전체 → NPC 전체 → 적 전체
   order(units) {
