@@ -205,7 +205,6 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .row.opt { font-size: 12px; height: 20px; line-height: 20px; letter-spacing: 0; margin-top: 4px; color: #6c846c; }
 #titlescreen .row:disabled { cursor: default; opacity: .45; }
 #titlescreen .row.edsw { font-size: 14px; margin-top: 6px; color: #9cb49c; }
-#titlescreen .row.edsw.two { height: 36px; line-height: 18px; }
 #titlescreen .version { width: 100%; text-align: center; font: 400 12px/16px var(--font); color: #6c846c; }
 #titlescreen .wide .row { width: 180px; font-size: 14px; }
 #titlescreen .row.back { margin-top: 6px; }
@@ -333,9 +332,12 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
   font: 400 14px/21px var(--font); color: #e0e0d4; text-align: center; text-shadow: 1px 1px 0 #000; }
 #titlescreen .edcard .n { font-size: 20px; line-height: 30px; letter-spacing: 6px; color: #fcfcfc; }
 #titlescreen .edcard .who { margin-top: 5px; font-size: 13px; color: #e8cc78; }
-#titlescreen .edcard:hover, #titlescreen .edcard:focus-visible { border-color: #e8cc78; background: rgba(70, 56, 20, .55); }
-#titlescreen .edcard.now { border-color: #8c7c48; }
-#titlescreen .edcard .cur { font-size: 12px; line-height: 16px; color: #e8cc78; margin: -2px 0 3px; }
+/* 지금 판 = 은은한 금색 (금테·옅은 금빛 바탕·이름 앞 ◆), 고르는 중 (마우스·초점) = 흰 테두리. 둘이 같은 색이면 초점을 옮겼을 때 어느 쪽이 지금 판인지 헷갈린다 */
+#titlescreen .edcard.now { border-color: #b09a5c; background: rgba(90, 72, 24, .38); }
+#titlescreen .edcard.now .n { color: #ecdcae; }
+#titlescreen .edcard.now .n::before { content: "◆"; font-size: 13px; letter-spacing: 0; margin-right: 9px; vertical-align: 2px; color: #e0c470; }
+#titlescreen .edcard:hover, #titlescreen .edcard:focus-visible { border-color: #fcfcfc; box-shadow: inset 0 0 0 1px #fcfcfc; }
+#titlescreen .edcard:not(.now):hover, #titlescreen .edcard:not(.now):focus-visible { background: rgba(255, 255, 255, .1); }
 #titlescreen .pick .row.back { margin-top: 0; }
 #titlescreen .pick .foot { width: 100%; text-align: center; font: 400 12px/16px var(--font); color: #9cb49c; }
 /* 기록 옮기기 (title.ts openTransfer) */

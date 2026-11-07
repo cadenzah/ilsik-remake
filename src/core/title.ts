@@ -147,12 +147,13 @@ export function showTitle(): Promise<Launch> {
         ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },
         // 판 바꾸기 = 판 고르기 창 (두 판 설명을 보고 바꾼다. 2026-11-07 사용자: 처음 방문 때만 뜨면 이미 해 본 사람은 볼 길이 없다)
-        { label: '판 바꾸기', sub: `지금 ${EDITIONS.find(e => e.id === ed)!.name}`, cls: 'edsw', on: () => pickEdition(true) },
+        { label: '판 바꾸기', cls: 'edsw', on: () => pickEdition(true) },
       ])
-      body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
+      // 어느 판인지는 맨 아래 버전 줄에 판 이름으로 (「개선판 v1.0.0」). 「지금 ○○판」 같은 설명 글은 쓰지 않는다 (2026-11-07 사용자)
+      body.insertAdjacentHTML('beforeend', `<div class="version">${EDITIONS.find(e => e.id === ed)!.name} ${__VERSION__.split(' ')[0]}</div>`)
     }
 
-    // 판 고르기 창: 처음 방문 (판을 고른 적이 없을 때) 과 메뉴 맨 아래 「판 바꾸기」 (back = 지금 판 표시·돌아가기·Esc). 판마다 카드 한 장
+    // 판 고르기 창: 처음 방문 (판을 고른 적이 없을 때) 과 메뉴 맨 아래 「판 바꾸기」 (back = 지금 판 카드에 ◆ 표시·돌아가기·Esc). 판마다 카드 한 장
     const pickEdition = (back = false) => {
       applyFont(undefined)
       win.classList.remove('wide')
@@ -160,7 +161,7 @@ export function showTitle(): Promise<Launch> {
       win.classList.toggle('back', back)
       const card = (id: EditionId, name: string, lines: string[], who: string) => {
         const now = back && id === ed
-        return `<button class="edcard${now ? ' now' : ''}" data-ed="${id}"><span class="n">${name}</span>${now ? '<span class="cur">지금 하는 판</span>' : ''}${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
+        return `<button class="edcard${now ? ' now' : ''}" data-ed="${id}"><span class="n">${name}</span>${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
       }
       body.innerHTML = `<div class="ask">${back ? '판 바꾸기' : '어느 판으로 하시겠습니까?'}</div>
         ${card('remake', '개선판', ['현대어로 새로 쓴 대사', '반격·협공·상성 같은 새 규칙', '위험 범위·피해 예측 등 편의 기능'], '처음 하는 분, 새롭게 즐기고 싶은 분')}
