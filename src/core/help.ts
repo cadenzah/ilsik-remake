@@ -54,6 +54,40 @@ const L = {
   ancient: '용자의검 · 빛의갑옷 · 무자의책 · 현자의돌은 고대 병기입니다. 지닌 개수만큼 제관과 사바카의 방어를 뚫습니다. 마법에는 효과가 없습니다.',
 }
 
+// ---------- 원작과 달라진 점 (2026-11-07 사용자: 신규·개선 표시, 「이건 꼭 알아두세요」, 숨은 장·진엔딩은 넣지 않음) ----------
+// MUST_KNOW = 원작 감각대로 하면 손해 보는 네 가지 (레벨업 고정은 뺌 — 다시 불러와 굴리는 사람만 겪고, 아래 항목·강해지기에 있다). 도움말 「원작과 차이」 맨 위에만 (처음 새로 시작 때 보여 주던 쪽은 뺐다 — 사용자: 과하게 친절, 겪으며 아는 재미). 한 줄 한 문장으로 짧게
+const MUST_KNOW_TITLE = '이건 꼭 알아두세요'
+const MUST_KNOW = [
+  '적은 [[우리 편이 다 움직인 뒤]]에 움직입니다.',
+  '근접 공격을 받고 살아남으면 [[반격]]합니다.',
+  '[[피해 계산]]이 원작과 다릅니다.',
+  '[[쓰러진 대원]]은 이겨도 그 장에서 얻은 경험치를 다 잃고, 다음 장을 지친 채 시작합니다.',
+]
+/** 표의 링크: 누르면 그 주제로 (mountHelp) */
+const go = (key: string, label: string) => `<a data-topic="${key}" href="#">${label}</a>`
+const NEW = '<em class="tag new">신규</em>', MOD = '<em class="tag mod">개선</em>'
+// [무엇, 원작, 개선판]. 근거: 순서 = remake/index.ts order, 피해·마법 = balance-proposal 1·2, 경계 = original/ai.ts aiGate, 물러나 쉼·보스·호위 NPC = remake/ai.ts (제안 10·N3), 승급 = 36, 성장 = N4·5, 쓰러짐 = 12, 별 = 11·34
+const DIFF_ROWS: [string, string, string][] = [
+  ['전투 순서', '민첩 순서대로 한 명씩', `${MOD} 우리 편 → 함께 싸우는 이 → 적, 편마다 한꺼번에`],
+  ['피해', '방어가 앞서면 1', `${MOD} 계산식과 장마다 적의 세기를 다시 맞춤`],
+  ['마법', '원작 수치', `${MOD} 생명상해·생명회복의 세기를 다시 맞춤`],
+  ['반격', '없음', `${NEW} ${go('counter', '반격')}`],
+  ['새 규칙', '없음', `${NEW} ${go('flank', '협공')} · ${go('zoc', '통제 영역')} · ${go('stance', '전력·방어')} · ${go('affinity', '약점·내성')}`],
+  ['경계 중인 적', '다가가거나 치면 깸', `${MOD} 깨우는 범위를 위험 범위에서 봄 (${go('foes', '적의 속셈')})`],
+  ['지친 적', '그 자리에서 쉼', `${MOD} 손이 닿지 않는 곳으로 물러나 쉼`],
+  ['적의 움직임', '저마다 달려듦', `${MOD} 보스는 자리를 지키고, 무리는 발을 맞춰 다가옴`],
+  ['지켜야 할 인물', '적에게 달려듦', `${MOD} 물러서며 싸움`],
+  ['승급', '레벨업 때 바로', `${MOD} 바로 받거나 정비 화면에서 나중에 (${go('grow', '강해지기')})`],
+  ['레벨업', '오를 때마다 무작위', `${MOD} 판마다 정해짐, 오래 덜 오른 능력치는 더 오름`],
+  ['쓰러진 대원', '대가 없음', `${NEW} 그 장의 경험치를 잃고 지친 채 다음 장으로`],
+  ['출전 안 한 동료', '경험치 없음', `${NEW} 조금 받음, 늦게 합류한 동료는 일행 레벨 가까이`],
+  ['난이도', '하나', `${NEW} 쉬움 · 보통 · 어려움 (설정에서 언제든)`],
+  ['도전 과제', '없음', `${NEW} 장마다 별 (${go('win', '이기고 지기')})`],
+  ['다시 하기', '이어하기만', `${NEW} 장 지도에서 깬 장 다시 하기 · 도감`],
+  ['이야기', '원작 대사', `${MOD} 현대어로 새로 쓴 대사, 덧붙인 장면`],
+  ['화면', '원작 창', `${NEW} 위험 범위 · 피해 예측 · 적을 눌러 이동과 공격 · 적 차례 요약`],
+]
+
 export const HELP: HelpTopic[] = [
   { key: 'start', title: '처음이라면', core: [
     '[[아리크스]]가 쓰러지면 패배합니다. 아리크스는 출전에서 뺄 수 없습니다.',
@@ -61,6 +95,17 @@ export const HELP: HelpTopic[] = [
     '근접 공격을 받고 살아남은 상대는 바로 [[반격]]해 옵니다. 한 번에 쓰러뜨리지 못할 상대라면 붙기 전에 한 번 더 생각해 보세요.',
     '싸우고 움직일수록 피로가 쌓여 약해집니다. 한 차례 가만히 있으면 쉬면서 회복합니다.',
     '[[위험 범위]]를 켜 두면 적이 닿을 수 있는 칸이 표시됩니다.',
+  ] },
+  { key: 'diff', title: '원작과 차이', summary: '원작을 해 본 분을 위해 개선판에서 바뀐 것을 모았습니다.', core: [
+    { html: () => `<div class="must"><b>${MUST_KNOW_TITLE}</b><ol>${MUST_KNOW.map(l => `<li>${term(l)}</li>`).join('')}</ol></div>` },
+    // 좁은 전투 창에서도 읽히게 표가 아니라 항목마다 세 줄 (이름 + 표시 / 원작 / 개선판)
+    { html: () => `<ul class="diff">${DIFF_ROWS.map(([w, o, r]) => {
+      const [, tag, rest] = r.match(/^(<em[^>]*>[^<]*<\/em>)\s*(.*)$/) ?? ['', '', r]
+      return `<li><span class="w">${w}</span>${tag}<br><span class="o">원작</span>${o}<br><span class="o">개선판</span>${rest}</li>`
+    }).join('')}</ul>` },
+  ], more: [
+    `안내 카드 제목 옆의 ${NEW}는 원작에 없던 규칙, ${MOD}은 원작에서 바뀐 규칙입니다. 표시가 없으면 원작과 같은 규칙입니다.`,
+    '원작 그대로 하고 싶다면 타이틀 메뉴 맨 아래에서 원작판을 고르세요.',
   ] },
   { key: 'win', title: '이기고 지기', summary: '[[아리크스]]가 쓰러지면 패배합니다. 장에 따라 함께 지켜야 할 인물이 더 있습니다.', core: [
     '장마다 [[도전 과제]]가 붙어 있습니다. 해낸 만큼 별을 받고, 가장 좋은 기록은 장 지도에 남습니다.',
@@ -172,6 +217,18 @@ export const TIP_CARDS: Record<string, TipCard> = {
   bench: tc('grow', '대기 동료', L.bench, L.late),
   ancient: tc('jobs', '고대 병기', L.ancient, '공격 확인창에 「특효」로 표시됩니다.'),
 }
+// 카드 제목 옆 표시 (원작과 차이): 신규 = 원작에 없던 규칙, 개선 = 원작에도 있던 것이 바뀜, 없음 = 원작과 같음 (foeRest·escort).
+// wake = 원작도 경계 대기가 있었고 깨우는 범위가 보이게 됨, tired = 원작 피로에 「70 넘으면 반격 못 함」, promo = 원작은 레벨업 때 바로 승급
+export type TipTag = '신규' | '개선'
+const TIP_TAG: Record<string, TipTag> = {
+  counter: '신규', zoc: '신규', flank: '신규', stance: '신규', undead: '신규', resist: '신규', caster: '신규', heavy: '신규', arrow: '신규',
+  down: '신규', bench: '신규', ancient: '신규', wake: '개선', tired: '개선', promo: '개선',
+}
+/** 카드 키 (갈래 포함, 'resist:fly') 의 표시 HTML. 없으면 빈 글자 */
+export function tipTagHtml(key: string) {
+  const t = TIP_TAG[key.split(':')[0]]
+  return !t ? '' : t === '신규' ? `<em class="tag new" title="원작에 없던 규칙">신규</em>` : `<em class="tag mod" title="원작에서 바뀐 규칙">개선</em>`
+}
 /** 카드 글 (HTML, 문장마다 <br> — openWin 이 줄 수로 높이를 잰다). '@sum'·'@where' 를 주제 글로 */
 export function tipCardHtml(c: TipCard) {
   const t = HELP.find(h => h.key === c.topic)
@@ -229,6 +286,13 @@ export function mountHelp(el: HTMLElement, k: HelpKnown, at = lastTopic, extra: 
       if (by > 0) body.scrollTo({ top: body.scrollTop + by, behavior: 'smooth' })
     })
   }
+  body.addEventListener('click', e => {   // 「원작과 차이」 표의 주제 링크
+    const a = (e.target as HTMLElement).closest<HTMLElement>('[data-topic]')
+    if (!a) return
+    e.preventDefault()
+    const j = list.findIndex(t => t.key === a.dataset.topic)
+    if (j >= 0) { show(j); btns[j].focus() }
+  })
   btns.forEach((b, i) => {
     b.onclick = () => show(i)
     b.onkeydown = e => {   // 위아래 화살표로 주제 넘기기

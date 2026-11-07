@@ -8,7 +8,7 @@ import type { UnitType } from './data'
 import { locked } from './lessons'
 import type { Unit } from './unit'
 import { playDialogue, type Line } from './dialogue'
-import { helpKnown, rulesWin, tipCard, tipCardHtml, type HelpTopic } from './help'
+import { helpKnown, rulesWin, tipCard, tipCardHtml, tipTagHtml, type HelpTopic } from './help'
 import { loadProgress } from './save'
 import { setting } from './settings'
 import { S } from './state'
@@ -163,6 +163,7 @@ function cardWin(t: Pending): Promise<void> {
       buttons: [['도움말에서 더 보기', () => rulesWin(battleKnown(), ok, { topic: c.topic, label: '닫기', extra: tipLog() })], ['닫기', ok]],
       onBack: () => { closeWin('tip'); ok() }, x: false,
     })
+    el.querySelector('.t')?.insertAdjacentHTML('beforeend', tipTagHtml(t.variant ? `${t.key}:${t.variant}` : t.key))
     const gone = setInterval(() => { if (!el.isConnected && !document.querySelector('.owin.rules')) { clearInterval(gone); ok() } }, 300)   // 다른 일 (closeAll) 이 창을 치워도 멈추지 않게
   })
 }
@@ -170,8 +171,8 @@ function cardWin(t: Pending): Promise<void> {
 /** 전투 메뉴 도움말 맨 앞 「안내 기록」: 이 판에서 본 카드를 본 순서대로 */
 export function tipLog(): HelpTopic[] {
   const seen = [...FLAGS].filter(f => f.startsWith('tip:')).map(f => f.slice(4).split(':'))
-  const cards = seen.map(([k, v]) => tipCard(k, v)).filter(Boolean)
+  const cards = seen.map(([k, v]) => ({ c: tipCard(k, v), tag: tipTagHtml(v ? `${k}:${v}` : k) })).filter(x => x.c)
   if (!cards.length) return []
   return [{ key: 'tips', title: '안내 기록', summary: '이 판에서 본 안내입니다. 본 순서대로 모았습니다.',
-    core: cards.map(c => ({ html: () => `<b>${c.title}</b><br>${tipCardHtml(c)}` })) }]
+    core: cards.map(({ c, tag }) => ({ html: () => `<b>${c.title}</b>${tag}<br>${tipCardHtml(c)}` })) }]
 }

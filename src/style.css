@@ -50,6 +50,10 @@ button:disabled { opacity: .45; cursor: default; }
 canvas#view { touch-action: none; }
 /* 원작 창 (comma): 제목 띠 25 · 크림 바탕. 글자 = 검정 + 왼쪽 회색 그림자 (원작 색 7/0) */
 .owin { position: absolute; background-size: 100% 100%; image-rendering: pixelated; color: #000; font: 16px/16px var(--font); }
+/* 원작과 달라진 점 표시 (안내 카드 제목·안내 기록·도움말 표). 신규 = 원작에 없던 규칙, 개선 = 원작에서 바뀐 규칙 */
+.tag { font-style: normal; font-size: 11px; line-height: 14px; padding: 0 5px; margin-left: 6px; border-radius: 3px; vertical-align: 1px; color: #fff; text-shadow: none; white-space: nowrap; }
+.tag.new { background: #a0401c; }
+.tag.mod { background: #2c6488; }
 .owin .t { position: absolute; left: 8px; right: 8px; top: 5px; height: 18px; line-height: 18px; text-align: center; white-space: nowrap; overflow: hidden; }
 /* 제목 줄 ✕ (웹 보탬: 오른쪽 클릭·Esc 가 없는 터치 기기용) · 맵 덮개 (창 바깥 = 닫기) */
 .oclose { all: unset; position: absolute; right: 2px; top: 1px; width: 24px; height: 24px; cursor: pointer; }
@@ -321,6 +325,17 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .notice a { color: #f0d070; text-decoration: underline; text-underline-offset: 3px; }
 #titlescreen .notice a:hover, #titlescreen .notice a:focus-visible { color: #fcfcfc; }
 #titlescreen .notice .dim { color: #9c9c90; font-size: 13px; line-height: 1.6; }
+#titlescreen .ask { width: 100%; text-align: center; font: 400 13px/18px var(--font); color: #fcfcfc; margin: 0 0 4px; }
+/* 처음 방문 판 고르기 (title.ts pickEdition): 판마다 카드 한 장, 글자는 메뉴보다 크고 밝게 */
+#titlescreen .win.pick { left: 262px; width: 370px; }
+#titlescreen .pick .ask { font-size: 16px; line-height: 22px; margin: 0 0 8px; }
+#titlescreen .edcard { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; flex-direction: column; align-items: center;
+  padding: 6px 10px 9px; margin-bottom: 6px; border: 1px solid #4c5c4c; border-radius: 4px; background: rgba(0, 0, 0, .4);
+  font: 400 14px/21px var(--font); color: #e0e0d4; text-align: center; text-shadow: 1px 1px 0 #000; }
+#titlescreen .edcard .n { font-size: 20px; line-height: 30px; letter-spacing: 6px; color: #fcfcfc; }
+#titlescreen .edcard .who { margin-top: 5px; font-size: 13px; color: #e8cc78; }
+#titlescreen .edcard:hover, #titlescreen .edcard:focus-visible { border-color: #e8cc78; background: rgba(70, 56, 20, .55); }
+#titlescreen .pick .foot { width: 100%; text-align: center; font: 400 12px/16px var(--font); color: #9cb49c; }
 /* 기록 옮기기 (title.ts openTransfer) */
 #titlescreen .transfer { position: absolute; inset: 0 0 34px; padding: 18px 22px 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr;
   gap: 0 16px; color: #e8e6df; font: 13px/1.5 var(--font); }
@@ -673,7 +688,7 @@ html.ui-modern .owin .snd .ovol input { accent-color: var(--ec-green); }
 .help .hl button { all: unset; cursor: pointer; padding: 3px 8px; border-radius: 3px; color: var(--hdim); line-height: 1.35; }
 .help .hl button:hover, .help .hl button:focus-visible { color: var(--hfg); }
 .help .hl button.on { color: var(--hfg); background: var(--hsel); }
-.help .hb { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-right: 6px; }
+.help .hb { word-break: keep-all; overflow-wrap: anywhere; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-right: 6px; }
 .help h4 { margin: 0 0 2px; font-size: 1.1em; font-weight: 400; color: var(--hfg); }
 .help h4 em { font-style: normal; font-size: 11px; margin-left: 8px; padding: 0 6px; border: 1px solid var(--hline); border-radius: 3px; color: var(--hdim); vertical-align: 2px; }
 .help .sum { margin: 2px 0 8px; color: var(--hacc); }
@@ -687,6 +702,15 @@ html.ui-modern .owin .snd .ovol input { accent-color: var(--ec-green); }
 .help details { margin-top: 2px; color: var(--hdim); }
 .help details summary { cursor: pointer; margin-bottom: 4px; }
 .help details summary:hover { color: var(--hfg); }
+.help .must { border: 1px solid var(--hline); border-radius: 3px; padding: 4px 8px 2px; margin-bottom: 8px; }
+.help .must ol { margin: 2px 0 2px; padding-left: 18px; }
+.help .must li { margin-bottom: 3px; }
+.help ul.diff { padding-left: 0; list-style: none; }
+.help ul.diff li { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed var(--hline); }
+.help ul.diff .w { color: var(--hfg); }
+.help ul.diff .o { display: inline-block; min-width: 3.6em; margin-right: 6px; color: var(--hdim); font-size: .92em; }
+.help ul.diff li .tag { margin-left: 6px; }
+.help a[data-topic] { color: var(--hacc); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .help .where { margin: 6px 0 0; padding-top: 4px; border-top: 1px dashed var(--hline); color: var(--hdim); font-size: .92em; }
 .help .fig { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; }
 .help .fig span { color: var(--hdim); font-size: .92em; line-height: 1.4; }

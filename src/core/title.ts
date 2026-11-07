@@ -7,7 +7,7 @@ import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { prologue } from './movie'
-import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
+import { applyBundle, bundleCode, currentBundle, hasImportBackup, hasLastEdition, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
   setLastEdition, startOtherRoad, undoImport, type EditionId, type Progress, type SaveBundle, type SaveSlot, type Suspended } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
@@ -135,7 +135,7 @@ export function showTitle(): Promise<Launch> {
     const menu = () => {
       const p = loadProgress(ed)
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
-      win.classList.remove('wide')
+      win.classList.remove('wide', 'pick')
       rows([
         { label: '유랑천하', on: () => ed === 'remake' ? pickDifficulty() : newGame() },
         { label: '지난흔적', on: () => loadMenu() },
@@ -150,6 +150,25 @@ export function showTitle(): Promise<Launch> {
           on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
       ])
       body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
+    }
+
+    // 처음 방문 (판을 고른 적이 없을 때): 두 판의 차이를 보고 고른다. 뒤로는 메뉴 맨 아래 원작판·개선판 버튼 (2026-11-07 사용자 시안 결정)
+    const pickEdition = () => {
+      applyFont(undefined)
+      win.classList.remove('wide')
+      win.classList.add('pick')
+      const card = (id: EditionId, name: string, lines: string[], who: string) =>
+        `<button class="edcard" data-ed="${id}"><span class="n">${name}</span>${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
+      body.innerHTML = `<div class="ask">어느 판으로 하시겠습니까?</div>
+        ${card('remake', '개선판', ['현대어로 새로 쓴 대사', '반격·협공·상성 같은 새 규칙', '위험 범위·피해 예측 등 편의 기능'], '처음 하는 분, 새롭게 즐기고 싶은 분')}
+        ${card('original', '원작판', ['1996년 원작의 규칙과 대사', '민첩 순서대로 한 명씩 움직이는 턴', '편의 기능 없음'], '원작을 그대로 다시 해 보고 싶은 분')}
+        <div class="foot">메뉴 맨 아래에서 언제든 바꿀 수 있습니다</div>`
+      body.querySelectorAll<HTMLButtonElement>('.edcard').forEach(b => b.onclick = () => {
+        ed = b.dataset.ed as EditionId
+        setLastEdition(ed)
+        menu()
+      })
+      body.querySelector<HTMLButtonElement>('.edcard')?.focus()
     }
 
     const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) }
@@ -337,7 +356,8 @@ export function showTitle(): Promise<Launch> {
     const showMenu = async () => {
       bg.src = `${A}/ui/mark1.png`
       win.hidden = false
-      menu()
+      if (hasLastEdition()) menu()
+      else pickEdition()
       await busy(pageReady(stage))   // 첫 실행: 배경·창틀 그림과 글꼴이 오기 전에 밝히지 않는다
       stage.classList.remove('dark')
     }

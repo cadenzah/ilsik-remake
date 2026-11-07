@@ -46,7 +46,7 @@ P.start = async function (opt = {}) {
   function closeTip() {
     const tip = document.querySelector('.owin.tip')
     if (!vis(tip)) return false
-    D.tips.push({ n: S.def?.n, turn: S.turn, title: tip.innerText.split('\n')[0], line: DL.talkLog.at(-1)?.text?.slice(0, 40) })
+    D.tips.push({ n: S.def?.n, turn: S.turn, title: tip.querySelector('.t')?.firstChild?.textContent ?? tip.innerText.split('\n')[0], line: DL.talkLog.at(-1)?.text?.slice(0, 40) })
     btnIn(tip, ['닫기'])?.click()
     return true
   }
