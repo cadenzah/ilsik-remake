@@ -115,3 +115,8 @@
 - 부르는 자리 (battle.ts): 아군 차례 시작 turnTips (escort·wake·ancient·heavy·stance (2장부터)·tired) → flushTips, 일행 행동 끝 finishUnit → flushTips, attack 의 attackTips (flank·arrow) 와 반격 뒤 counter, castSpell 의 spellResult 뒤 상성 (remake/affinity.ts affinityTip: 약점 = 불사족 → 상극 → 중갑, 내성 = 비행 → 같은 계열 → 종족), aiAct 쉬기 = foeRest, select = zoc (grid.reachable 를 zoc 끄고 견줌, 못 보이면 버림), showLevelUp 승급 제안 뒤 promo, 전투 뒤 장면 뒤 postTips (down = 판 플래그 down:이름, bench = 출전 안 한 동료)
 - 도움말: rulesWin(known, back, { topic, label, extra }), mountHelp 의 고른 주제를 키로 기억, 전투 메뉴 도움말 맨 앞 「안내 기록」 (본 것이 있을 때)
 - tools/play_campaign.js 는 안내 카드를 「닫기」 하고 status().tips 에 남긴다
+
+## 6. 4단계 — 1~10장 빈도 (2026-11-07)
+- 캠페인 자동 진행 (play_campaign.js, 보통) 으로 1~9장 (9장 뒤 B 루트 12장) 에서 뜬 안내: 1장 경계 1턴·통제 영역 3턴·협공 4턴 (반격은 4턴 같은 공격에서 협공 다음에 쌓여 셋째 자리를 놓치고 2장으로) / 2장 전력·방어 1턴·반격 2턴·적의 휴식 4턴 (첫 승급 제안 = 소피아 장검은 셋이 차서 빠짐) / 3장 호위 1턴·승급·쓰러진 대원 (전투 뒤) / 4장 없음 / 5장 피로 / 6장 활과 비행 (화살병 → 루이스) / 7~9장 없음. 장마다 0~3, 한 장에 셋이 차는 것은 1·2장뿐 — 상한 셋은 그대로 둔다
+- 고침: ① 일어난 일 중 **반격을 먼저** (tips.ts flushTips) — 1장 = 경계·통제 영역·반격, 협공은 2장 2턴으로 (다시 돌려 확인). ② **승급은 셈 밖** (battle.ts showLevelUp → tipNow force) — 제안이 드물고 이미 레벨업 창 앞에 멈춘 때라 한 차례·한 장 상한에 걸려 버려지면 다음 제안까지 (몇 장 뒤) 못 본다. tipNow force 는 이제 그 안내 하나만 보인다 (쌓인 다른 것은 그대로). ③ 대사: 피로 레스다 「숨이 턱까지 찼구나」 → 「많이 지쳤구나」 (2장 적의 휴식 카론 「숨이 턱까지 찼군요」 와 겹침)
+- 자동 진행은 마법을 쓰지 않아 상성 마법 안내 (undead·resist·caster) 와 전력·방어 실제 사용은 이 방법으로 못 본다 (undead 는 반영 때 3장에서 손으로 확인). 손으로 해 볼 것: 7장 거목 ← 카론 땅 (caster), 3장 카론 비석술 → 조인 (resist fly)

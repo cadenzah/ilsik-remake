@@ -68,8 +68,10 @@ export function noteTip(key: TipKey, variant?: string, name?: string) {
 export async function flushTips(force = false) {
   while (pending.length && on()) {
     if (!force && (shown >= PER_BATTLE || lastTurn === S.turn)) return
-    // 방금 일어난 일 (반격·협공·상성…) 을 장 내내 깔린 것 (경계·전력·방어·중갑…) 보다 먼저. 호위는 장 시작에 가장 먼저
-    const ev = pending.findIndex(p => !STANDING.includes(p.key))
+    // 방금 일어난 일 (반격·협공·상성…) 을 장 내내 깔린 것 (경계·전력·방어·중갑…) 보다 먼저. 호위는 장 시작에 가장 먼저.
+    // 반격은 일어난 일 중에서도 먼저 — 한 공격에서 협공과 함께 생기면 협공이 1장 셋째 자리를 차지해 반격이 2장으로 밀렸다 (2026-11-07 1~10장 돌려 봄)
+    const urgent = pending.findIndex(p => p.key === 'counter')
+    const ev = urgent >= 0 ? urgent : pending.findIndex(p => !STANDING.includes(p.key))
     const t = pending.splice(pending[0].key === 'escort' || ev < 0 ? 0 : ev, 1)[0]
     if (seenTip(t.key)) continue
     await show(t)
@@ -77,11 +79,13 @@ export async function flushTips(force = false) {
   }
 }
 
-/** 바로 보인다 (그 자리에서 일어난 일: 통제 영역·승급·전투 뒤). 지금 못 보이면 (한 차례 하나·한 전투 셋) 버린다 — 일이 다시 일어날 때 또 */
+/** 바로 보인다 (그 자리에서 일어난 일: 통제 영역·승급·전투 뒤). 지금 못 보이면 (한 차례 하나·한 전투 셋) 버린다 — 일이 다시 일어날 때 또.
+ *  force = 셈 없이 이것 하나만 (쌓인 다른 안내는 그대로 둔다) */
 export async function tipNow(key: TipKey, variant?: string, name?: string, force = false) {
   if (!on() || seenTip(key)) return
   const was = pending.findIndex(p => p.key === key)
   if (was >= 0) pending.splice(was, 1)
+  if (force) return show({ key, variant, name })
   pending.unshift({ key, variant, name })
   await flushTips(force)
   const left = pending.findIndex(p => p.key === key)

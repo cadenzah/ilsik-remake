@@ -433,7 +433,7 @@ async function showLevelUp(u: Unit, r: LevelUp) {
     width: Math.max(180, got.length * 112 + 24, ...lines.map(l => l.replace(/<[^>]+>/g, '').length * 14 + 32)),
     buttons: offers.length ? [['승급', () => { takePromos(u); ok() }], ['나중에', ok]] : [['확인', ok]], onBack: () => { closeWin('levelup'); ok() }, x: false }))
   if (u.type.id === PARTY[0]) await recall(u.type.lv >= 20 ? 'lv20' : u.type.lv >= 10 ? 'lv10' : null)   // 레스다 회상 (B1 제안 42)
-  if (offers.length) await tipNow('promo')   // 승급 고르기 안내 (tips.ts)
+  if (offers.length) await tipNow('promo', undefined, undefined, true)   // 승급 고르기 안내 (tips.ts). 셈 밖 — 첫 제안 (2장 소피아) 때 그 장 셋이 차 있어 빠지곤 했고, 제안은 드물다
 }
 
 /** 원작 타이머 한 틱 (BIOS 18.2Hz, 0aa2:02f0 기다리기 단위) */
