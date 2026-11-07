@@ -204,9 +204,8 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .row:hover:not(:disabled), #titlescreen .row:focus-visible { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
 #titlescreen .row.opt { font-size: 12px; height: 20px; line-height: 20px; letter-spacing: 0; margin-top: 4px; color: #6c846c; }
 #titlescreen .row:disabled { cursor: default; opacity: .45; }
-#titlescreen .row.ed { width: 56px; font-size: 13px; height: 20px; line-height: 20px; color: #6c846c; }
-#titlescreen .row.ed.on { color: #fcfcfc; text-shadow: 1px 1px 0 #000; }
-#titlescreen .row.ed { margin-top: 6px; }
+#titlescreen .row.edsw { font-size: 14px; margin-top: 6px; color: #9cb49c; }
+#titlescreen .row.edsw.two { height: 36px; line-height: 18px; }
 #titlescreen .version { width: 100%; text-align: center; font: 400 12px/16px var(--font); color: #6c846c; }
 #titlescreen .wide .row { width: 180px; font-size: 14px; }
 #titlescreen .row.back { margin-top: 6px; }
@@ -335,6 +334,9 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .edcard .n { font-size: 20px; line-height: 30px; letter-spacing: 6px; color: #fcfcfc; }
 #titlescreen .edcard .who { margin-top: 5px; font-size: 13px; color: #e8cc78; }
 #titlescreen .edcard:hover, #titlescreen .edcard:focus-visible { border-color: #e8cc78; background: rgba(70, 56, 20, .55); }
+#titlescreen .edcard.now { border-color: #8c7c48; }
+#titlescreen .edcard .cur { font-size: 12px; line-height: 16px; color: #e8cc78; margin: -2px 0 3px; }
+#titlescreen .pick .row.back { margin-top: 0; }
 #titlescreen .pick .foot { width: 100%; text-align: center; font: 400 12px/16px var(--font); color: #9cb49c; }
 /* 기록 옮기기 (title.ts openTransfer) */
 #titlescreen .transfer { position: absolute; inset: 0 0 34px; padding: 18px 22px 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr;

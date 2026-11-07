@@ -135,7 +135,7 @@ export function showTitle(): Promise<Launch> {
     const menu = () => {
       const p = loadProgress(ed)
       applyFont(ed === 'original' || undefined)   // 원작판은 늘 원작 글꼴 (설정은 개선판 메뉴에만)
-      win.classList.remove('wide', 'pick')
+      win.classList.remove('wide', 'pick', 'back')
       rows([
         { label: '유랑천하', on: () => ed === 'remake' ? pickDifficulty() : newGame() },
         { label: '지난흔적', on: () => loadMenu() },
@@ -146,29 +146,39 @@ export function showTitle(): Promise<Launch> {
           { label: '설 정', on: () => settings() },
         ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },
-        ...EDITIONS.map(e => ({ label: e.name, cls: `ed ${e.id === ed ? 'on' : ''}`,
-          on: () => { ed = e.id; setLastEdition(ed); menu(); body.querySelector<HTMLButtonElement>('.ed.on')?.focus() } })),
+        // 판 바꾸기 = 판 고르기 창 (두 판 설명을 보고 바꾼다. 2026-11-07 사용자: 처음 방문 때만 뜨면 이미 해 본 사람은 볼 길이 없다)
+        { label: '판 바꾸기', sub: `지금 ${EDITIONS.find(e => e.id === ed)!.name}`, cls: 'edsw', on: () => pickEdition(true) },
       ])
       body.insertAdjacentHTML('beforeend', `<div class="version">${__VERSION__.split(' ')[0]}</div>`)
     }
 
-    // 처음 방문 (판을 고른 적이 없을 때): 두 판의 차이를 보고 고른다. 뒤로는 메뉴 맨 아래 원작판·개선판 버튼 (2026-11-07 사용자 시안 결정)
-    const pickEdition = () => {
+    // 판 고르기 창: 처음 방문 (판을 고른 적이 없을 때) 과 메뉴 맨 아래 「판 바꾸기」 (back = 지금 판 표시·돌아가기·Esc). 판마다 카드 한 장
+    const pickEdition = (back = false) => {
       applyFont(undefined)
       win.classList.remove('wide')
       win.classList.add('pick')
-      const card = (id: EditionId, name: string, lines: string[], who: string) =>
-        `<button class="edcard" data-ed="${id}"><span class="n">${name}</span>${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
-      body.innerHTML = `<div class="ask">어느 판으로 하시겠습니까?</div>
+      win.classList.toggle('back', back)
+      const card = (id: EditionId, name: string, lines: string[], who: string) => {
+        const now = back && id === ed
+        return `<button class="edcard${now ? ' now' : ''}" data-ed="${id}"><span class="n">${name}</span>${now ? '<span class="cur">지금 하는 판</span>' : ''}${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
+      }
+      body.innerHTML = `<div class="ask">${back ? '판 바꾸기' : '어느 판으로 하시겠습니까?'}</div>
         ${card('remake', '개선판', ['현대어로 새로 쓴 대사', '반격·협공·상성 같은 새 규칙', '위험 범위·피해 예측 등 편의 기능'], '처음 하는 분, 새롭게 즐기고 싶은 분')}
         ${card('original', '원작판', ['1996년 원작의 규칙과 대사', '민첩 순서대로 한 명씩 움직이는 턴', '편의 기능 없음'], '원작을 그대로 다시 해 보고 싶은 분')}
-        <div class="foot">메뉴 맨 아래에서 언제든 바꿀 수 있습니다</div>`
+        ${back ? '' : '<div class="foot">메뉴 맨 아래 「판 바꾸기」에서 언제든 바꿀 수 있습니다</div>'}`
+      if (back) {
+        const b = document.createElement('button')
+        b.className = 'row back'
+        b.textContent = '돌아가기'
+        b.onclick = () => menu()
+        body.append(b)
+      }
       body.querySelectorAll<HTMLButtonElement>('.edcard').forEach(b => b.onclick = () => {
         ed = b.dataset.ed as EditionId
         setLastEdition(ed)
         menu()
       })
-      body.querySelector<HTMLButtonElement>('.edcard')?.focus()
+      body.querySelector<HTMLButtonElement>(back ? '.edcard.now' : '.edcard')?.focus()
     }
 
     const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) }
@@ -349,7 +359,7 @@ export function showTitle(): Promise<Launch> {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
         bs[(i + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length]?.focus()
-      } else if (e.key === 'Escape' && win.classList.contains('wide')) menu()
+      } else if (e.key === 'Escape' && (win.classList.contains('wide') || win.classList.contains('back'))) menu()
     }
     addEventListener('keydown', onKey)
 
