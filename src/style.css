@@ -398,13 +398,13 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #camp .mb .x { position: absolute; left: 0; top: 0; }   /* 원작 STA 11: 고른 도구를 못 쓰는 인물 */
 #camp.remake .it.picked { outline: 2px solid #c86414; }
 #camp .hit:focus-visible, #camp .mb:focus-visible, #camp .sb:focus-visible, #camp .it:focus-visible, #camp .eq:focus-visible { outline: 1px dotted #000; }
-/* 개선판: 마우스 올림·남은 칸·선두 표시 */
+/* 개선판: 마우스 올림·남은 칸·고정 대원 (출전 0번) 표시 */
 #camp.remake .mb:hover:not(.gone), #camp.remake .sb:hover, #camp.remake .it:hover, #camp.remake .eq:hover { outline: 1px solid #c86414; }
 #camp.remake .eq.up::after { content: '승급'; position: absolute; right: -2px; top: -6px; padding: 0 2px; font-size: 10px; line-height: 12px; background: #c86414; color: #fff; }   /* 받지 않은 승급 (B1 제안 36) */
 #camp.remake .hit:hover { outline: 1px solid #fff; }
 #camp.remake .mb.shown:not(.gone) { outline: 1px dashed #c86414; }
 #camp .empty { box-sizing: border-box; border: 1px dashed rgba(120, 80, 30, .7); border-radius: 3px; }
-#camp.remake .sb.lead::after { content: "선두"; position: absolute; right: 0; bottom: 0; padding: 0 2px; font-size: 9px; line-height: 11px;
+#camp.remake .sb.lead::after { content: "고정"; position: absolute; right: 0; bottom: 0; padding: 0 2px; font-size: 9px; line-height: 11px;
   color: #fff; background: #c86414; }
 #camp .count { left: 548px; top: 352px; width: 60px; text-align: right; font-weight: 700; color: #000; }
 /* 확인창 (원작 0aa2:0c58): 주황 띠 제목 + [결정][취소] */

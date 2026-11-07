@@ -148,7 +148,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
         role="checkbox" aria-checked="${on}" tabindex="-1">
       <span class="mc-check">${on ? '✓' : ''}</span>
       <span class="mc-spr">${sprite(t, false)}</span>
-      <span class="mc-name"><b>${esc(t.name)}</b>${i === 0 ? '<em>선두</em>' : ''}${upNext(t, 0) !== undefined || upNext(t, 1) !== undefined ? '<em class="mc-upmark">승급</em>' : ''}<small>${esc(p.job || p.race)} · Lv ${t.lv}</small></span>
+      <span class="mc-name"><b>${esc(t.name)}</b>${i === 0 ? '<em>고정</em>' : ''}${upNext(t, 0) !== undefined || upNext(t, 1) !== undefined ? '<em class="mc-upmark">승급</em>' : ''}<small>${esc(p.job || p.race)} · Lv ${t.lv}</small></span>
       <span class="mc-hp">생명 ${st.maxHp}</span>
       <span class="mc-ord">${on ? j + 1 : ''}</span>
     </button>`
@@ -204,7 +204,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       <div class="mc-card">
         <i class="mc-por" style="background-position:-${(t.por % 12) * 96}px -${Math.floor(t.por / 12) * 111}px"></i>
         <div class="mc-who">
-          <h3>${esc(t.name)}${shown === 0 ? '<em>선두</em>' : ''}</h3>
+          <h3>${esc(t.name)}${shown === 0 ? '<em>고정</em>' : ''}</h3>
           <p>${[p.race, p.sex, p.job].filter(Boolean).map(esc).join(' · ')} · Lv ${t.lv} · 경험 ${t.exp}</p>
           <p class="dim">${[p.move && `이동 ${esc(p.move)}`, p.rank && `부하상태 ${esc(p.rank)}`, `피로 ${t.fatigue}`].filter(Boolean).join(' · ')}</p>
           <div class="mc-stats">${STAT_LABEL.map(stat).join('')}</div>
