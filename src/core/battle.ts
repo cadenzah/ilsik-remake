@@ -1,7 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
-import { battleKnown, flushTips, noteTip, resetTips, seenTip, tipLog, tipNow } from './tips'
+import { battleKnown, beginLessons, counterOpened, flushTips, noteTip, openCounter, openFlank, resetTips, seenTip, tipLog, tipNow } from './tips'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
 import { EQUIP, FLAGS, ITEMS, PARTY, finishStage, partyType, promoteDeployed, nextStage, restore, sceneLines, snapshot, takePromo, type Camp } from './campaign'
@@ -179,6 +179,7 @@ async function start(resume?: Suspended) {
   playMusic(song, true)   // 2ff8:0a7e: 전투 로드 뒤 장 곡 — 장 앞 대화부터 전투 보상까지 (원작판은 거기서 멈춤, 개선판은 장 뒤 장면까지). 다시 하기는 처음부터
   resetTalk()
   resetTips()
+  beginLessons()   // 1장 차례차례 배우기 (core/lessons.ts)
   S.active = []
   S.mode = { kind: 'busy' }
   S.aim = S.watch = null
@@ -359,6 +360,7 @@ async function attack(a: Unit, c: Unit) {
   if (attackKind(a) === 3) await explode(a.type.equip[0] - 87, area)
   else if (attackKind(a) >= 4 && c !== a) await arrowHit(a, c, attackKind(a) === 4)
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
+  const opened = remake() && openCounter(a, c, () => counterDamage(a, c) > 0)   // 1장: 적의 첫 근접 공격에 반격이 열린다 (tips.ts)
   const back = counterDamage(a, c)   // 타격 전 상태로 판단 (맞으면 혼수가 풀린다)
   if (remake()) attackTips(a, targets)
   const { hits } = strike(a, c)
@@ -369,7 +371,7 @@ async function attack(a: Unit, c: Unit) {
   S.fx = null
   await fadeDead(targets)
   await gainExp(a, hits)
-  if (back) { await counterAct(a, c, back); if (remake()) noteTip('counter') }
+  if (back) { await counterAct(a, c, back); if (opened) await counterOpened(); else if (remake()) noteTip('counter') }
 }
 
 /** 시스템 대화 안내 (tips.ts): 일행의 협공, 활이 날 수 있는 유닛을 맞힘 (어느 편이든 — 적이 쏘면 foe 갈래) */
@@ -749,6 +751,7 @@ function enemySummary() {
 /** 아군 차례 시작에 쌓을 안내 (tips.ts). 앞에 쌓은 것부터 보이므로 급한 것을 먼저: 호위 → 경계 → 고대 병기 → 중갑 → 전력·방어 → 피로 */
 function turnTips(live: Unit[]) {
   const foes = alive('enemy')
+  openFlank()   // 1장: 반격을 배운 다음 차례에 협공을 열고 소개
   if (S.cond.some(r => r.do.includes('lose') && 'dead' in r.if && r.if.dead.some(d => { const u = member(d); return !!u && isNpc(u) }))) noteTip('escort')
   if (foes.some(f => S.troopState[f.troop] === 1)) noteTip('wake')
   if (live.some(u => foes.some(f => S.ed.rules.bane?.(u, f)))) noteTip('ancient')
@@ -966,6 +969,7 @@ async function resumeAt(r: Suspended, all: Unit[]) {
   r.told.forEach(t => told.add(t))
   S.joined = [...r.joined]
   FLAGS.clear(); r.flags.forEach(f => FLAGS.add(f))
+  beginLessons()   // 저장한 때까지 배운 것으로
   if (r.items) ITEMS.splice(0, ITEMS.length, ...r.items)
   r.taken?.forEach(i => taken.add(i))
   S.turn = r.turn

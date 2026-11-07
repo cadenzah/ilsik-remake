@@ -5,6 +5,7 @@ import type { LevelUp } from './edition'
 import { FLAGS, ITEMS, PARTY, partyType, keepGrowth, joinLine } from './campaign'
 import { DIRS, inside, key, moveCost } from './grid'
 import { attackKind, inReach, strikeTargets } from './attack'
+import { locked } from './lessons'
 import { applyHit, hitText, spellTargets } from './magic'
 import type { Placement } from './stage'
 import { member, S } from './state'
@@ -130,7 +131,7 @@ let counterTurn: Unit['side'] | undefined   // 그 상대 차례의 공격 쪽
  *  피해 = 물리 피해 × scale × decay^(이번 상대 차례에 이미 되받은 횟수), 최소 1. 개선판 = scale 1 · decay 1 (원래 위력, 감쇠 없음) */
 export function counterDamage(a: Unit, c: Unit, from: Pos = a): number {
   const cfg = S.ed.counter
-  if (!cfg || c.side === a.side || attackKind(a) >= 2 || c.coma > 0 || S.troopState[c.troop] === 2 || !inReach(c, c, from)) return 0
+  if (!cfg || locked.has('counter') || c.side === a.side || attackKind(a) >= 2 || c.coma > 0 || S.troopState[c.troop] === 2 || !inReach(c, c, from)) return 0
   const dealt = S.ed.rules.damageRange(S.map, a, c, from, S.units)[0], hp = c.hp   // 협공으로 쓰러지면 못 되받는다 (되받는 피해에는 협공 없음)
   if (dealt >= hp) return 0
   c.hp = hp - dealt

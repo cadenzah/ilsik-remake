@@ -2,6 +2,7 @@
 // 전투 계산에 난수가 없다: 명중 판정·치명타·피해 흔들림·반격 모두 없음. 정수화는 0 쪽 절사, 중간값 일부는 float32
 import type { Item, Magic, StageMap, Tables, UnitType } from '../../core/data'
 import type { LevelUp, Rules, SpellHit, Stance } from '../../core/edition'
+import { locked } from '../../core/lessons'
 import { applyMods, equippedStats, nextUpgrade, refit, type BuffStat, type Pos, type Unit } from '../../core/unit'
 
 const f32 = Math.fround
@@ -40,7 +41,7 @@ export function baneCut(a: Unit, d: Unit, b?: Bane) {
 /** 협공 (개선판 B1 제안 30): 대상 옆 (상하좌우) 에 붙은 공격자 편 1명마다 물리 피해 +per, 최대 +max. 혼수인 유닛은 안 친다 */
 export interface Flank { per: number; max: number }
 export function flankBonus(a: Unit, d: Unit, units?: Unit[], f?: Flank) {
-  if (!f || !units || d.side === a.side) return 0
+  if (!f || !units || d.side === a.side || locked.has('flank')) return 0   // 1장 배우기 전 (core/lessons.ts)
   const n = units.filter(o => o !== a && o.hp > 0 && !o.coma && o.side === a.side && Math.abs(o.x - d.x) + Math.abs(o.y - d.y) === 1).length
   return Math.min(f.max, f.per * n)
 }

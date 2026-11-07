@@ -5,6 +5,8 @@
 // 다시 하기는 장 시작 플래그로 되돌아가므로 그 장에서 처음 본 안내는 다시 나온다 (레스다 회상과 같음)
 import { FLAGS } from './campaign'
 import type { UnitType } from './data'
+import { locked } from './lessons'
+import type { Unit } from './unit'
 import { playDialogue, type Line } from './dialogue'
 import { helpKnown, rulesWin, tipCard, tipCardHtml, type HelpTopic } from './help'
 import { loadProgress } from './save'
@@ -55,6 +57,34 @@ let shown = 0, lastTurn = -1
 export function resetTips() { pending.length = 0; shown = 0; lastTurn = -1 }
 
 const on = () => lines.size > 0 && (setting('tipLines') || setting('tipCards'))
+
+/** 1장 차례차례 배우기 (core/lessons.ts, tips-proposal.md 7절): 안내가 켜진 판의 1장에서 아직 안 배운 반격·협공을 잠근다.
+ *  전투 시작·중간 저장에서 이어 하기 (판 플래그를 되돌린 뒤) 에 부른다. 2장부터·안내 끔·원작판은 잠그지 않는다 */
+export function beginLessons() {
+  locked.clear()
+  if (!on() || S.def?.n !== 1) return
+  if (!seenTip('counter')) locked.add('counter')
+  if (!seenTip('flank')) locked.add('flank')
+}
+
+/** 적이 처음 일행을 칠 때 (battle.ts attack, 되받기 판단 전): 반격을 열어 본다. 이번 공격을 되받을 수 있을 때만 열고 true
+ *  — 그 자리에서 되받고 바로 안내 (openedTip). 활처럼 되받지 못하는 공격이면 잠근 채 다음 근접 공격을 기다린다 */
+export function openCounter(a: Unit, c: Unit, can: () => boolean): boolean {
+  if (!locked.has('counter') || a.side !== 'enemy' || c.troop !== 0) return false
+  locked.delete('counter')
+  if (can()) return true
+  locked.add('counter')
+  return false
+}
+/** 방금 열린 반격: 적 차례 중이라도 그 자리에서 (셈 밖). 레스다가 「방금 그것」 을 짚는다 */
+export const counterOpened = () => tipNow('counter', 'open', undefined, true)
+
+/** 반격을 배운 뒤 첫 아군 차례 (battle.ts turnTips): 협공을 열고 소개 — 쓰기 전에 알려 준다 */
+export function openFlank() {
+  if (!locked.has('flank') || !seenTip('counter')) return
+  locked.delete('flank')
+  noteTip('flank', 'open')
+}
 /** 이 판에서 이미 본 안내인가 (갈래와 상관없이) */
 export const seenTip = (key: TipKey) => [...FLAGS].some(f => f === `tip:${key}` || f.startsWith(`tip:${key}:`))
 
