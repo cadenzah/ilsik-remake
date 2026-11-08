@@ -7,7 +7,7 @@ import type { Camp } from './campaign'
 import { A } from './data'
 import { fadeIn, fadeOut } from './fade'
 import { prologue } from './movie'
-import { applyBundle, bundleCode, currentBundle, hasImportBackup, hasLastEdition, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
+import { applyBundle, bundleCode, currentBundle, hasImportBackup, lastEdition, loadProgress, loadSlots, loadSuspended, parseTransfer, progressCamp, resetProgress,
   setLastEdition, startOtherRoad, undoImport, type EditionId, type Progress, type SaveBundle, type SaveSlot, type Suspended } from './save'
 import { ROUTE_NAMES, withCarry } from './replay'
 import { chapterMap, codex } from './replayScreens'
@@ -147,39 +147,36 @@ export function showTitle(): Promise<Launch> {
         ] : [],   // 원작판: 원작 메뉴 (유랑천하·지난흔적) 그대로. 장 선택·설정 같은 웹 편의는 개선판에만
         { label: '제 작 진', on: () => credits(0) },
         // 판 바꾸기 = 판 고르기 창 (두 판 설명을 보고 바꾼다. 2026-11-07 사용자: 처음 방문 때만 뜨면 이미 해 본 사람은 볼 길이 없다)
-        { label: '판 바꾸기', cls: 'edsw', on: () => pickEdition(true) },
+        { label: '판 바꾸기', cls: 'edsw', on: () => pickEdition() },
       ])
       // 어느 판인지는 맨 아래 버전 줄에 판 이름으로 (「개선판 v1.0.0」). 「지금 ○○판」 같은 설명 글은 쓰지 않는다 (2026-11-07 사용자)
       body.insertAdjacentHTML('beforeend', `<div class="version">${EDITIONS.find(e => e.id === ed)!.name} ${__VERSION__.split(' ')[0]}</div>`)
     }
 
-    // 판 고르기 창: 처음 방문 (판을 고른 적이 없을 때) 과 메뉴 맨 아래 「판 바꾸기」 (back = 지금 판 카드에 ◆ 표시·돌아가기·Esc). 판마다 카드 한 장
-    const pickEdition = (back = false) => {
+    // 판 고르기 창: 메뉴 맨 아래 「판 바꾸기」. 지금 판 카드에 ◆, 돌아가기·Esc. 판마다 카드 한 장
+    // 첫 실행에는 띄우지 않는다 (2026-11-08 사용자): 처음 하는 사람에겐 고를 근거가 없는 질문이라 개선판 메뉴로 바로 가고, 원작판을 찾는 사람은 이 창으로
+    // 카드 문구 (2026-11-08 사용자): 개선판은 대사 + 새 규칙·메커니즘 한 줄 + 편의 기능·UI 한 줄. 규칙 이름을 늘어놓거나 하나하나 풀어 쓰지 않는다.
+    // 원작판 = 원작 그대로 + 편의는 개선판에서 꼭 필요한 것만 옮겼다는 취지 (창 닫기 ✕·대화 기록·확대 등, ux.md 5·8절)
+    const pickEdition = () => {
       applyFont(undefined)
       win.classList.remove('wide')
-      win.classList.add('pick')
-      win.classList.toggle('back', back)
-      const card = (id: EditionId, name: string, lines: string[], who: string) => {
-        const now = back && id === ed
-        return `<button class="edcard${now ? ' now' : ''}" data-ed="${id}"><span class="n">${name}</span>${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
-      }
-      body.innerHTML = `<div class="ask">${back ? '판 바꾸기' : '어느 판으로 하시겠습니까?'}</div>
-        ${card('remake', '개선판', ['현대어로 새로 쓴 대사', '반격·협공·상성 같은 새 규칙', '위험 범위·피해 예측 등 편의 기능'], '처음 하는 분, 새롭게 즐기고 싶은 분')}
-        ${card('original', '원작판', ['1996년 원작의 규칙과 대사', '민첩 순서대로 한 명씩 움직이는 턴', '편의 기능 없음'], '원작을 그대로 다시 해 보고 싶은 분')}
-        ${back ? '' : '<div class="foot">메뉴 맨 아래 「판 바꾸기」에서 언제든 바꿀 수 있습니다</div>'}`
-      if (back) {
-        const b = document.createElement('button')
-        b.className = 'row back'
-        b.textContent = '돌아가기'
-        b.onclick = () => menu()
-        body.append(b)
-      }
+      win.classList.add('pick', 'back')
+      const card = (id: EditionId, name: string, lines: string[], who: string) =>
+        `<button class="edcard${id === ed ? ' now' : ''}" data-ed="${id}"><span class="n">${name}</span>${lines.map(l => `<span class="l">${l}</span>`).join('')}<span class="who">${who}</span></button>`
+      body.innerHTML = `<div class="ask">판 바꾸기</div>
+        ${card('remake', '개선판', ['현대어로 새로 쓴 대사', '게임 양상을 다채롭게 만드는 새 규칙과 메커니즘', '플레이를 편하게 하는 편의 기능과 UI 개선'], '처음 하는 분, 새롭게 즐기고 싶은 분')}
+        ${card('original', '원작판', ['1996년 원작의 규칙과 대사', '개선판에서 옮겨 온 최소한의 편의 기능'], '원작을 그대로 다시 해 보고 싶은 분')}`
+      const b = document.createElement('button')
+      b.className = 'row back'
+      b.textContent = '돌아가기'
+      b.onclick = () => menu()
+      body.append(b)
       body.querySelectorAll<HTMLButtonElement>('.edcard').forEach(b => b.onclick = () => {
         ed = b.dataset.ed as EditionId
         setLastEdition(ed)
         menu()
       })
-      body.querySelector<HTMLButtonElement>(back ? '.edcard.now' : '.edcard')?.focus()
+      body.querySelector<HTMLButtonElement>('.edcard.now')?.focus()
     }
 
     const newGame = () => { resetProgress(ed); launch(stageDef(1, 0, true), { flags: [], party: [], items: [] }) }
@@ -367,8 +364,7 @@ export function showTitle(): Promise<Launch> {
     const showMenu = async () => {
       bg.src = `${A}/ui/mark1.png`
       win.hidden = false
-      if (hasLastEdition()) menu()
-      else pickEdition()
+      menu()   // 처음 방문도 메뉴로 (판을 고른 적이 없으면 lastEdition = 개선판)
       await busy(pageReady(stage))   // 첫 실행: 배경·창틀 그림과 글꼴이 오기 전에 밝히지 않는다
       stage.classList.remove('dark')
     }

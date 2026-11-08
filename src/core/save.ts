@@ -62,10 +62,6 @@ const LAST_ED = 'eclipse.edition'
 export function lastEdition(): EditionId {
   try { return localStorage.getItem(LAST_ED) === 'original' ? 'original' : 'remake' } catch { return 'remake' }
 }
-/** 판을 한 번이라도 고른 적이 있나 — 없으면 타이틀이 판 고르기 창부터 연다 */
-export function hasLastEdition() {
-  try { return localStorage.getItem(LAST_ED) !== null } catch { return true }
-}
 export function setLastEdition(ed: EditionId) {
   try { localStorage.setItem(LAST_ED, ed) } catch { /* 무시 */ }
 }
