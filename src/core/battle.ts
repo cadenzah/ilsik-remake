@@ -37,7 +37,7 @@ import { alive, canCommand, isNpc, member, S, unitAt } from './state'
 import { banter, blocksAt, chapter, epilogue, goalStates, initScript, ownsSteps, recall, resetTalk, story, type When } from './script'
 import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMenu, initSkinCss, isOpen, onWinChange, openWin, setOutsideCloses, showMenu, showResult, type Btn } from './ui'
 import { applyMods, nextUpgrade, type Pos, type Unit } from './unit'
-import { addExp, again, applyCounter, brace, counterDamage, freshBattle, stageTune, judge, placements, rest, spellResult, startEvents, strike, takePromos, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
+import { addExp, again, applyCounter, brace, chests, counterDamage, freshBattle, stageTune, judge, placements, rest, spellResult, startEvents, strike, takePromos, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
 import { SCHOOL_COLOR, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
 import { schoolIcon } from './affIcons'
@@ -1158,7 +1158,7 @@ async function moveTo(u: Unit, t: Pos) {
 export function hoverTile(t: Pos | null) {
   S.hover = t
   if (!remake()) return
-  setTerrain(t ? terrainName(S.map, t.x, t.y) : null)
+  setTerrain(t ? terrainName(S.map, t.x, t.y) + (chests().some(c => !c.open && c.x === t.x && c.y === t.y) ? ' · 보물 상자' : '') : null)
   const there = t && unitAt(t.x, t.y)
   if (!there || S.mode.kind === 'busy' || modalOpen() || (S.mode.kind === 'targeting' && S.mode.magic)) { hideBasic(); return }   // 마법 범위 미리보기를 가리지 않게
   const { sx, sy } = toScreen(there.x, there.y)

@@ -9,7 +9,7 @@ export const edition: Edition = {
   rules,
   order,
   planFor,
-  features: { threat: false, forecast: false, quickAttack: false, commandFirst: true, autoRest: false, originalCamp: true },
+  features: { threat: false, forecast: false, quickAttack: false, commandFirst: true, autoRest: false, originalCamp: true, chests: false },
   // 원작 진로 메뉴 (0aa2:0b0d, DS:0x9ae~): 메뉴 순서 암흑동굴(B)·혼탁한호수(A)·옛 신전(C)
   routeLabels: ['혼탁한호수', '암흑동굴', '옛 신전'],
   routeOrder: [1, 0, 2],

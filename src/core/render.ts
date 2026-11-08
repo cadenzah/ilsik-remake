@@ -9,6 +9,8 @@ import { piece, size } from './skin'
 import { alive, isNpc, S, unitAt } from './state'
 import { aiCaster, areaCells, inSpellRange, spellTargets, spellsOf } from './magic'
 import type { Pos, Unit } from './unit'
+import { chests } from './battleCore'
+import { CHEST, CHEST_LOCK, chestImage } from './chestArt'
 
 export const canvas = document.getElementById('view') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -171,6 +173,8 @@ export function frame(now: number) {
       const t = mp.tiles[y * mp.w + x]
       ctx.drawImage(S.atlas, (t % mp.atlasCols) * TW, Math.floor(t / mp.atlasCols) * TH, TW, TH, x * TW, y * TH, TW, TH)
     }
+
+  for (const c of chests()) drawChest(c.x * TW, c.y * TH, c.open, now)
 
   const each = (f: (x: number, y: number) => void) => { for (let y = 0; y < mp.h; y++) for (let x = 0; x < mp.w; x++) f(x, y) }
 
@@ -361,6 +365,18 @@ export function frame(now: number) {
 }
 
 /** 머리 위 오른쪽 표: 「방어」 (방어 태세) */
+/** 보물 상자 (개선판, core/chestArt.ts 도트). 칸 (x, y) 왼위 기준. 닫힌 상자는 이따금 자물쇠에 작은 빛 (화소 십자) */
+function drawChest(x: number, y: number, open: boolean, now: number) {
+  ctx.drawImage(chestImage(open), x + CHEST.x, y + CHEST.y)
+  if (open) return
+  const k = (now % 2600) / 2600   // 2.6초마다 짧게
+  if (k >= 0.18) return
+  const r = Math.round(Math.sin((k / 0.18) * Math.PI) * 4), cx = x + CHEST.x + Math.floor(CHEST_LOCK.x), cy = y + CHEST.y + CHEST_LOCK.y
+  if (r < 1) return
+  ctx.fillStyle = '#fcfcd8'
+  ctx.fillRect(cx, cy - r, 1, 2 * r + 1); ctx.fillRect(cx - r, cy, 2 * r + 1, 1)
+}
+
 function badge(x: number, y: number, text: string, line = '#9ad8ff', fill = 'rgba(20,40,70,0.85)', ink = '#cfeeff') {
   ctx.font = 'bold 11px sans-serif'
   ctx.textAlign = 'center'

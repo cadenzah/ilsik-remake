@@ -274,6 +274,17 @@ export function takeTreasure(i: number) {
   ITEMS.push(S.treasure[i].item)
   return S.treasure[i].item
 }
+/** 지도에 그릴 보물 상자 (개선판 features.chests — 원작은 표시 없음). 한 칸에 둘이면 하나로, 다 주우면 열린 상자 */
+export function chests(): { x: number; y: number; open: boolean }[] {
+  if (!S.ed.features.chests) return []
+  const at = new Map<number, { x: number; y: number; open: boolean }>()
+  S.treasure.forEach((t, i) => {
+    const k = key(t.at[0], t.at[1]), c = at.get(k) ?? { x: t.at[0], y: t.at[1], open: true }
+    c.open &&= taken.has(i)
+    at.set(k, c)
+  })
+  return [...at.values()]
+}
 
 // ---------- 승패 (원작 2ff8:0def 전투 루프 + 124e:d4a7 장별 조건) ----------
 

@@ -3,6 +3,7 @@
 // 흰 사각형 = 지금 보는 범위. 클릭·끌기 = 그 자리로 화면 이동. 켬/끔은 localStorage 에 기억.
 // 자리는 맵 창 네 모서리 중 하나: 지금 모서리가 유닛을 가리면 덜 가리는 모서리로 비킨다 (가려진 아군을 못 고르는 일 없게)
 import { TH, TW } from './data'
+import { chests } from './battleCore'
 import { clampCam, afterFrame, toScreen } from './render'
 import { hud, mapRect, onLayout, view } from './screen'
 import { winUrl } from './skin'
@@ -129,6 +130,8 @@ function draw() {
   cx.fillStyle = 'rgba(0,0,0,.25)'
   cx.fillRect(0, 0, cv.width, cv.height)
   const d = Math.max(2, k - 1)
+  cx.fillStyle = '#ffd040'   // 아직 안 연 보물 상자 = 금빛 점 (유닛 점 밑)
+  for (const c of chests()) if (!c.open) cx.fillRect(c.x * k + (k - d) / 2, c.y * k + (k - d) / 2, d, d)
   for (const u of S.units) {
     if (u.hp <= 0 || u.alpha <= 0) continue
     cx.fillStyle = isNpc(u) ? '#3ce060' : u.side === 'ally' ? '#4a7dff' : '#ff3a3a'

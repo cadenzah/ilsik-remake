@@ -1,7 +1,7 @@
 // 개선판 장 평가 = 화면 이름 「도전 과제」 (B1 제안 11·34, balance-proposal.md "11·34 장 평가"): 장마다 같은 꼴의 보조 목표 셋 → 달성한 수만큼 별.
 //   N턴 안에 이긴다 (N = Edition.par, 시뮬레이터가 이긴 판의 턴 중앙값 — 없는 장은 빼고)
 //   아무도 쓰러지지 않는다 (일행 대원, 자리를 비운 대원은 빼고)
-//   숨은 보물을 모두 줍는다 (보물이 있는 장만)
+//   보물 상자를 모두 연다 (보물이 있는 장만, 원작 숨은 보물 — 개선판은 지도에 상자로 그린다)
 // 보상은 없다 (사용자 결정 2026-11-06: 원작이 이미 장마다 보상 도구를 준다). 대본의 이야기 보조 목표 (script.ts goal) 는 별에 넣지 않는다
 import { taken } from './battleCore'
 import type { GoalState } from './script'
@@ -21,7 +21,7 @@ export function stageMarks(won = false): Mark[] {
   const all = S.treasure.length
   if (all) {
     const got = taken.size
-    marks.push({ text: `숨은 보물을 모두 줍는다 (${got} / ${all})`, state: got === all ? 'done' : won ? 'failed' : 'open' })
+    marks.push({ text: `보물 상자를 모두 연다 (${got} / ${all})`, state: got === all ? 'done' : won ? 'failed' : 'open' })
   }
   return marks
 }
