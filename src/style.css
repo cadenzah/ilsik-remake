@@ -689,7 +689,7 @@ html.ui-modern .owin .b .tipc b { color: var(--ec-blue); text-shadow: none; }
 .owin .b .tipc .note { margin-top: 6px; font-size: 13px; line-height: 16px; color: #5a4a30; text-shadow: none; }
 html.ui-modern .owin .b .tipc .note { color: var(--ec-text-2); }
 .help .tipc { margin: 2px 0 8px; }
-.owin .b .talklog { display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 6px; }
+.owin .b .talklog { text-align: left; display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 6px; }
 .owin .b .talklog .who { white-space: nowrap; }
 .owin .b .talklog .say { word-break: keep-all; overflow-wrap: anywhere; }
 .owin .b .talklog .narr, .owin .b .talklog > div { grid-column: 1 / -1; font-style: italic; }

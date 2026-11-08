@@ -185,6 +185,8 @@ export const closeAll = () => { while (stack.length) closeEl(stack[stack.length 
 /** 모달 창이 떠 있나 (맵 클릭 막기) */
 export const modalOpen = () => stack.some(w => w.modal)
 export const isOpen = (kind: string) => stack.some(w => w.kind === kind)
+/** 모달이 아닌 창 (도전 과제·장 환경 배지 창) 까지 하나라도 떠 있나 */
+export const anyWinOpen = () => stack.length > 0
 
 /** 오른쪽 클릭·Esc: 맨 위 모달 창의 '뒤로'. 창이 처리했으면 true */
 export function back(): boolean {

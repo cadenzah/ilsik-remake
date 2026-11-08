@@ -3,14 +3,14 @@
 // 개선판: 맵 창 아래쪽에 낮은 두 칸 (위 칸 = 왼쪽 정렬·초상 왼쪽, 아래 칸 = 오른쪽 정렬·초상 오른쪽), 초상은 창 위로 조금 나온다.
 //   지금 말하는 칸만 밝게. 혼자 말하는 장면은 아래 자리 하나.
 // 조작: 클릭·Space·Enter = 이 쪽 다 보이기 → 다음, Ctrl 누르고 있기 = 빨리 넘김, Esc = 장면 넘기기.
-//   클릭은 대화창과 맵 창 안만 (창틀 문양·화면 밖 띠는 무시, 2026-11-06)
+//   클릭은 대화창과 맵 창 안만 (창틀 문양·화면 밖 띠는 무시, 2026-11-06). 창 (메뉴·대화 기록·도전 과제·장 환경 배지 창) 이 떠 있으면 누르기·Esc = 창 닫기만 (2026-11-09)
 // 초상: 장면을 열 때 모두 받아 두고, 아직 안 온 초상의 줄은 초상이 올 때까지 (최대 3초) 그 줄을 늦춘다 — 직전 화자 초상에 새 대사가 붙지 않게
 // 대사는 talkLog 에 남는다 (장을 시작할 때 비움). 대화 중 띠의 「대화 기록」 = 대화 기록 창 (두 판, 웹 보탬, band.ts showTalkLog). 창이 떠 있는 동안 글자 찍기는 멈춘다
 import { portraitUrl, type UnitType } from './data'
 import { showTalkLog } from './band'
 import { busy, imgLoaded, imgReady } from './loading'
 import { hud, mapRect, onLayout, toLogical, view } from './screen'
-import { back as winBack, closeWin, esc, modalOpen, openWin } from './ui'
+import { anyWinOpen, back as winBack, closeWin, esc, modalOpen, openWin } from './ui'
 import { winUrl } from './skin'
 
 export interface Line { who?: UnitType; text: string }
@@ -172,23 +172,25 @@ export function playDialogue(lines: Line[], edition: 'original' | 'remake' = vie
       else { while (put(c)); if (fast) c.timer = window.setTimeout(advance, 60) }   // 이 쪽 다 보이기
     }
 
+    // 창 닫기: 모달 창은 그 창의 '뒤로', 배지 창 (모달 아님, 도전 과제·장 환경) 은 맨 위 창을 닫는다
+    const shut = () => { if (!winBack()) closeWin() }
     const onPointer = (e: PointerEvent) => {
       const t = e.target as HTMLElement
       const onSpeak = !!t?.closest?.('.speak')
       if (!onSpeak && !t?.closest?.('#view')) return
       if (e.button === 2) return
-      if (!onSpeak && !modalOpen()) {   // 맵 창 밖 (창틀 문양·화면 밖 띠) 은 넘기지 않는다. 창이 떠 있으면 어디든 창 닫기
+      if (!onSpeak && !anyWinOpen()) {   // 맵 창 밖 (창틀 문양·화면 밖 띠) 은 넘기지 않는다. 창이 떠 있으면 어디든 창 닫기
         const p = toLogical(e.clientX, e.clientY), m = mapRect()
         if (p.x < m.x || p.y < m.y || p.x >= m.x + m.w || p.y >= m.y + m.h) return
       }
       e.preventDefault()
       e.stopPropagation()
-      if (modalOpen()) { winBack(); return }   // 대화 중 띠 「메뉴」 로 연 창: 바깥을 누르면 창만 닫고 대화는 그대로
+      if (anyWinOpen()) { shut(); return }   // 대화 중 띠 「메뉴」·배지로 연 창: 바깥을 누르면 창만 닫고 대화는 그대로
       advance()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (modalOpen()) {   // 창이 떠 있으면 Esc = 창 닫기, Enter·Space = 창 버튼 (대화를 넘기지 않는다)
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); winBack() }
+      if (anyWinOpen()) {   // 창이 떠 있으면 Esc = 창 닫기, Enter·Space = 창 버튼 (대화를 넘기지 않는다)
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); shut() }
         return
       }
       if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); advance() }
