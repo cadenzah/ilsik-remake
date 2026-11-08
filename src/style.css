@@ -89,7 +89,7 @@ canvas#view { touch-action: none; }
 /* 위·아래 띠 (band.ts) */
 #hud .band { left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
 .band > * { position: absolute; pointer-events: auto; }
-.band-title { text-align: center; line-height: 29px; color: #3a2008; text-shadow: -1px 0 #c8a878; white-space: nowrap; overflow: hidden; pointer-events: none !important; }
+.band-title { text-align: center; line-height: 29px; color: #3a2008; text-shadow: -1px 0 #c8a878; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none !important; }
 .band.foe .band-title { background: rgba(200, 40, 20, .18); }
 .plate { height: 25px; line-height: 23px; text-align: center; white-space: nowrap; background: #fcecA4;
   border: 1px solid #64401c; box-shadow: inset 0 0 0 1px #ecd084; border-radius: 3px; color: #000; padding: 0 6px; }
@@ -181,9 +181,9 @@ html.ui-modern .owin .b { color: var(--ec-text); text-shadow: none; }
 html.ui-modern .owin .blue, html.ui-modern .owin .h.blue { color: var(--ec-blue); text-shadow: none; }
 html.ui-modern .owin .red, html.ui-modern .owin .h.red { color: var(--ec-red); text-shadow: none; }
 html.ui-modern .owin .green, html.ui-modern .owin .h.green { color: var(--ec-green); text-shadow: none; }
+html.ui-modern .owin .h.env { color: var(--ec-bronze-dk); text-shadow: none; }
 html.ui-modern .owin .dim { color: var(--ec-text-2); }
 html.ui-modern .owin .done { color: var(--ec-green); } html.ui-modern .owin .failed { color: var(--ec-red); }
-html.ui-modern .owin .h.env { color: var(--ec-bronze-dk); text-shadow: none; }
 html.ui-modern .owin.basic .v { color: var(--ec-blue); text-shadow: none; }
 html.ui-modern .owin.basic::before { content: "◆ 인물기본자료 ◆"; position: absolute; left: 0; right: 0; top: 4px; text-align: center; font-size: 13px; line-height: 18px; color: var(--ec-text); }
 html.ui-modern .obtn { border: 1px solid var(--ec-bronze-dk); border-bottom-width: 2px; border-image: none; border-radius: 3px; background: var(--ec-parch-2);
@@ -779,3 +779,36 @@ html.ui-modern .owin .snd .ovol input { accent-color: var(--ec-green); }
 [data-scroll="down"] { -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
 [data-scroll="up"] { -webkit-mask-image: linear-gradient(transparent, #000 36px); mask-image: linear-gradient(transparent, #000 36px); }
 [data-scroll="both"] { -webkit-mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+/* 띠 배지 (개선판 stageBadges.ts): 도전 과제 별·장 환경. all: unset 은 pointer-events 도 풀어 띠 (none) 를 물려받으므로 auto 를 다시 준다 — 빠지면 실제 클릭이 맵으로 샌다 */
+.bchip { all: unset; pointer-events: auto; position: absolute; box-sizing: border-box; height: 22px; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0 5px;
+  background: rgba(255, 250, 222, .7); border: 1px solid #8a6430; border-radius: 11px; color: #3a2008; cursor: pointer; white-space: nowrap; font-size: 14px; line-height: 20px; }
+.bchip:hover { background: #fff6d0; border-color: #4a2c0c; }
+.bchip .aff-ic { width: 16px; height: 16px; flex: none; }
+.bchip.pulse { animation: bchip-pulse .6s ease-in-out 4; }
+@keyframes bchip-pulse { 50% { background: #ffe07a; box-shadow: 0 0 0 3px rgba(255, 210, 74, .55); } }
+.bstar { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
+.bstar.open { fill: none; stroke: #a07000; stroke-width: 1.4; }
+.bstar.done { fill: #e9a92e; stroke: #8a5a00; stroke-width: 1; }
+.bstar.failed { fill: none; stroke: #9a8c78; stroke-width: 1.2; opacity: .55; }
+html.ui-modern .bchip { background: var(--ec-parch); border-color: var(--ec-bronze-dk); color: var(--ec-text); }
+.owin .bmark.failed { color: #7a6a58; text-decoration: line-through; }
+.owin .bmark.failed .dim, .owin .bmark.failed .bstar { text-decoration: none; }
+/* 도전 과제 알림 (맵 위쪽 가운데) */
+.btoast { position: absolute; transform: translateX(-50%); z-index: 30; padding: 3px 12px; height: 26px; line-height: 20px; white-space: nowrap; cursor: pointer;
+  background: rgba(24, 16, 8, .86); color: #f6e7b8; border: 1px solid #c89a40; border-radius: 13px; box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
+  animation: btoast-in .25s ease-out; transition: opacity .4s, transform .4s; display: flex; align-items: center; gap: 5px; }
+.btoast.fail { border-color: #c06050; color: #ffd8c8; }
+.btoast.done { border-color: #e9c040; color: #fff0a8; }
+.btoast.gone { opacity: 0; transform: translate(-50%, -6px); }
+@keyframes btoast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+/* 장 환경 알림 띠 (장 시작, 맵 가운데) */
+.benv { position: absolute; z-index: 30; padding: 10px 16px 12px; text-align: center; pointer-events: none; color: #f6e7b8;
+  background: linear-gradient(90deg, transparent, rgba(16, 10, 4, .88) 18%, rgba(16, 10, 4, .88) 82%, transparent);
+  border-top: 1px solid rgba(233, 169, 46, .7); border-bottom: 1px solid rgba(233, 169, 46, .7); animation: benv-in .35s ease-out; transition: opacity .35s; }
+.benv .k { font-size: 13px; color: #c8a868; }
+.benv .n { font-size: 24px; line-height: 34px; color: #ffe08a; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.benv .n .aff-ic { width: 24px; height: 24px; filter: drop-shadow(0 0 2px #fff8); }
+.benv .x { font-size: 14px; }
+.benv.gone { opacity: 0; }
+@keyframes benv-in { from { opacity: 0; transform: scaleY(.6); } }
+.owin.marks .b, .owin.envwin .b { text-align: left; padding-left: 14px; word-break: keep-all; }

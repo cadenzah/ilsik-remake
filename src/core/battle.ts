@@ -1,7 +1,7 @@
 // 전투 진행: 초기화·동작·승패·턴. 규칙·행동 순서·AI 는 판(S.ed)이 정한다
 import { MAGIC_EFFECTS, TW, portraitUrl, loadBattles, loadDialogue, loadFig, loadScenes, loadStage, loadTables, loadUnitSprite, type Magic } from './data'
 import { rulesWin } from './help'
-import { affinityIntro, battleKnown, beginLessons, counterOpened, flushTips, noteTip, openCounter, openFlank, resetTips, seenTip, tipLog, tipNow } from './tips'
+import { affinityIntro, battleKnown, beginLessons, counterOpened, flushTips, noteTip, openCounter, openFlank, peekFlank, resetTips, seenTip, tipLog, tipNow } from './tips'
 import { locked } from './lessons'
 import { onOffVolumeWin, soundWin } from './volumeUi'
 import { diff, logWin, mark, record, resetLog } from './battleLog'
@@ -18,7 +18,7 @@ import { endingMovie } from './movie'
 import { josa } from 'es-hangul'
 import { fadeIn, fadeOut } from './fade'
 import { busy, imgReady } from './loading'
-import { canvas, centerOn, centerOnIfOff, clampCam, frame, resize, toScreen } from './render'
+import { canvas, centerOn, centerOnIfOff, clampCam, frame, keepInView, resize, toScreen } from './render'
 import { layout, mapRect, view } from './screen'
 import { loadSkin, pieceUrl, winUrl } from './skin'
 import { initBand, setDisabled, setOn, setTerrain, setTitle, setTurn } from './band'
@@ -27,6 +27,7 @@ import { aboveUnit, goGo, hideBasic, levelUpMark, showBasic, showConditions } fr
 import { playDialogue, resetTalkLog } from './dialogue'
 import { loadSlots, loadSuspended, recordClear, recordHidden, recordRun, recordStars, writeSlot, writeSuspended, type Suspended } from './save'
 import { stageMarks, starText } from './grade'
+import { envBanner, initBadges } from './stageBadges'
 import { FOUND, carryOf } from './replay'
 import { SKIP_INTRO } from './title'
 import { DIFFICULTIES, difficulty, setSetting, setting } from './settings'
@@ -190,6 +191,7 @@ async function start(resume?: Suspended) {
   hideBasic()
   setTurn(1, null)
   setTitle(chapterTitle())
+  initBadges(remake())   // 위 띠 배지: 도전 과제·장 환경 (stageBadges.ts)
   centerOn(S.units[0])
   await fadeIn()
   if (S.def.n === 37) await recall('ch37')   // 레스다 회상 (B1 제안 42): 정체를 듣는 장 앞
@@ -198,7 +200,7 @@ async function start(resume?: Suspended) {
   await banter('start')
   if (!remake()) await goGo()   // 원작: 첫 대화 뒤 「GO!! GO!!」, 첫 클릭에 사라짐
   // 개선판: 장 카드 + 목표 (S2 제안 4, ux-proposal 16) 는 장 앞 대화·1턴 장면을 다 본 뒤, 첫 아군 차례 직전에
-  await runRounds(false, remake() ? () => new Promise<void>(ok => showGoalsWin(ok)) : undefined)
+  await runRounds(false, remake() ? () => new Promise<void>(ok => showGoalsWin(() => void envBanner().then(ok))) : undefined)   // 목표 창 뒤 장 환경 띠
 }
 
 // ---------- 동작 (애니메이션 포함) ----------
@@ -217,6 +219,7 @@ export async function walk(u: Unit, path: Pos[]) {
         const k = Math.min(1, (performance.now() - t0) / (STEP_MS * (aiTurn && remake() && setting('fastEnemy') ? 0.35 : 1)))
         u.px = sx + (p.x - sx) * k
         u.py = sy + (p.y - sy) * k
+        keepInView({ x: u.px, y: u.py })   // 화면 가장자리로 가면 따라간다 (두 판 모두 — 원작은 따라가지 않았다, 웹 보탬)
         k < 1 ? requestAnimationFrame(tick) : ok()
       }
       tick()
@@ -348,14 +351,20 @@ async function attack(a: Unit, c: Unit) {
   if (d !== a) a.facing = d.x > a.x ? 'right' : d.x < a.x ? 'left' : d.y > a.y ? 'down' : 'up'
   const melee = attackKind(a) <= 2
   if (melee) faceAttacker(a, targets)
+  if (remake()) peekFlank(a, targets)   // 1장: 반격 전에 먼저 둘러쌌으면 그 자리에서 협공을 연다 (tips.ts)
+  const helpers = remake() ? flankers(a, targets) : []   // 협공: 상대 곁에 붙은 같은 편도 함께 친다 (동작만, 피해는 협공 배율로)
+  const turned = helpers.map(h => h.facing)
+  for (const h of helpers) h.facing = h.x < d.x ? 'right' : h.x > d.x ? 'left' : h.y < d.y ? 'down' : 'up'
   // 원작 공격 동작 (FIG 준비 → 타격). 그림이 없으면 상대 쪽으로 살짝 밀고 들어갔다 돌아오기
   // 효과음: 공격자 초상 번호의 소리 (원작 20ec:1897·3ab5·4c67, 타격 프레임 무렵 [근사])
-  if (!await playPose(a, 280)) {
-    a.px += Math.sign(d.x - a.x) * 0.25; a.py += Math.sign(d.y - a.y) * 0.25
-    play('e1', a.type.por)
+  await Promise.all([a, ...helpers].map(async (u, i) => {
+    if (i) await sleep(60 * i * pace())   // 곁의 동료는 한 박자씩 늦게 — 한꺼번에 몰아치는 느낌
+    if (await playPose(u, 280)) { if (!i) play('e1', a.type.por); return }
+    u.px += Math.sign(d.x - u.x) * 0.25; u.py += Math.sign(d.y - u.y) * 0.25
+    if (!i) play('e1', a.type.por)
     await sleep(200 * pace())
-    a.px = a.x; a.py = a.y
-  } else play('e1', a.type.por)
+    u.px = u.x; u.py = u.y
+  }))
   // 궁수·추전수·포수: 공격자 칸에서 중심 칸까지 투사체가 날아간다. 포수는 떨어진 범위 칸마다 폭발
   if (attackKind(a) >= 3) await flyShot(a, c)
   const area = strikeArea(a) ? strikeCells(a, c) : []
@@ -364,21 +373,34 @@ async function attack(a: Unit, c: Unit) {
   if (area.length) S.fx = { cells: area.map(p => ({ ...p, ring: dist(p, c) })), base: -1, step: 0, color: '255,150,60', t0: performance.now(), until: performance.now() + 420 * pace() }
   const opened = remake() && openCounter(a, c, () => counterDamage(a, c) > 0)   // 1장: 적의 첫 근접 공격에 반격이 열린다 (tips.ts)
   const back = counterDamage(a, c)   // 타격 전 상태로 판단 (맞으면 혼수가 풀린다)
-  if (remake()) attackTips(a, targets)
+  const teach = remake() && attackTips(a, targets)
   const { hits } = strike(a, c)
   if (melee) await meleeHit(a, targets)   // 맞는 자세·밀림 (원작 39c9·4b7a) 이 타격 프레임을 보이는 동안
   else await sleep(320 * pace())   // 타격 프레임을 잠시 보인다
   a.pose = undefined
+  helpers.forEach((h, i) => { h.pose = undefined; h.facing = turned[i] })
   await sleep(220 * pace())
   S.fx = null
   await fadeDead(targets)
   await gainExp(a, hits)
   if (back) { await counterAct(a, c, back); if (opened) await counterOpened(); else if (remake()) noteTip('counter') }
+  if (teach) await tipNow('flank', undefined, undefined, true)
 }
 
-/** 시스템 대화 안내 (tips.ts): 일행의 협공 (상성은 장 시작에 소개한다 — affinityIntro) */
+/** 협공에 드는 같은 편 (rules.flankBonus 와 같은 셈: 상대 상하좌우에 붙은, 혼수 아닌 같은 편). 협공이 붙는 상대가 하나일 때만 (범위 공격은 빼고) */
+function flankers(a: Unit, targets: Unit[]) {
+  const foes = targets.filter(t => t.side !== a.side)
+  if (foes.length !== 1 || !((S.ed.rules.flank?.(a, foes[0], S.units) ?? 0) > 0)) return []
+  const d = foes[0]
+  return S.units.filter(o => o !== a && o.hp > 0 && !o.coma && o.side === a.side && Math.abs(o.x - d.x) + Math.abs(o.y - d.y) === 1).slice(0, 3)
+}
+
+/** 시스템 대화 안내 (tips.ts): 일행의 협공 (상성은 장 시작에 소개한다 — affinityIntro). 1장은 배우기라 공격이 끝난 그 자리에서 셈 없이 보인다 → true */
 function attackTips(a: Unit, targets: Unit[]) {
-  if (a.troop === 0 && targets.some(t => t.side !== a.side && (S.ed.rules.flank?.(a, t, S.units) ?? 0) > 0)) noteTip('flank')
+  if (a.troop !== 0 || !targets.some(t => t.side !== a.side && (S.ed.rules.flank?.(a, t, S.units) ?? 0) > 0)) return false
+  if (S.def.n === 1 && !seenTip('flank')) return true
+  noteTip('flank')
+  return false
 }
 
 /** 반격 연출 (개선판 제안 3): 맞은 쪽이 공격 동작으로 되받는다 */
@@ -612,8 +634,9 @@ function bossHit() {
 /** 조건 창: 원작 승리·실패 조건 (+ 개선판 장 카드 목표·보조 목표) */
 function showGoalsWin(onClose?: () => void, button?: string) {
   const card = chapter()?.card
-  showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined, env: remake() ? stageTune()?.env : undefined,
-    goals: remake() ? goalStates(aliveMember) : undefined, marks: remake() ? stageMarks() : undefined, orig: !remake(), onClose, button })
+  // 도전 과제·장 환경은 위 띠 배지로 옮겼다 (stageBadges.ts, 2026-11-08)
+  showConditions({ title: remake() ? (card ? `${S.def.n}장 · ${card[0]}` : S.def.title) : '', goal: remake() ? card?.[1] : undefined,
+    goals: remake() ? goalStates(aliveMember) : undefined, orig: !remake(), onClose, button })
 }
 
 /** 타이틀로: 페이지를 새로 불러 전투 상태를 깨끗이 버린다 (판은 save 의 마지막 판으로 기억). 로고 연출은 이번만 건너뛴다 */
@@ -723,7 +746,7 @@ async function runRounds(resumed = false, intro?: () => Promise<void>) {
         if (live.every(u => u.acted || u.hp <= 0)) skipped = true
         else {
           if (step.length > 1) await goGo(900)
-          if (remake()) { turnTips(live); await flushTips(false, true) }   // 차례 시작 묶음 + 적 차례에 생긴 안내 (tips.ts)
+          if (remake()) { await openFlank(); turnTips(live); await flushTips(false, true) }   // 차례 시작 묶음 + 적 차례에 생긴 안내 (tips.ts)
           if (await playerStep(live)) return
         }
         if (remake()) { record(S.turn, 'ally', diff(before, 'ally')); since = { at: mark(), turn: S.turn } }
@@ -745,7 +768,6 @@ function enemySummary() {
 /** 아군 차례 시작에 깔 안내 (tips.ts). 한 묶음으로 tips.ts BUNDLE 순서 (호위 → 경계 → 상성 → 고대 병기 → 전력·방어 → 피로) 로 보인다 */
 function turnTips(live: Unit[]) {
   const foes = alive('enemy')
-  openFlank()   // 1장: 반격을 배운 다음 차례에 협공을 열고 소개
   if (S.cond.some(r => r.do.includes('lose') && 'dead' in r.if && r.if.dead.some(d => { const u = member(d); return !!u && isNpc(u) }))) noteTip('escort')
   if (foes.some(f => S.troopState[f.troop] === 1)) noteTip('wake')
   affinityIntro(live, foes)   // 처음 보이는 상성 갈래 (불사족·비행·마법 쓰는 적·중갑·적 궁수·종족)
@@ -970,6 +992,7 @@ async function resumeAt(r: Suspended, all: Unit[]) {
   closeAll()
   hideBasic()
   setTitle(chapterTitle())
+  initBadges(remake())
   centerOn(S.units.find(u => u.troop === 0 && u.hp > 0 && !u.acted) ?? S.units[0])
   await fadeIn()
   await runRounds(true)
@@ -1161,6 +1184,7 @@ function askAttack(u: Unit, target: Unit, spot?: Pos, moves?: ReturnType<typeof 
   if (S.ed.features.forecast) {
     const span = (a: number, b: number) => a === b ? `${a}` : `${a}~${b}`
     const hit = strikeTargets(u, target, spot ?? u)
+    if (remake()) peekFlank(u, hit)   // 1장: 먼저 둘러쌌으면 협공을 열어 예고에도 보인다 (tips.ts)
     const flank = (t: Unit) => { const b = S.ed.rules.flank?.(u, t, S.units) ?? 0; return b ? ` <span class="green">협공 +${Math.round(b * 100)}%</span>` : '' }   // 제안 30
     const aff = (t: Unit) => affTag(S.ed.rules.affinity?.(u, t) ?? 1) + envTag(S.ed.rules.env?.(u) ?? 1)   // 상성 (제안 25-2): 활 → 비행, 장 환경 (제안 26)
     if (hit.length === 1 && hit[0] === target) {

@@ -110,8 +110,8 @@ export function strike(a: Unit, c: Unit) {
   const hits: { target: Unit; value: number }[] = []
   for (const t of targets) {
     const dmg = S.ed.rules.rollDamage(S.map, a, t, S.units)   // 협공 (제안 30) 은 맵의 유닛으로
-    // 적의 협공 (개선판 어려움) 은 확인창이 없으니 맞은 자리에 「협공」 (일행 쪽은 확인창에 보인다)
-    if (a.side === 'enemy' && S.ed.rules.flank?.(a, t, S.units)) S.floats.push({ x: t.x, y: t.y - 0.8, text: '협공', t0: performance.now(), color: '#ff8080' })
+    // 협공 (개선판): 맞은 자리에 「협공」 — 곁의 같은 편이 함께 치는 동작 (battle.ts flankers) 과 같이. 적의 협공 (어려움) 은 붉게
+    if (S.ed.rules.flank?.(a, t, S.units)) S.floats.push({ x: t.x, y: t.y - 0.8, text: '협공', t0: performance.now(), color: a.side === 'enemy' ? '#ff8080' : '#8fe08f' })
     t.hp = Math.max(0, t.hp - dmg)
     t.coma = 0   // 맞으면 혼수가 풀린다 (20ec:9456)
     wake(t)

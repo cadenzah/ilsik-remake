@@ -74,6 +74,20 @@ export function toTile(lx: number, ly: number): Pos | null {
 }
 
 /** 칸이 맵 창 가장자리 밖이면 가운데로 */
+/** 걷는 유닛을 따라간다 (두 판 모두, 웹 보탬): 맵 창 가장자리 margin 칸 안으로 들어오면 그만큼만 화면을 민다 — 늘 가운데로 쫓지는 않는다.
+ *  p 는 칸 좌표 (걷는 중의 소수 좌표도). 맵 창이 좁으면 여백을 창의 1/4 로 줄인다 */
+export function keepInView(p: { x: number; y: number }, margin = 1.5) {
+  if (!S.map) return
+  const { vw, vh } = viewSize()
+  const mx = Math.min(margin * TW, vw / 4), my = Math.min(margin * TH, vh / 4)
+  const x0 = p.x * TW, y0 = p.y * TH
+  if (x0 < S.cam.x + mx) S.cam.x = x0 - mx
+  else if (x0 + TW > S.cam.x + vw - mx) S.cam.x = x0 + TW - vw + mx
+  if (y0 < S.cam.y + my) S.cam.y = y0 - my
+  else if (y0 + TH > S.cam.y + vh - my) S.cam.y = y0 + TH - vh + my
+  clampCam()
+}
+
 export function centerOnIfOff(p: Pos) {
   const m = mapRect(), { sx, sy } = toScreen(p.x, p.y), cw = TW * S.cam.scale, ch = TH * S.cam.scale
   if (sx < m.x + cw / 2 || sy < m.y + ch / 2 || sx + cw > m.x + m.w - cw / 2 || sy + ch > m.y + m.h - ch / 2) centerOn(p)

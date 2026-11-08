@@ -82,11 +82,20 @@ export function openCounter(a: Unit, c: Unit, can: () => boolean): boolean {
 /** 방금 열린 반격: 적 차례 중이라도 그 자리에서 (셈 밖). 레스다가 「방금 그것」 을 짚는다 */
 export const counterOpened = () => tipNow('counter', 'open', undefined, true)
 
-/** 반격을 배운 뒤 첫 아군 차례 (battle.ts turnTips): 협공을 열고 소개 — 쓰기 전에 알려 준다 */
-export function openFlank() {
+/** 반격을 배운 뒤 첫 아군 차례 (battle.ts 차례 시작): 협공을 열고 소개 — 쓰기 전에 알려 준다. 셈 밖 (반격처럼 1장 배우기는 한 전투 셋에 밀려 사라지면 안 된다) */
+export async function openFlank() {
   if (!locked.has('flank') || !seenTip('counter')) return
   locked.delete('flank')
-  noteTip('flank', 'open')
+  await tipNow('flank', 'open', undefined, true)
+}
+/** 1장에서 반격을 배우기 전에 일행이 먼저 둘러쌌을 때 (battle.ts 확인창·attack): 그 자리에서 협공을 연다 — 잠긴 채 두면 둘러싸도 아무 일이 없어 고장처럼 보였다.
+ *  협공이 붙는 공격이면 열어 두고 true (확인창 예고에도 「협공」 이 보인다), 아니면 잠근 채 */
+export function peekFlank(a: Unit, ts: Unit[]): boolean {
+  if (!locked.has('flank') || !on() || a.troop !== 0) return false
+  locked.delete('flank')
+  if (ts.some(t => t.side !== a.side && (S.ed.rules.flank?.(a, t, S.units) ?? 0) > 0)) return true
+  locked.add('flank')
+  return false
 }
 /** 이 판에서 이미 본 안내인가 (갈래와 상관없이) */
 export const seenTip = (key: TipKey) => [...FLAGS].some(f => f === `tip:${key}` || f.startsWith(`tip:${key}:`))

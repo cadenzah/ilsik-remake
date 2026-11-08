@@ -18,6 +18,7 @@ let root: HTMLElement | null = null
 let bar: HTMLElement, titleEl: HTMLElement, plate: HTMLElement | null = null, terrain: HTMLElement | null = null
 let buttons: BandButton[] = [], els = new Map<string, HTMLButtonElement>()
 const hiddenIds = new Set<string>()
+let chips: { c: BandChip; el: HTMLButtonElement }[] = []   // 개선판 배지 (stageBadges.ts: 도전 과제·장 환경)
 let talk: HTMLButtonElement | null = null, talkFn: (() => void) | null = null   // 대화 중에만 「대화 기록」 (두 판)
 const BTN_Y = 14, GAP = 4, EDGE = 14
 
@@ -35,6 +36,7 @@ export function initBand(remake: boolean, btns: BandButton[] = []) {
   root.append(titleEl)
   buttons = remake ? btns : []
   els = new Map()
+  chips = []
   plate = terrain = null
   talk = button(['대화 기록', () => talkFn?.()])
   talk.classList.add('talklog-btn')
@@ -66,7 +68,43 @@ export function showTalkLog(fn: (() => void) | null) {
   place()
 }
 
-export function setTitle(t: string) { titleEl.textContent = t }
+export function setTitle(t: string) { titleEl.textContent = t; place() }
+
+/** 띠 배지. 원작 창틀 화면 = 아래 띠 오른쪽 (대화 기록 자리 왼쪽), 현대식 = 위 바 턴 패 옆. w = 잴 수 없을 때의 너비, short = 현대식 위 바에서 제목이 안 들어갈 때 대신 보일 것 */
+export interface BandChip { id: string; html: string; short?: string; w: number; label: string; on: () => void }
+export function setChips(list: BandChip[]) {
+  for (const { el } of chips) el.remove()
+  chips = list.map(c => {
+    const el = document.createElement('button')
+    el.className = 'bchip'
+    el.dataset.id = c.id
+    el.innerHTML = c.html
+    el.title = c.label
+    el.setAttribute('aria-label', c.label)
+    el.tabIndex = -1
+    el.onclick = e => { e.stopPropagation(); c.on() }
+    el.oncontextmenu = e => e.preventDefault()
+    root?.append(el)
+    return { c, el }
+  })
+  place()
+}
+
+/** 배지 하나의 모양: 넓게 (html) 또는 좁게 (short). 너비는 실제로 그려 잰다 (글꼴마다 글자 폭이 달라 어림하면 글이 테를 넘는다) */
+const measured = new Map<string, number>()
+function chipShape(ch: { c: BandChip; el: HTMLButtonElement }, wide: boolean) {
+  const use = wide || !ch.c.short
+  const html = use ? ch.c.html : ch.c.short!
+  ch.el.innerHTML = html
+  let w = measured.get(html)
+  if (!w) {
+    ch.el.style.width = 'auto'
+    w = ch.el.offsetWidth ? Math.ceil(ch.el.offsetWidth) : use ? ch.c.w : 30
+    if (ch.el.offsetWidth) measured.set(html, w)
+  }
+  ch.el.style.width = `${w}px`
+  return w
+}
 
 /** 턴 패: "4턴" + 차례 (아군 파랑·적 빨강·NPC 초록). 적·NPC 차례엔 제목 칸이 붉은 빛 */
 export function setTurn(turn: number, side: 'ally' | 'enemy' | 'npc' | null, who = '') {
@@ -129,21 +167,42 @@ function place() {
   const by = view.h - FRAME.b + 7
   if (terrain) Object.assign(terrain.style, { left: `${EDGE + 54}px`, top: `${by}px` })
   if (talk) Object.assign(talk.style, { left: `${view.w - EDGE - 54 - parseFloat(talk.style.width)}px`, top: `${by}px` })   // 지형 패와 맞선 자리
+  // 배지: 아래 띠, 「대화 기록」 자리 왼쪽부터 안쪽으로 (위 제목 칸은 가장 좁은 화면에서 긴 장 제목만으로 거의 차서 겹치거나 잘린다 — 22장 · 신카루스 항구 안 = 192 / 266)
+  let rx = view.w - EDGE - 54 - (talk ? parseFloat(talk.style.width) + 8 : 0)
+  for (const ch of [...chips].reverse()) {
+    rx -= chipShape(ch, true)
+    Object.assign(ch.el.style, { left: `${rx}px`, top: `${by + 1}px` })
+    rx -= 6
+  }
 }
 
 /** 현대식 위 바: 왼쪽부터 턴 패·제목, 오른쪽 끝부터 버튼 (자리가 모자라면 순위 낮은 것부터 메뉴로) */
 function placeModern() {
+  // 배지를 넓게 / 좁게 둘 다 놓아 보고 숨는 버튼이 적은 쪽 (같으면 넓게). 제목이 안 들어가면 좁게
+  const short = chips.some(ch => ch.c.short) ? layoutModern(false) : null
+  const wide = layoutModern(true)
+  if (short && (!wide.fits && short.fits || short.hidden < wide.hidden)) layoutModern(false)
+}
+function layoutModern(wide: boolean): { hidden: number; fits: boolean } {
   const by = (TOP_BAR - 25) / 2, PAD = 8
   Object.assign(bar.style, { left: '0px', top: '0px', width: `${view.w}px`, height: `${TOP_BAR}px` })
   hiddenIds.clear()
   const plateW = plate ? Math.max(56, textWidth(plate.textContent ?? '') + 18) : 0
   if (plate) Object.assign(plate.style, { left: `${PAD}px`, top: `${by}px`, width: `${plateW}px` })
-  const titleX = PAD + (plate ? plateW + 10 : 0)
+  let titleX = PAD + (plate ? plateW + 10 : 0)
+  for (const ch of chips) {   // 배지: 턴 패 바로 옆
+    const w = chipShape(ch, wide)
+    Object.assign(ch.el.style, { left: `${titleX}px`, top: `${(TOP_BAR - 22) / 2}px` })
+    titleX += w + 6
+  }
+  if (chips.length) titleX += 4
   // 버튼: 오른쪽 무리 (적은 순서대로 오른쪽 끝) 앞에 왼쪽 무리
   const order = [...buttons.filter(b => b.side === 'left'), ...buttons.filter(b => b.side === 'right')]
   const shown = [...order], width = (b: BandButton) => parseFloat(els.get(b.id)!.style.width)
-  const total = () => shown.reduce((n, b) => n + width(b) + GAP, 0)
-  while (shown.length && total() > view.w - PAD - titleX - 120) {
+  const talkW = talk && !talk.hidden ? parseFloat(talk.style.width) + GAP : 0   // 대화 중 「대화 기록」 도 위 바 자리를 쓴다
+  const total = () => shown.reduce((n, b) => n + width(b) + GAP, talkW)
+  const tw = Math.max(120, textWidth(titleEl.textContent ?? '') + 8)   // 제목 몫: 실제 글 길이 (전에는 120 고정이라 좁은 화면에서 긴 장 제목이 잘렸다)
+  while (shown.length && total() > view.w - PAD - titleX - tw) {
     const worst = shown.reduce((a, b) => (b.prio > a.prio ? b : a))
     if (worst.prio === 0) break
     shown.splice(shown.indexOf(worst), 1)
@@ -160,10 +219,12 @@ function placeModern() {
     Object.assign(talk.style, { left: `${x}px`, top: `${by}px` })
     x -= GAP
   }
+  const fits = x - titleX >= tw
   Object.assign(titleEl.style, { left: `${titleX}px`, top: '0px', width: `${Math.max(0, x - titleX - 8)}px`, height: `${TOP_BAR}px` })
   for (const [id, e] of els) e.hidden = hiddenIds.has(id)
   const fy = view.h - 25 - PAD
   if (terrain) Object.assign(terrain.style, { left: `${PAD}px`, top: `${fy}px` })
+  return { hidden: hiddenIds.size, fits }
 }
 
 onLayout(place)

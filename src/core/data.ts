@@ -115,7 +115,7 @@ export interface ExtraBattle {
 /** 장 환경 규칙 (개선판 B1 제안 26, 두 편 모두 — balance-proposal.md "26 장 환경 규칙"). name = 목표 창·확인창 이름, text = 한 줄 설명.
  *  tire = 차례를 마칠 때 늘어나는 피로 배율, school = 생명상해 마법 계열 (Magic.school) 마다 피해 배율, bow = 활 (궁수·추전수) 물리 피해 배율,
  *  race = 공격자 종족마다 주는 피해 (물리·생명상해) 배율 */
-export interface StageEnv { name: string; text: string; tire?: number; school?: Record<string, number>; bow?: number; race?: Record<string, number> }
+export interface StageEnv { name: string; text: string; icon?: string; tire?: number; school?: Record<string, number>; bow?: number; race?: Record<string, number> }
 export interface StageTune { env?: StageEnv; foeScale?: number; npcHp?: number; remove?: Member[]; troop?: Record<string, number>; ai?: Record<string, 'charge' | 'hold' | 'pack'>; hard?: Omit<StageTune, 'hard' | 'note'>; note?: string }
 export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
 /** 전투 시작 처리 (tools/cond.py START, 원작 124e:c3da): 전투 전 장면 뒤 순서대로. hpScale = [부대, 비율] HP × 비율 (버림),
