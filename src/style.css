@@ -74,6 +74,7 @@ canvas#view { touch-action: none; }
 .owin .blue, .owin .h.blue { color: #2828e0; text-shadow: -1px 0 #8888ff; }
 .owin .red, .owin .h.red { color: #b00000; text-shadow: -1px 0 #ff8080; }
 .owin .green, .owin .h.green { color: #006a1a; text-shadow: -1px 0 #80c080; }
+.owin .h.env { color: #8a5a10; text-shadow: -1px 0 #e0b060; }   /* 장 환경 (B1 제안 26) */
 .owin .dim { color: #555; }
 .owin .done { color: #006a1a; } .owin .failed { color: #b00000; text-decoration: line-through; }
 /* 원작 글자 버튼 (ECPBUT 0005): 왼 8 + 가운데 + 오른 8, 높이 25 */
@@ -161,6 +162,7 @@ html.ui-modern .owin .red, html.ui-modern .owin .h.red { color: var(--ec-red); t
 html.ui-modern .owin .green, html.ui-modern .owin .h.green { color: var(--ec-green); text-shadow: none; }
 html.ui-modern .owin .dim { color: var(--ec-text-2); }
 html.ui-modern .owin .done { color: var(--ec-green); } html.ui-modern .owin .failed { color: var(--ec-red); }
+html.ui-modern .owin .h.env { color: var(--ec-bronze-dk); text-shadow: none; }
 html.ui-modern .owin.basic .v { color: var(--ec-blue); text-shadow: none; }
 html.ui-modern .owin.basic::before { content: "◆ 인물기본자료 ◆"; position: absolute; left: 0; right: 0; top: 4px; text-align: center; font-size: 13px; line-height: 18px; color: var(--ec-text); }
 html.ui-modern .obtn { border: 1px solid var(--ec-bronze-dk); border-bottom-width: 2px; border-image: none; border-radius: 3px; background: var(--ec-parch-2);

@@ -7,6 +7,7 @@ import { afterWin, ensureSeed, grow, partyChange, startFatigue } from './growth'
 import { affinity, affinityNote, affinityKinds, affinityTags } from './affinity'
 import { makeRules, type Tuning } from '../original/rules'
 import { FLAGS } from '../../core/campaign'
+import { stageTune } from '../../core/battleCore'
 import { S } from '../../core/state'
 import { difficulty } from '../../core/settings'
 import aliases from '../../../content/remake/names.json'
@@ -40,7 +41,9 @@ const flank = { per: 0.1, max: 0.3 }
 // 상성 (B1 제안 25·25-2): 종족·비행·시전자 속성·중갑 — remake/affinity.ts, balance-proposal.md "25 종족 상성"·"25-2 맞붙음 늘리기". 두 편 모두
 enemyHit.affinity = affinity
 // 승급 고르기 (B1 제안 36): 레벨업 때 장비 승급을 바로 쓰지 않고 「승급 / 나중에」, 받지 않은 승급은 정비 화면에서 (core/campaign.ts takePromo)
-export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity }
+// 장 환경 (B1 제안 26): 장별 조정 (tune.json) 의 env — 빙설암 혹한·하스가나 폭염·고해 바닷바람·악령의 언덕 등. 두 편 모두, balance-proposal.md "26 장 환경 규칙"
+const env = () => stageTune()?.env
+export const tuning: Tuning = { form: 'ratio', coef: 0.4, enemy: enemyHit, grow, bane, stance, flank, promoChoice: true, affinity, env }
 /** 난이도 (0 쉬움 · 1 보통 · 2 어려움) 를 적 조정에. hardFlank = 어려움에서 적도 협공 (tools/sim 이 끄고 비교) */
 export function applyDifficulty(d: number, hardFlank = true) {
   S.diff = d   // 장별 조정의 hard (core/battleCore stageTune)

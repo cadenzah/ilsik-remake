@@ -112,7 +112,11 @@ export interface ExtraBattle {
  *  npcHp = 함께 싸우는 NPC 생명 배율 (1 비율식에 호위 NPC 가 약해진 몫), troop = 부대 초기 상태 바꾸기 (부대 번호 → 상태 0~4, ai.ts),
  *  hard = 어려움 (S.diff 2) 에서만 위 값을 덮어쓴다, note = 까닭 */
 /** ai = 성향 덮어쓰기 (개선판 B1 제안 10, remake/ai.ts mindOf): 키 "부대" 또는 "부대.대원" */
-export interface StageTune { foeScale?: number; npcHp?: number; remove?: Member[]; troop?: Record<string, number>; ai?: Record<string, 'charge' | 'hold' | 'pack'>; hard?: Omit<StageTune, 'hard' | 'note'>; note?: string }
+/** 장 환경 규칙 (개선판 B1 제안 26, 두 편 모두 — balance-proposal.md "26 장 환경 규칙"). name = 목표 창·확인창 이름, text = 한 줄 설명.
+ *  tire = 차례를 마칠 때 늘어나는 피로 배율, school = 생명상해 마법 계열 (Magic.school) 마다 피해 배율, bow = 활 (궁수·추전수) 물리 피해 배율,
+ *  race = 공격자 종족마다 주는 피해 (물리·생명상해) 배율 */
+export interface StageEnv { name: string; text: string; tire?: number; school?: Record<string, number>; bow?: number; race?: Record<string, number> }
+export interface StageTune { env?: StageEnv; foeScale?: number; npcHp?: number; remove?: Member[]; troop?: Record<string, number>; ai?: Record<string, 'charge' | 'hold' | 'pack'>; hard?: Omit<StageTune, 'hard' | 'note'>; note?: string }
 export interface TurnEvent { turn?: number; route?: number; flag?: string; do?: CondDo[]; area?: [number, [number, number][]] }
 /** 전투 시작 처리 (tools/cond.py START, 원작 124e:c3da): 전투 전 장면 뒤 순서대로. hpScale = [부대, 비율] HP × 비율 (버림),
  *  absent = 일행 중 그 초상 대원 HP 0 (맵에서 지움), state = 부대 상태 */

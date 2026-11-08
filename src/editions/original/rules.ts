@@ -1,6 +1,6 @@
 // 원작판 전투 규칙 [확정] — 행동 실행 20ec:6e92, 수치 함수 0aa2:0e17(유닛, x, k) (rules.md "원작 전투 공식").
 // 전투 계산에 난수가 없다: 명중 판정·치명타·피해 흔들림·반격 모두 없음. 정수화는 0 쪽 절사, 중간값 일부는 float32
-import type { Item, Magic, StageMap, Tables, UnitType } from '../../core/data'
+import type { Item, Magic, StageEnv, StageMap, Tables, UnitType } from '../../core/data'
 import type { LevelUp, Rules, SpellHit, Stance } from '../../core/edition'
 import { locked } from '../../core/lessons'
 import { applyMods, equippedStats, nextUpgrade, refit, type BuffStat, type Pos, type Unit } from '../../core/unit'
@@ -23,7 +23,8 @@ const terrDef = (map: StageMap, u: Unit) => flier(u) ? 115 : 85 + 5 * layer3(map
 
 /** 피해 조정 (B1 제안 1·2, balance-proposal.md). 물리식 form: orig = 원작 A − D / floor = max(A − D, coef·A) / ratio = coef·A² / (A + D) / cap = min(A − D, ratio).
  *  A·D = 지형 보정 뒤 k1·k2. spell = 생명상해 피해 배율, heal = 생명회복 배율 (없으면 1 = 원작). enemy = 적이 칠 때 (없으면 같은 값). 원작판은 늘 ORIGINAL */
-export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank; promoChoice?: boolean; affinity?: Affinity }
+export interface Tuning { form: 'orig' | 'floor' | 'ratio' | 'cap'; coef: number; spell?: number; heal?: number; enemy?: Omit<Tuning, 'enemy'>; grow?: Grow; bane?: Bane; stance?: Stance; flank?: Flank; promoChoice?: boolean; affinity?: Affinity; env?: () => StageEnv | undefined }
+/** 장 환경 (개선판 B1 제안 26): 지금 장의 환경 규칙. 두 편 모두 같은 것을 본다 (적 조정 enemy 와 상관없이 Tuning 맨 위의 것) */
 /** 특효 (개선판 B1 제안 24): 공격자가 items 를 지닌 (장비·도구 칸) 수마다 foes (유닛 종류) 의 물리 방어 D 를 cut 씩 덜 본다. 마법은 그대로 */
 export interface Bane { items: number[]; foes: number[]; cut: number }
 /** 레벨업 능력치 난수 (개선판 B1 N4, levelUp). roll = 0 ~ n−1 (stat 0~4 = 생명·역량·방어·정신·민첩, t.lv 는 이미 올린 레벨),
@@ -51,6 +52,12 @@ export type Affinity = (d: UnitType, key: number | 'bow') => number
 /** 활 (궁수·추전수) 물리 공격인가 — 상성 'bow' 를 본다 */
 const bowAttack = (a: Unit) => a.type.job === 17 || a.type.job === 18
 
+/** 장 환경 피해 배율 (개선판 B1 제안 26): 공격자 종족 × 계열 (key = Magic.school, 'bow' = 활 물리, 없으면 그 밖의 물리) */
+export function envScale(e: StageEnv | undefined, a: UnitType, key?: number | 'bow') {
+  if (!e) return 1
+  return (e.race?.[a.race] ?? 1) * (key === 'bow' ? e.bow ?? 1 : key !== undefined ? e.school?.[key] ?? 1 : 1)
+}
+
 /** 물리 피해 (6e92:7932): trunc((A·0.01·Ta − D·0.01·Td)·0.01) 를 [1, 99], 대상 HP 까지 */
 function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIGINAL, units?: Unit[]) {
   const p = forSide(a, all)
@@ -59,7 +66,8 @@ function damage(map: StageMap, a: Unit, d: Unit, at: Pos = a, all: Tuning = ORIG
   const ratio = p.coef * A * A / Math.max(1, A + D)
   const raw = p.form === 'ratio' ? ratio : p.form === 'cap' ? Math.min(A - D, ratio) : p.form === 'floor' ? Math.max(A - D, p.coef * A) : A - D
   const aff = p.affinity && bowAttack(a) ? p.affinity(d.type, 'bow') : 1   // 상성 (제안 25-2): 활 → 비행
-  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1) * (1 + flankBonus(a, d, units, p.flank)) * aff)   // 협공은 편마다 (적 조정에 없으면 적은 협공 없음)
+  const env = envScale(all.env?.(), a.type, bowAttack(a) ? 'bow' : undefined)   // 장 환경 (제안 26)
+  const v = tr(raw * 0.01 * (st && a.power ? st.dmg : 1) * (1 + flankBonus(a, d, units, p.flank)) * aff * env)   // 협공은 편마다 (적 조정에 없으면 적은 협공 없음)
   return Math.min(clamp(v, 1, 99), d.hp)
 }
 
@@ -88,7 +96,7 @@ function comaHits(a: Unit, d: Unit) {
 /** 마법 한 대상 (124e:c1b6 효과 → 계산, 6e92 마법 분기). P = MAD 위력. 지형 보정 없음 */
 function spell(a: Unit, d: Unit, m: Magic, all: Tuning = ORIGINAL): SpellHit {
   const P = m.power, e = m.effect, t = forSide(a, all)
-  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * (t.affinity?.(d.type, m.school) ?? 1)), 1, 99), d.hp) }
+  if (e === 7) return { kind: 'hp', value: Math.min(clamp(tr(0.00075 * P * P * ratio(a, d) * (t.spell ?? 1) * (t.affinity?.(d.type, m.school) ?? 1) * envScale(all.env?.(), a.type, m.school)), 1, 99), d.hp) }
   if (e === 0) {
     const v = clamp(tr(k5(a, P) * (t.heal ?? 1)), 1, 99)
     return { kind: 'heal', value: Math.min(v, d.maxHp - d.hp), fatigue: Math.min(d.fatigue, tr(1 + 0.33 * v)) }
@@ -221,7 +229,9 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
     if (attacked) f = Math.min(100, tr(f + (6 * u.type.rank + 82) * (1 + 0.1 * (u.steps + 1 + 5)) * 0.033 * (tuning.stance && u.power ? tuning.stance.tire : 1)))
     // 마법 (8e0f): += trunc((6·부하 + 82)·MAD 피로·0.01)
     if (magic) f = Math.min(100, tr(f + (6 * u.type.rank + 82) * magic.fatigue * 0.01))
-    return Math.min(100, f + u.steps)
+    f = Math.min(100, f + u.steps)
+    const k = tuning.env?.()?.tire   // 장 환경 (제안 26): 늘어난 몫을 배로
+    return k ? Math.min(100, u.fatigue + tr((f - u.fatigue) * k)) : f
   },
   // 시전 조건 피로 + MAD 피로 ≤ 90 (124e:3481)
   canCast: (u, m) => u.fatigue + m.fatigue <= 90,
@@ -254,6 +264,7 @@ export function makeRules(tuning: Tuning = ORIGINAL): Rules { return {
   bane: (a, d) => baneCut(a, d, tuning.bane) < 1,
   ...tuning.affinity || tuning.enemy?.affinity ? { affinity: (a: Unit, d: Unit, m?: Magic) => { const f = forSide(a, tuning).affinity; return !f ? 1 : m ? (m.effect === 7 ? f(d.type, m.school) : 1) : bowAttack(a) ? f(d.type, 'bow') : 1 } } : {},
   stance: tuning.stance,
+  ...tuning.env ? { env: (a: Unit, m?: Magic) => m && m.effect !== 7 ? 1 : envScale(tuning.env?.(), a.type, m ? m.school : bowAttack(a) ? 'bow' : undefined) } : {},
   ...tuning.flank || tuning.enemy?.flank ? { flank: (a: Unit, d: Unit, units: Unit[]) => flankBonus(a, d, units, forSide(a, tuning).flank) } : {},
 } }
 

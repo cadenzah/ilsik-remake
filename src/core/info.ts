@@ -96,11 +96,12 @@ export function conditions(orig = false): { win: string[]; lose: string[] } {
 
 type Goal = { text: string; state: 'open' | 'done' | 'failed' }
 /** 조건 창. title = 개선판 장 카드, goals = 개선판 목표·보조 목표, marks = 개선판 장 평가 (grade.ts), orig = 원작판 문형 (원작 0aa2:225a) */
-export function showConditions(o: { title?: string; goal?: string; goals?: Goal[]; marks?: Goal[]; orig?: boolean; onClose?: () => void; button?: string } = {}) {
+export function showConditions(o: { title?: string; goal?: string; env?: { name: string; text: string }; goals?: Goal[]; marks?: Goal[]; orig?: boolean; onClose?: () => void; button?: string } = {}) {
   const c = conditions(o.orig)
   const mark = { open: '◇', done: '✓', failed: '✗' }
   const body = [
     '<span class="h blue">승리조건</span>', ...(o.goal ? [esc(o.goal)] : c.win.map(esc)),
+    ...(o.env ? ['<span class="h env">장 환경 · 적과 우리 편 모두</span>', `◆ ${esc(o.env.name)} — ${esc(o.env.text)}`] : []),   // B1 제안 26
     '<span class="h red">실패조건</span>', ...c.lose.map(esc),
     ...(o.goals?.length ? ['<span class="h green">보조 목표</span>', ...o.goals.map(g => `<span class="${g.state}">${mark[g.state]} ${esc(g.text)}</span>`)] : []),
     ...(o.marks?.length ? ['<span class="h green">도전 과제</span>', ...o.marks.map(g => `<span class="${g.state}">${mark[g.state]} ${esc(g.text)}</span>`)] : []),
