@@ -64,20 +64,6 @@ export function affinityRow(t: UnitType, magic = S.tables?.magic): { row: Partia
 export const affinity = (t: UnitType, key: AffKey) => affinityRow(t).row[key] ?? 1
 
 const SCHOOL = ['빛', '어둠', '바람', '물', '불', '땅']
-const KEY_NAME = (k: AffKey) => k === 'bow' ? '활' : SCHOOL[k] ?? ''
-
-/** 카드·도감 글: 약점 (센 것부터) · 내성. 예 「약점 빛·불 · 내성 어둠」 */
-export function affinityNote(t: UnitType, magic?: Map<number, Magic>): string {
-  const ent = (Object.entries(affinityRow(t, magic).row) as [string, number][]).map(([k, v]) => [k === 'bow' ? 'bow' : Number(k), v] as [AffKey, number]).sort((a, b) => b[1] - a[1] || (a[0] === 'bow' ? -1 : b[0] === 'bow' ? 1 : 0))
-  const weak = ent.filter(([, v]) => v > 1).map(([k]) => KEY_NAME(k)), strong = ent.filter(([, v]) => v < 1).map(([k]) => KEY_NAME(k))
-  return [weak.length ? `약점 ${weak.join('·')}` : '', strong.length ? `내성 ${strong.join('·')}` : ''].filter(Boolean).join(' · ')
-}
-
-/** 카드 이름 줄 꼬리표: 종족 (상성이 있을 때)·비행·「불 마법」·중갑 */
-export function affinityTags(t: UnitType, raceName: string, magic?: Map<number, Magic>): string {
-  return affinityRow(t, magic).tags.map(x => x === 'race' ? raceName : x).filter(Boolean).join('·')
-}
-
 /** 시스템 대화 안내 (tips-proposal.md 9절): 이 종류에 붙은 상성 갈래 — 장 시작에 처음 보이는 갈래를 소개한다.
  *  종족 (undead 불사족 · demon 마족 · dragon 용족 · sea 해족 · ice 빙마녀 · machine 기계) · fly 비행 · caster 마법 쓰는 유닛 · heavy 중갑 · archer 활 (궁수·추전수 — 날 수 있는 일행에게 위험) */
 const RACE_KIND: Record<number, string> = { 7: 'undead', 9: 'demon', 8: 'dragon', 10: 'sea', 11: 'ice', 12: 'machine' }
@@ -89,4 +75,27 @@ export function affinityKinds(t: UnitType, magic = S.tables?.magic): string[] {
   if (AFF.armor && isHeavy(t)) k.push('heavy')
   if (isBow(t)) k.push('archer')
   return k
+}
+
+/** 전투 중 마우스 올림 창의 상성 아이콘 (core/affIcons.ts): 약점·내성은 쓰지 않고 까닭만 그림으로 (2026-11-08 사용자: 글로 다 알려 주면 과하게 친절).
+ *  종족 갈래 (undead·demon·dragon·sea·ice·machine) · fly · 시전 계열 'el0'~'el5' (빛 어둠 바람 물 불 땅) · heavy */
+export function affinityMarks(t: UnitType, magic = S.tables?.magic): string[] {
+  const k: string[] = []
+  if (AFF.race && RACE_KIND[t.race]) k.push(RACE_KIND[t.race])
+  if (AFF.fly && isFlyer(t)) k.push('fly')
+  const e = AFF.cast ? elementOf(t, magic) : -1
+  if (e >= 0) k.push(`el${e}`)
+  if (AFF.armor && isHeavy(t)) k.push('heavy')
+  return k
+}
+
+/** 도감 (replayScreens) 의 약점·내성 아이콘 키 (core/affIcons.ts weakResist): 'el0'~'el5'·'bow', 센 것부터. 약점 중 가장 센 것이 다른 약점보다 세면 '+' */
+export function affinityWR(t: UnitType, magic?: Map<number, Magic>): { weak: string[]; resist: string[] } {
+  const key = (k: string) => k === 'bow' ? 'bow' : `el${k}`
+  const ent = (Object.entries(affinityRow(t, magic).row) as [string, number][]).sort((a, b) => b[1] - a[1] || (a[0] === 'bow' ? -1 : b[0] === 'bow' ? 1 : 0))
+  const w = ent.filter(([, v]) => v > 1), top = w[0]?.[1] ?? 0
+  return {
+    weak: w.map(([k, v]) => key(k) + (v === top && w.some(([, x]) => x < top) ? '+' : '')),
+    resist: ent.filter(([, v]) => v < 1).reverse().map(([k]) => key(k)),
+  }
 }

@@ -9,6 +9,7 @@ import type { Unit } from './unit'
 import { closeWin, esc, openWin } from './ui'
 import { winUrl } from './skin'
 import { TW } from './data'
+import { affIcons } from './affIcons'
 
 const NARROW = 171, WIDE = 224   // 개선판 마우스 올림 창은 정보 줄 때문에 넓게 (지형·이동·사거리 줄이 잘리지 않게)
 
@@ -19,11 +20,9 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
   basic = null
   if (!u) return
   const next = opts.extra ? nextTurn(u) : ''
-  // 상성 (개선판 B1 제안 25·25-2): 상성이 있으면 이름 줄에 까닭 (「불사족」「비행·불 마법」…), 그 아래 「약점 빛·불 · 내성 어둠」 줄
-  const af = opts.extra ? S.ed.affinityText?.(u.type, S.tables.labels.race[u.type.race] ?? '') : undefined
-  const kin = af?.note ? `<span class="dim">${esc(af.note)}</span>` : ''
-  const race = af?.note && af.tags ? ` <span class="dim">${esc(af.tags)}</span>` : ''
-  const h = opts.extra ? 112 + (next ? 18 : 0) + (kin ? 18 : 0) : 74, W = opts.extra ? WIDE : NARROW
+  // 상성 (개선판 B1 제안 25·25-2): 이름 줄 끝에 까닭만 아이콘으로 (종족·비행·시전 계열·중갑, core/affIcons.ts). 약점·내성 글은 쓰지 않는다 (2026-11-08 사용자: 과하게 친절)
+  const race = opts.extra ? affIcons(S.ed.affinityMarks?.(u.type) ?? []) : ''
+  const h = opts.extra ? 112 + (next ? 18 : 0) : 74, W = opts.extra ? WIDE : NARROW
   const el = document.createElement('div')
   el.className = `owin basic${opts.extra ? ' passive' : ''}`   // 개선판 마우스 올림 창은 입력을 가로채지 않는다
   Object.assign(el.style, { width: `${W}px`, height: `${h}px`, backgroundImage: `url(${winUrl('basic', W, h)})` })
@@ -32,7 +31,7 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
       <span class="v${i === 3 && S.ed.id === 'remake' && v > 70 ? ' red' : ''}" style="left:${(W - NARROW) / 2 + 8 + i * 32}px">${String(v).padStart(2, '0')}</span>`).join('')
     + `<img class="ic face" alt="큰 창" src="${pieceUrl('icon.4.0')}" style="left:${(W - NARROW) / 2 + 12 + 4 * 32 + 2}px">`
     + (opts.extra ? `<div class="x"><b>${esc(u.type.name)}</b> Lv ${u.type.lv}${race}${u.side === 'ally' && u.troop !== 0 ? ' · NPC' : ''}${statusTags(u)}
-        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span>${kin ? `<br>${kin}` : ''}${next ? `<br>${next}` : ''}</div>` : '')
+        <br><span class="dim">${esc(terrainName(S.map, u.x, u.y))} · 이동 ${u.mov} · 사거리 ${u.range[1]}</span>${next ? `<br>${next}` : ''}</div>` : '')
   const face = el.querySelector<HTMLElement>('.face')!
   if (opts.onFace) { face.classList.add('btn'); face.onclick = e => { e.stopPropagation(); opts.onFace!() } }
   el.oncontextmenu = e => { e.preventDefault(); showBasic(null) }
@@ -45,15 +44,15 @@ export function showBasic(u: Unit | null, at?: { x: number; y: number }, opts: {
 }
 export const hideBasic = () => showBasic(null)
 
-/** 개선판 줄 (B1 N1): 컴퓨터 조종 유닛의 다음 차례 — 경계 (상태 1) · 대기 (2) · 휴식선 (rules aiRests). 그 밖은 빈 줄 없음 */
+/** 개선판 줄 (B1 N1): 컴퓨터 조종 유닛 — 경계 (상태 1) · 대기 (2) · 성향. 그 밖은 빈 줄 없음.
+ *  쉬려는 적의 「다음 턴 휴식」 예고는 뺐다 (2026-11-08 사용자: 너무 친절함 — 피로·생명 수치를 보고 스스로 판단) */
 function nextTurn(u: Unit) {
   if (u.hp <= 0 || !(u.side === 'enemy' || isNpc(u))) return ''
   const st = S.troopState[u.troop]
   if (st === 1) return '<span class="blue">경계</span>'
   if (st === 2) return '<span class="dim">대기</span>'
   const mind = S.ed.mindNote?.(u) ?? ''   // 개선판 성향 (B1 제안 10)
-  if (!S.ed.rules.aiRests(u)) return mind ? `<span class="dim">${mind}</span>` : ''
-  return `<span class="blue">다음 차례 ${S.ed.mindNote && mind !== '자리 지킴' && st !== 3 ? '물러나 ' : ''}휴식</span>`
+  return mind ? `<span class="dim">${mind}</span>` : ''
 }
 
 /** 개선판 줄: 상태 이상 (중독·혼수 남은 차례, 강화·약화) */

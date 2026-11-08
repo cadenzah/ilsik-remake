@@ -64,7 +64,7 @@ export const SETTINGS: { k: Setting; label: string; desc: string }[] = [   // de
   { k: 'logoSound', label: '로고 효과음', desc: '시작 로고의 천둥소리' },
   { k: 'music', label: '배경음악', desc: '' },
   { k: 'sound', label: '인게임 효과음', desc: '' },
-  { k: 'fastEnemy', label: '적 차례 빠르게', desc: '' },
+  { k: 'fastEnemy', label: '적 턴 빠르게', desc: '' },
   { k: 'shortAnim', label: '전투 연출 짧게', desc: '' },
   { k: 'quickAttack', label: '공격 확인 생략', desc: '대상을 누르면 바로 공격' },
   { k: 'tipLines', label: '이야기 속 안내', desc: '새 규칙을 처음 겪을 때 동료의 한마디' },

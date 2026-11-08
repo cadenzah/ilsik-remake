@@ -38,7 +38,8 @@ import { back as winBack, modalOpen, closeAll, closeWin, confirmWin, esc, hideMe
 import { applyMods, nextUpgrade, type Pos, type Unit } from './unit'
 import { addExp, again, applyCounter, brace, counterDamage, freshBattle, stageTune, judge, placements, rest, spellResult, startEvents, strike, takePromos, takeTreasure, taken, tire, told, treasureAt, turnStart, woke } from './battleCore'
 import type { UnitType } from './data'
-import { SCHOOL_COLOR, SCHOOL_NAME, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
+import { SCHOOL_COLOR, areaCells, hitLine, inSpellRange, spellCenters, spellDesc, spellInfo, spellTargets, spellsOf } from './magic'
+import { schoolIcon } from './affIcons'
 
 const STEP_MS = 135   // 한 칸 걷기 (ms)
 // 개선판 편의 설정: 적 차례 빠르게 (ai), 전투 연출 짧게. 원작판은 늘 1
@@ -949,7 +950,7 @@ function midSave(back: () => void) {
     troopState: S.troopState, fired: [...S.fired], told: [...told], joined: S.joined, flags: [...FLAGS], saved: Date.now(),
     grown: snapshot().grown, equip: snapshot().equip, items: [...ITEMS], taken: [...taken],
   })
-  showResult('중간 저장', `${S.turn}턴 아군 차례를 저장했습니다.\n타이틀 「지난흔적」에서 이어 할 수 있습니다.`, [['확인', back]])
+  showResult('중간 저장', `${S.turn}턴을 저장했습니다.\n타이틀 「지난흔적」에서 이어 할 수 있습니다.`, [['확인', back]])
 }
 
 /** 중간 저장에서 이어 하기: 유닛·부대·발동 기록을 되돌리고 그 턴 아군 차례부터. 저장은 이 장을 이길 때까지 남는다 */
@@ -1319,7 +1320,7 @@ function magicMenu(u: Unit, from: Pos, onBack: () => void) {
     const why = !S.ed.rules.canCast(u, m) ? '피로가 모자람' : !ok ? '닿는 대상 없음' : ''
     return `<button class="mgrow ${inf.side === '적' ? 'foe' : 'own'}" data-i="${i}" ${ok ? '' : 'aria-disabled="true"'}>
       <i class="mgicon" style="background-position:-${m.id * 32}px 0"></i>
-      <span class="mgtop"><b>${esc(m.name)}</b><small>${SCHOOL_NAME[m.school] ?? ''}</small><em class="mgfat">피로 +${m.fatigue}</em></span>
+      <span class="mgtop"><b>${esc(m.name)}</b><small class="mgsch">${schoolIcon(m.school)}</small><em class="mgfat">피로 +${m.fatigue}</em></span>
       <span class="mgsub">${why ? `<span class="mgwhy">${why}</span>` : `<span class="mgside">${inf.side}</span>${esc(inf.what)}`}<span class="mgmeta">사거리 ${inf.range} · ${inf.area}</span></span>
     </button>`
   }).join('')

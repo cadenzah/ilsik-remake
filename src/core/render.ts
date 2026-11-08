@@ -284,8 +284,8 @@ export function frame(now: number) {
         ctx.fillRect(x + 8, y + TH - 7, ((TW - 16) * Math.min(100, u.fatigue)) / 100, 3)
       }
       statusDots(u, x, y)
-      if (restsNext(u)) badge(x, y, '휴식')
-      else if (u.guard && u.hp > 0) badge(x, y, '방어', '#ffd27a', 'rgba(70,50,10,0.85)', '#fff1cf')   // 방어 태세 (제안 27)
+      // 쉬려는 적의 「휴식」 표는 뺐다 (2026-11-08 사용자: 너무 친절함, 마우스 올림 창의 예고와 함께)
+      if (u.guard && u.hp > 0) badge(x, y, '방어', '#ffd27a', 'rgba(70,50,10,0.85)', '#fff1cf')   // 방어 태세 (제안 27)
     }
     ctx.globalAlpha = 1
   }
@@ -346,10 +346,7 @@ export function frame(now: number) {
   requestAnimationFrame(frame)
 }
 
-/** 컴퓨터 조종 유닛이 다음 제 차례에 쉰다 (휴식선, 행동하는 부대) — 개선판 B1 N1 */
-export const restsNext = (u: Unit) => u.hp > 0 && (u.side === 'enemy' || isNpc(u)) && S.troopState[u.troop] !== 1 && S.troopState[u.troop] !== 2 && S.ed.rules.aiRests(u)
-
-/** 머리 위 오른쪽 표: 「휴식」 (컴퓨터 유닛 휴식선) · 「방어」 (방어 태세) */
+/** 머리 위 오른쪽 표: 「방어」 (방어 태세) */
 function badge(x: number, y: number, text: string, line = '#9ad8ff', fill = 'rgba(20,40,70,0.85)', ink = '#cfeeff') {
   ctx.font = 'bold 11px sans-serif'
   ctx.textAlign = 'center'

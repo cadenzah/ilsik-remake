@@ -16,6 +16,7 @@ import { equippedStats, nextUpgrade } from './unit'
 import { applyFont } from './font'
 import { musicOn, setMusicOn } from './music'
 import { SFX, play } from './sfx'
+import { schoolIcon } from './affIcons'
 import { VOLUME_KINDS, markOnOff, volumeRow } from './volumeUi'
 import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting, type VolumeKind } from './settings'
 
@@ -257,7 +258,7 @@ export function campScreen(o: CampOptions): Promise<CampResult> {
     const m = o.tables.magic.get(id)
     if (!m) return
     desc.innerHTML = `<span class="mgi" style="${px(25, 8, 32, 40)};background-position:-${id * 32}px 0"></span>` +
-      `<span class="txt b" style="${px(72, 3)}">${esc(m.name)}</span>` +
+      `<span class="txt b" style="${px(72, 3)}">${esc(m.name)}${o.remake ? ` ${schoolIcon(m.school)}` : ''}</span>` +
       `<span class="txt" style="${px(72, 22)}">${MAGIC_EFFECTS[m.effect] ?? ''}</span>` +
       `<span class="txt" style="${px(72, 41)}">피로 +${m.fatigue}</span>`
   }

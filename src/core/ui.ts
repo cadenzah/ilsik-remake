@@ -47,6 +47,7 @@ export interface WinOpts {
   dir?: 'col' | 'row'
   body?: string          // 버튼 위 본문 (HTML, 원작 글자 색 클래스 .blue .red .dim)
   bodyH?: number         // 본문 높이 (없으면 줄 수 × 16 + 여백)
+  fit?: boolean          // 본문 높이를 실제로 그려 재서 맞춘다 (목록·문단처럼 <br> 줄 수로 못 재는 글)
   width?: number         // 창 너비 (없으면 버튼·본문에 맞춤)
   btnW?: number          // 버튼 너비 (없으면 가장 긴 글자에 맞춤)
   at?: { x: number; y: number } | 'center'
@@ -69,16 +70,20 @@ export function openWin(o: WinOpts): HTMLElement {
   const w = Math.round(Math.max(minW, o.width ?? Math.max(o.title ? textWidth(o.title) + 40 : 0, o.body ? 136 : 0, 86)))
   // 본문 줄 수: <br> 줄마다 창 안쪽 너비로 접힌 줄 수
   const lines = o.body ? o.body.split('<br>').reduce((n, l) => n + Math.max(1, Math.ceil(textWidth(l.replace(/<[^>]+>/g, '').replace(/&\w+;/g, '_')) / (w - 24))), 0) : 0
-  const bodyH = o.body ? (o.bodyH ?? lines * 18 + 8) : 0
+  const want = o.body ? (o.bodyH ?? (o.fit ? measureBody(o.body, w, o.kind) : lines * 18) + 8) : 0
   const btnBlock = !btns.length ? 0 : dir === 'col' ? btns.length * (BTN_H + GAP) - GAP : BTN_H
-  const h = BAR + 5 + bodyH + (btns.length ? btnBlock + (o.body ? 4 : 2) : 0) + 5 + BOTTOM
+  const frame = BAR + 5 + (btns.length ? btnBlock + (o.body ? 4 : 2) : 0) + 5 + BOTTOM
+  // 맵 칸보다 길면 본문만 줄이고 스크롤 (버튼은 늘 보이게)
+  const room = mapRect().h - 8 - frame
+  const bodyH = want > room ? Math.max(36, room) : want
+  const h = frame + bodyH
   const el = document.createElement('div')
   el.className = `owin ${o.kind ?? ''}`
   el.style.width = `${w}px`
   el.style.height = `${h}px`
   el.style.backgroundImage = `url(${winUrl('comma', w, h)})`
   if (o.title) el.insertAdjacentHTML('beforeend', `<div class="t">${esc(o.title)}</div>`)
-  if (o.body) el.insertAdjacentHTML('beforeend', `<div class="b" style="top:${BAR + 5}px;height:${bodyH}px">${o.body}</div>`)
+  if (o.body) el.insertAdjacentHTML('beforeend', `<div class="b${bodyH < want ? ' scroll' : ''}" style="top:${BAR + 5}px;height:${bodyH}px">${o.body}</div>`)
   const pick = o.closeOnPick ?? true
   btns.forEach((b, i) => {
     const fn = b[1]
@@ -111,6 +116,18 @@ export function openWin(o: WinOpts): HTMLElement {
   el.oncontextmenu = e => { e.preventDefault(); back() }
   changed()
   return el
+}
+
+/** 본문을 보이지 않게 실제 창 모양으로 그려 높이를 잰다 (fit) */
+function measureBody(body: string, w: number, kind?: string) {
+  const probe = document.createElement('div')
+  probe.className = `owin ${kind ?? ''}`
+  Object.assign(probe.style, { width: `${w}px`, height: '0', visibility: 'hidden', left: '-9999px', top: '0' })
+  probe.innerHTML = `<div class="b" style="top:0">${body}</div>`
+  hud.append(probe)
+  const h = probe.querySelector<HTMLElement>('.b')!.scrollHeight
+  probe.remove()
+  return h
 }
 
 function closeEl(el: HTMLElement) {

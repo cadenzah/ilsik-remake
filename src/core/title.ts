@@ -151,7 +151,9 @@ export function showTitle(): Promise<Launch> {
       ])
       // 어느 판인지는 맨 아래 버전 줄에 판 이름으로 (「개선판 v1.0.0」). 「지금 ○○판」 같은 설명 글은 쓰지 않는다 (2026-11-07 사용자)
       body.insertAdjacentHTML('beforeend', `<div class="version">${EDITIONS.find(e => e.id === ed)!.name} ${__VERSION__.split(' ')[0]}</div>`)
+      mainMark = body.firstElementChild   // 대기 화면 (attract) 은 이 첫 줄이 그대로 보일 때만 — 하위 창은 body 를 갈아 끼운다
     }
+    let mainMark: Element | null = null
 
     // 판 고르기 창: 메뉴 맨 아래 「판 바꾸기」. 지금 판 카드에 ◆, 돌아가기·Esc. 판마다 카드 한 장
     // 첫 실행에는 띄우지 않는다 (2026-11-08 사용자): 처음 하는 사람에겐 고를 근거가 없는 질문이라 개선판 메뉴로 바로 가고, 원작판을 찾는 사람은 이 창으로
@@ -369,7 +371,8 @@ export function showTitle(): Promise<Launch> {
       stage.classList.remove('dark')
     }
 
-    // 대기 화면: 메인 메뉴 첫 화면 (하위 창·제작진·장 지도 제외) 에서 입력이 없으면 프롤로그 → 로고 → 메뉴. 다시 대기하면 또 튼다.
+    // 대기 화면: 메인 메뉴 첫 화면에서만 입력이 없으면 프롤로그 → 로고 → 메뉴. 다시 대기하면 또 튼다.
+    // 하위 창 (난이도·지난흔적·설정·판 바꾸기·안내 묻기 등)·제작진·장 지도·도감 에서는 틀지 않는다 (2026-11-08 사용자). onMain = 메뉴 첫 줄이 화면에 있음
     // 프롤로그 중 누르면 로고 없이 바로 메뉴로. 숨은 탭에서는 틀지 않는다 (받을 것이 크다)
     let idleTimer = 0, attracting = false
     const armIdle = () => {
@@ -377,7 +380,8 @@ export function showTitle(): Promise<Launch> {
       if (!attracting) idleTimer = window.setTimeout(() => void attract(), IDLE_MS)
     }
     const attract = async () => {
-      if (document.hidden || win.hidden || win.classList.contains('wide') || pageAt !== -1) { armIdle(); return }
+      const onMain = !win.hidden && pageAt === -1 && !!mainMark && body.contains(mainMark) && !win.classList.contains('wide') && !win.classList.contains('pick')
+      if (document.hidden || !onMain) { armIdle(); return }
       attracting = true
       win.inert = true   // 어두워지는 동안 초점 단추에 키가 들어가지 않게
       await fadeOut()

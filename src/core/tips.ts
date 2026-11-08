@@ -10,7 +10,7 @@ import type { UnitType } from './data'
 import { locked } from './lessons'
 import type { Unit } from './unit'
 import { playDialogue, type Line } from './dialogue'
-import { AFF_LINE, helpKnown, rulesWin, tipCard, tipCardHtml, tipTagHtml, type HelpTopic, type TipCard } from './help'
+import { AFF_LEAD, AFF_LINE, AFF_NOTE, AFF_OPPOSE, helpKnown, rulesWin, tipCard, tipCardHtml, tipTagHtml, type HelpTopic, type TipCard } from './help'
 import { loadProgress } from './save'
 import { setting } from './settings'
 import { S } from './state'
@@ -164,14 +164,13 @@ async function show(t: Pending) {
   S.mode = prev
 }
 
-/** 상성 소개 카드: 갈래 문장 (help.ts AFF_LINE) + 이 장에 나온 그 갈래 적의 약점·내성 (카드·도감과 같은 글) */
+/** 상성 소개 카드: 공통 첫 줄 + 이 장에서 처음 보이는 갈래마다 한 줄 (help.ts AFF_LINE). 적마다 약점을 늘어놓지는 않는다 (2026-11-08 사용자: 과하게 친절) */
 function affinityCard(kinds: string[]): TipCard | undefined {
   if (!kinds.length) return
-  const kindsOf = S.ed.affinityKinds!
-  const foes = [...new Map(S.units.filter(u => u.side === 'enemy' && u.hp > 0 && kindsOf(u.type).some(k => kinds.includes(k))).map(u => [u.type.name, u.type])).values()]
-  const notes = foes.map(t => `${t.name}: ${S.ed.affinityText?.(t, '', S.tables.magic).note ?? ''}`).filter(n => !n.endsWith(': '))
   const one = tipCard('affinity', kinds[0])
-  return { topic: 'affinity', title: kinds.length === 1 && one ? one.title : '상성', lines: ['@sum', ...kinds.map(k => AFF_LINE[k]).filter(Boolean), ...notes.length ? [`이 장의 적 — ${notes.join(' / ')}`] : [], '@where'] }
+  const points = kinds.map(k => AFF_LINE[k]).filter(Boolean)
+  if (kinds.includes('caster')) points.push(AFF_OPPOSE)
+  return { topic: 'affinity', title: kinds.length === 1 && one ? one.title : '상성', lead: AFF_LEAD, points, note: AFF_NOTE }
 }
 
 /** 후보 중 출전해 살아 있는 첫 일행. 「레스다 (회상)」 = 9~43장에서 살아 있는 레스다가 없을 때 */
@@ -199,7 +198,7 @@ function cardWin(t: Pending, c: TipCard | undefined): Promise<void> {
   if (!c) return Promise.resolve()
   return new Promise(ok => {
     const el = openWin({
-      title: c.title, kind: 'tip', at: 'center', width: 360, dir: 'row',
+      title: c.title, kind: 'tip', at: 'center', width: 360, dir: 'row', fit: true,
       body: tipCardHtml(c),
       buttons: [['도움말에서 더 보기', () => rulesWin(battleKnown(), ok, { topic: c.topic, label: '닫기', extra: tipLog() })], ['닫기', ok]],
       onBack: () => { closeWin('tip'); ok() }, x: false,

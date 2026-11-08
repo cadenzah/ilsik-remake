@@ -5,6 +5,8 @@ import { FOUND, HIDDEN, trueEndingOpen } from './replay'
 import { loadPlaces, placeLabel, type Place } from './worldmap'
 import type { Progress } from './save'
 import { starText } from './grade'
+import { affIcons, weakResist } from './affIcons'
+import { esc } from './ui'
 
 type Cleared = Progress['cleared'][number]
 
@@ -198,10 +200,12 @@ export async function codex(page: HTMLElement, p: Progress | null, close: () => 
   const groupOf = (name: string) => { const id = forms.get(name)![0]; return id < 29 ? 0 : id < 100 ? 1 : 2 }
   const groups = ['동료', '적', '그 밖의 인물']
   // 종족과 상성 (개선판 B1 제안 25·25-2, 도감은 개선판만). 알 수 없는 종족 (??????) 은 빼고
+  // 2026-11-08 사용자: 상성은 줄글 말고 아이콘 — 종족 이름 + 까닭 아이콘 (affinityMarks) + 약점·내성 아이콘 (affinityWR)
   const kin = (u: UnitType) => {
-    const r = t.labels.race[u.race] ?? '', a = edition.affinityText?.(u, r, t.magic)
-    const head = [r.startsWith('?') ? '' : r, ...(a?.tags ?? '').split('·').filter(x => x && x !== r)].filter(Boolean).join('·')
-    return head ? `<small>${head}${a?.note ? ` · ${a.note}` : ''}</small>` : ''
+    const r = t.labels.race[u.race] ?? '', race = r.startsWith('?') ? '' : r
+    const marks = edition.affinityMarks?.(u, t.magic) ?? [], wr = edition.affinityWR?.(u, t.magic)
+    const aff = wr && (wr.weak.length || wr.resist.length) ? ` ${affIcons(marks)} ${weakResist(wr.weak, wr.resist)}` : ''
+    return race || aff ? `<small>${esc(race)}${aff}</small>` : ''
   }
   const personCell = (name: string) => {
     const all = forms.get(name)!.filter(id => seen.has(id)).map(id => t.types[id]).sort((a, b) => a.lv - b.lv || a.id - b.id)

@@ -102,6 +102,27 @@ canvas#view { touch-action: none; }
 .owin.basic .v { position: absolute; top: 50px; width: 24px; text-align: center; color: #2a3c9c; text-shadow: -1px 0 #9aa8e0; }
 .owin.basic .v.red { color: #c01818; text-shadow: -1px 0 #f0a0a0; }   /* 개선판: 피로 70 넘음 (적 AI 휴식선) */
 .owin.basic .x { position: absolute; left: 10px; right: 6px; top: 72px; line-height: 18px; white-space: nowrap; overflow: hidden; }
+.aff-ics { margin-left: 4px; white-space: nowrap; }   /* 상성 아이콘 (core/affIcons.ts) */
+.aff-ic { width: 16px; height: 16px; vertical-align: -3px; margin-right: 2px; filter: drop-shadow(0 0 1px rgba(255, 248, 225, .9)); }
+.aff-g { white-space: nowrap; display: inline-block; margin-right: 6px; }
+.aff-w, .aff-r { font-size: 13px; margin: 0 3px 0 0; padding: 0 3px; border-radius: 3px; color: #fff; text-shadow: none; }
+.aff-w { background: #2f7a3a; } .aff-r { background: #a03030; }   /* 확인창 약점 초록 · 내성 빨강과 같은 뜻 */
+.aff-plus { width: 12px; height: 12px; margin: 0 3px 0 0; vertical-align: -1px; }   /* 특히 크게 듦 (affIcons plusMark): 줄 밖으로 튀어나가지 않게 위첨자 대신 같은 줄 */
+.aff-pairs > span { margin-right: 8px; white-space: nowrap; }
+.mgsch .aff-ic { width: 18px; height: 18px; vertical-align: -4px; }
+.mc-mg .aff-ic { margin-left: 4px; }
+/* 도움말 약점·내성: 표 + 아이콘 설명 */
+.help table.afft td.ic { white-space: nowrap; }
+.help .afflg p { margin: 8px 0 2px; }
+.help .afflg ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.help .afflg ul.one { grid-template-columns: 1fr; }
+.help .afflg li { display: flex; align-items: center; gap: 6px; margin: 0; }
+.help .afflg li.wide { grid-column: 1 / -1; }
+.help .afflg li .lgi { flex: none; min-width: 18px; display: inline-flex; justify-content: center; align-items: center; }
+.help .afflg li .lgi .aff-ics { margin-left: 0; display: inline-flex; align-items: center; }
+.help .afflg li .lgi .aff-ic, .help .afflg li .lgi .aff-plus { vertical-align: middle; margin: 0 1px; }
+.help .afflg li b { flex: none; }
+.help .afflg li span:last-child { opacity: .8; font-size: .92em; }
 /* 큰 인물기본자료 (camp.ts statusWindow): 정비 화면 상태창 */
 .bigstat { position: absolute; width: 330px; height: 330px; cursor: pointer; font: 14px/16px var(--font); }
 html.bmfont .bigstat { font-size: 16px; line-height: 15px; }
@@ -315,6 +336,10 @@ html.ui-modern .speak.dim { filter: brightness(.82) saturate(.75); opacity: .9; 
 #titlescreen .codex .cell b { display: block; font-weight: 400; color: #e8e6df; }
 #titlescreen .codex .cell small { color: #8c8c80; font-size: 10px; }
 #titlescreen .codex .cell small + small { display: block; }
+#titlescreen .codex .cell .aff-plus { width: 11px; height: 11px; }
+#titlescreen .codex .cell .aff-w, #titlescreen .codex .cell .aff-r { font-size: 10px; padding: 0 2px; }
+#titlescreen .codex .cell .aff-ic { width: 13px; height: 13px; vertical-align: -3px; }
+#titlescreen .codex .cell .aff-ics { margin-left: 2px; }
 #titlescreen .codex .items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
 #titlescreen .codex p { margin: 0; color: #6c6c64; }
 
@@ -651,7 +676,19 @@ html.ui-modern .owin.magicwin::before { content: "◆ 마법일람표 ◆"; posi
 .cut-white { position: fixed; inset: 0; z-index: 999; background: #fff; opacity: 0; pointer-events: none; transition-property: opacity; transition-timing-function: linear; }
 .cut-white.on { opacity: 1; }
 /* 개선판 전투 기록 (battleLog.ts, B1 N6) */
-.owin.log .b, .owin.talklog .b { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.owin.log .b, .owin.talklog .b, .owin .b.scroll { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.owin .b.scroll { scrollbar-width: thin; scrollbar-color: #8a6a30 transparent; padding-right: 4px; }
+/* 안내 카드 (tips.ts cardWin, help.ts tipCardHtml): 첫 줄 규칙 → 개조식 점 → 흐린 끝줄. 왼쪽 정렬 */
+.owin .b .tipc { text-align: left; word-break: keep-all; overflow-wrap: anywhere; }
+.owin .b .tipc p { margin: 0; }
+.owin .b .tipc b { font-weight: normal; color: #1c3c9c; text-shadow: -1px 0 #9aa8e0; }   /* 굵게는 비트맵 글꼴에서 안 보여 색으로 */
+html.ui-modern .owin .b .tipc b { color: var(--ec-blue); text-shadow: none; }
+.owin .b .tipc ul { margin: 4px 0 0; padding: 0; list-style: none; }
+.owin .b .tipc li { position: relative; padding-left: 12px; margin-top: 2px; }
+.owin .b .tipc li::before { content: "·"; position: absolute; left: 2px; font-weight: bold; }
+.owin .b .tipc .note { margin-top: 6px; font-size: 13px; line-height: 16px; color: #5a4a30; text-shadow: none; }
+html.ui-modern .owin .b .tipc .note { color: var(--ec-text-2); }
+.help .tipc { margin: 2px 0 8px; }
 .owin .b .talklog { display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 6px; }
 .owin .b .talklog .who { white-space: nowrap; }
 .owin .b .talklog .say { word-break: keep-all; overflow-wrap: anywhere; }

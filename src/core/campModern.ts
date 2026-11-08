@@ -11,6 +11,7 @@ import { TEMPLE_ASK, canEquip, equipDiff, icon, profile, sprite, type CampOption
 import { fadeIn, fadeOut } from './fade'
 import { applyFont } from './font'
 import { spellDesc } from './magic'
+import { schoolIcon } from './affIcons'
 import { SFX, play } from './sfx'
 import { VOLUME_KINDS, volumeRow } from './volumeUi'
 import { DIFFICULTIES, DIFF_DESC, SETTINGS, difficulty, nextDifficulty, setSetting, setting } from './settings'
@@ -212,7 +213,7 @@ export function campModern(o: CampOptions): Promise<CampResult> {
       </div>
       <div class="mc-slots">${[0, 1, 2].map(slot).join('')}</div>
       <div class="mc-magic">${magic.length ? magic.map(m => `<button class="mc-mg" data-id="${m!.id}" title="${esc(spellDesc(m!))}">
-        <i style="background-position:-${m!.id * 16}px 0"></i>${esc(m!.name)}</button>`).join('') : '<span class="dim">마법 없음</span>'}</div>`
+        <i style="background-position:-${m!.id * 16}px 0"></i>${esc(m!.name)}${schoolIcon(m!.school)}</button>`).join('') : '<span class="dim">마법 없음</span>'}</div>`
     detail.querySelectorAll<HTMLButtonElement>('.mc-mg').forEach(b => {   // 터치 기기엔 올리기가 없으니 누르면 아래 바에 설명
       const m = o.tables.magic.get(Number(b.dataset.id))!
       b.onclick = () => say(`${m.name} · ${spellDesc(m)}`)
